@@ -146,6 +146,72 @@ class ChartGenerator:
         return fig
 
     @staticmethod
+    def radar_chart_categories(df, componente, fecha=None):
+        """Generar gráfico de radar por categorías de un componente específico"""
+        if fecha:
+            df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
+        else:
+            ultima_fecha = df['Fecha'].max()
+            df_filtrado = df[(df['Fecha'] == ultima_fecha) & (df['Componente'] == componente)].copy()
+
+        if len(df_filtrado) == 0:
+            return ChartGenerator._empty_chart(f"No hay datos disponibles para el componente {componente}")
+
+        # Calcular promedio ponderado por categoría dentro del componente
+        def weighted_avg_category(group):
+            valores = group['Valor'].clip(0, 1)
+            pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+            peso_total = pesos.sum()
+            
+            if peso_total > 0:
+                return (valores * pesos).sum() / peso_total * 100
+            else:
+                return valores.mean() * 100
+
+        # Calcular datos para el radar por categoría
+        datos_radar = df_filtrado.groupby('Categoria').apply(weighted_avg_category).reset_index()
+        datos_radar.columns = ['Categoria', 'Cumplimiento']
+
+        if len(datos_radar) < 3:
+            return ChartGenerator._empty_chart(f"Se requieren al menos 3 categorías para el radar de {componente}")
+
+        # Crear gráfico de radar
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatterpolar(
+            r=datos_radar['Cumplimiento'],
+            theta=datos_radar['Categoria'],
+            fill='toself',
+            name='Cumplimiento por Categoría',
+            line_color='#E67E22',
+            fillcolor='rgba(230, 126, 34, 0.3)'
+        ))
+
+        fig.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 100],
+                    tickfont=dict(color='#2C3E50', size=10),
+                    gridcolor='#BDC3C7'
+                ),
+                angularaxis=dict(
+                    tickfont=dict(color='#2C3E50', size=11),
+                    gridcolor='#BDC3C7'
+                ),
+                bgcolor='rgba(248,249,250,0.8)'
+            ),
+            paper_bgcolor='rgba(248,249,250,0.9)',
+            font_color='#2C3E50',
+            title=f"Radar: Categorías de {componente}",
+            title_font_size=16,
+            title_font_color='#2C3E50',
+            height=350
+        )
+
+        return fig
+
+    @staticmethod
     def component_bar_chart(puntajes_componente):
         """Generar gráfico de barras por componente con colores específicos"""
         if puntajes_componente.empty:
@@ -235,10 +301,10 @@ class ChartGenerator:
         fig = go.Figure()
         fig.update_layout(
             title=message,
-            template="plotly_dark",
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font_color='white'
+            plot_bgcolor='rgba(248,249,250,0.9)',
+            paper_bgcolor='rgba(248,249,250,0.9)',
+            font_color='#2C3E50',
+            title_font_color='#2C3E50'
         )
         return fig
 
