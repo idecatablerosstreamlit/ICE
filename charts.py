@@ -23,8 +23,24 @@ class ChartGenerator:
         if len(df_filtrado) == 0:
             return ChartGenerator._empty_chart("No hay datos disponibles para el filtro seleccionado")
 
-        # Agrupar por fecha
-        df_evolucion = df_filtrado.groupby('Fecha')['Valor'].mean().reset_index()
+        # Agrupar por fecha y calcular promedio ponderado
+        if componente or not indicador:
+            # Para componente o vista general, usar promedio ponderado
+            def weighted_avg_by_date(group):
+                valores = group['Valor'].clip(0, 1)
+                pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+                peso_total = pesos.sum()
+                
+                if peso_total > 0:
+                    return (valores * pesos).sum() / peso_total
+                else:
+                    return valores.mean()
+            
+            df_evolucion = df_filtrado.groupby('Fecha').apply(weighted_avg_by_date).reset_index()
+            df_evolucion.columns = ['Fecha', 'Valor']
+        else:
+            # Para indicador específico, usar valor directo
+            df_evolucion = df_filtrado.groupby('Fecha')['Valor'].mean().reset_index()
 
         # Crear gráfico según tipo
         title = f"Evolución de {indicador if indicador else componente if componente else 'Indicadores'}"
@@ -60,23 +76,28 @@ class ChartGenerator:
     def radar_chart(df, fecha=None):
         """Generar gráfico de radar por componente"""
         if fecha:
-            df_filtrado = df[df['Fecha'] == fecha]
+            df_filtrado = df[df['Fecha'] == fecha].copy()
         else:
             ultima_fecha = df['Fecha'].max()
-            df_filtrado = df[df['Fecha'] == ultima_fecha]
+            df_filtrado = df[df['Fecha'] == ultima_fecha].copy()
 
         if len(df_filtrado) == 0:
             return ChartGenerator._empty_chart("No hay datos disponibles para la fecha seleccionada")
 
-        # Calcular cumplimiento
-        if 'Cumplimiento' not in df_filtrado.columns:
-            if df_filtrado['Valor'].max() <= 1:
-                df_filtrado['Cumplimiento'] = df_filtrado['Valor'] * 100
+        # Calcular promedio ponderado por componente (0-100 para visualización)
+        def weighted_avg_component(group):
+            valores = group['Valor'].clip(0, 1)
+            pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+            peso_total = pesos.sum()
+            
+            if peso_total > 0:
+                return (valores * pesos).sum() / peso_total * 100
             else:
-                df_filtrado['Cumplimiento'] = df_filtrado['Valor']
+                return valores.mean() * 100
 
-        # Agrupar por componente
-        datos_radar = df_filtrado.groupby('Componente')['Cumplimiento'].mean().reset_index()
+        # Calcular datos para el radar
+        datos_radar = df_filtrado.groupby('Componente').apply(weighted_avg_component).reset_index()
+        datos_radar.columns = ['Componente', 'Cumplimiento']
 
         if len(datos_radar) < 3:
             return ChartGenerator._empty_chart("Se requieren al menos 3 componentes para el gráfico de radar")
@@ -106,7 +127,7 @@ class ChartGenerator:
             ),
             paper_bgcolor='rgba(0,0,0,0)',
             font_color='white',
-            title="Diagrama de Radar: Cumplimiento por Componente",
+            title="Diagrama de Radar: Promedio Ponderado por Componente",
             height=450
         )
 
@@ -125,7 +146,7 @@ class ChartGenerator:
             puntajes_componente,
             y='Componente',
             x='Puntaje_Ponderado',
-            title="Puntaje por Componente",
+            title="Promedio Ponderado por Componente",
             template="plotly_dark",
             orientation='h'
         )
@@ -135,7 +156,7 @@ class ChartGenerator:
             paper_bgcolor='rgba(0,0,0,0)',
             font_color='white',
             yaxis_title="",
-            xaxis_title="Puntaje",
+            xaxis_title="Puntaje (0-1)",
             height=400
         )
         
@@ -165,7 +186,7 @@ class MetricsDisplay:
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric(label="Puntaje General", value=f"{puntaje_general:.1f}")
+            st.metric(label="Puntaje General", value=f"{puntaje_general:.3f}")
 
         if not puntajes_componente.empty:
             with col2:
@@ -173,7 +194,7 @@ class MetricsDisplay:
                 st.metric(
                     label="Mejor Componente",
                     value=mejor_componente['Componente'],
-                    delta=f"{mejor_componente['Puntaje_Ponderado']:.1f}"
+                    delta=f"{mejor_componente['Puntaje_Ponderado']:.3f}"
                 )
 
             with col3:
@@ -181,5 +202,5 @@ class MetricsDisplay:
                 st.metric(
                     label="Componente a Mejorar",
                     value=peor_componente['Componente'],
-                    delta=f"{peor_componente['Puntaje_Ponderado']:.1f}"
+                    delta=f"{peor_componente['Puntaje_Ponderado']:.3f}"
                 )
