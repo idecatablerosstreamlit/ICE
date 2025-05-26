@@ -2,10 +2,6 @@
 Utilidades para el manejo de datos del Dashboard ICE
 """
 
-"""
-Utilidades para el manejo de datos del Dashboard ICE
-"""
-
 import pandas as pd
 import os
 import streamlit as st
@@ -50,12 +46,20 @@ class DataLoader:
     def _process_dates(self):
         """Procesar columna de fechas"""
         try:
+            # Intentar conversión con formato específico
             self.df['Fecha'] = pd.to_datetime(self.df['Fecha'], format='%d/%m/%Y', errors='coerce')
         except:
             try:
+                # Intentar conversión automática
                 self.df['Fecha'] = pd.to_datetime(self.df['Fecha'], errors='coerce')
             except Exception as e:
                 st.warning(f"Error al convertir fechas: {e}")
+        
+        # Filtrar filas con fechas NaT si existen
+        if self.df['Fecha'].isna().any():
+            filas_con_nat = self.df['Fecha'].isna().sum()
+            st.warning(f"Se encontraron {filas_con_nat} filas con fechas inválidas que serán excluidas del análisis.")
+            self.df = self.df.dropna(subset=['Fecha'])
     
     def _process_values(self):
         """Procesar valores numéricos"""
