@@ -2,6 +2,10 @@
 Utilidades para el manejo de datos del Dashboard ICE
 """
 
+"""
+Utilidades para el manejo de datos del Dashboard ICE
+"""
+
 import pandas as pd
 import os
 import streamlit as st
@@ -63,56 +67,84 @@ class DataLoader:
         if 'Meta' not in self.df.columns:
             self.df['Meta'] = DEFAULT_META
         
+        # Asignar peso igual a todos los indicadores (será normalizado por componente)
         if 'Peso' not in self.df.columns:
-            self.df['Peso'] = 100 / len(self.df['Indicador'].unique() if 'Indicador' in self.df.columns else self.df.index)
+            self.df['Peso'] = 1.0
 
 class DataProcessor:
     """Clase para procesar y calcular métricas de los datos"""
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """Calcular puntajes por componente y categoría"""
+        """Calcular puntajes por componente y categoría usando promedio ponderado"""
         if fecha_filtro:
-            df_filtrado = df[df['Fecha'] == fecha_filtro]
+            df_filtrado = df[df['Fecha'] == fecha_filtro].copy()
         else:
-            df_filtrado = df
+            df_filtrado = df.copy()
 
         if len(df_filtrado) == 0:
             return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
-        # Calcular cumplimiento
-        if df_filtrado['Valor'].max() <= 1:
-            df_filtrado['Cumplimiento'] = df_filtrado['Valor'] * 100
+        # Normalizar valores (0-1 o convertir a 0-100 si es necesario para visualización)
+        df_filtrado['Valor_Normalizado'] = df_filtrado['Valor'].clip(0, 1)
+        
+        # Calcular puntajes por componente (promedio ponderado)
+        puntajes_componente = DataProcessor._calculate_weighted_average_by_group(
+            df_filtrado, 'Componente'
+        )
+        
+        # Calcular puntajes por categoría (promedio ponderado)
+        puntajes_categoria = DataProcessor._calculate_weighted_average_by_group(
+            df_filtrado, 'Categoria'
+        )
+        
+        # Calcular puntaje general (promedio ponderado de todos los indicadores)
+        peso_total = df_filtrado['Peso'].sum()
+        if peso_total > 0:
+            puntaje_general = (df_filtrado['Valor_Normalizado'] * df_filtrado['Peso']).sum() / peso_total
         else:
-            df_filtrado['Cumplimiento'] = df_filtrado['Valor']
-
-        df_filtrado['Cumplimiento'] = df_filtrado['Cumplimiento'].clip(upper=100)
-        df_filtrado['Puntaje_Ponderado'] = df_filtrado['Cumplimiento'] * df_filtrado['Peso'] / 100
-
-        # Agrupar por componente y categoría
-        puntajes_componente = df_filtrado.groupby('Componente')['Puntaje_Ponderado'].sum().reset_index()
-        puntajes_categoria = df_filtrado.groupby('Categoria')['Puntaje_Ponderado'].sum().reset_index()
-        puntaje_general = df_filtrado['Puntaje_Ponderado'].sum()
+            puntaje_general = df_filtrado['Valor_Normalizado'].mean()
 
         return puntajes_componente, puntajes_categoria, puntaje_general
+    
+    @staticmethod
+    def _calculate_weighted_average_by_group(df, group_column):
+        """Calcular promedio ponderado por grupo"""
+        def weighted_avg(group):
+            valores = group['Valor_Normalizado']
+            pesos = group['Peso']
+            peso_total = pesos.sum()
+            
+            if peso_total > 0:
+                return (valores * pesos).sum() / peso_total
+            else:
+                return valores.mean()
+        
+        # Calcular promedio ponderado por grupo
+        puntajes = df.groupby(group_column).apply(weighted_avg).reset_index()
+        puntajes.columns = [group_column, 'Puntaje_Ponderado']
+        
+        return puntajes
     
     @staticmethod
     def create_pivot_table(df, fecha=None, filas='Categoria', columnas='Componente', valores='Valor'):
         """Crear tabla dinámica"""
         if fecha:
-            df_filtrado = df[df['Fecha'] == fecha]
+            df_filtrado = df[df['Fecha'] == fecha].copy()
         else:
             ultima_fecha = df['Fecha'].max()
-            df_filtrado = df[df['Fecha'] == ultima_fecha]
+            df_filtrado = df[df['Fecha'] == ultima_fecha].copy()
 
-        if valores in ["Cumplimiento", "Puntaje_Ponderado"] and "Cumplimiento" not in df_filtrado.columns:
-            if df_filtrado['Valor'].max() <= 1:
-                df_filtrado['Cumplimiento'] = df_filtrado['Valor'] * 100
-            else:
-                df_filtrado['Cumplimiento'] = df_filtrado['Valor']
+        # Calcular columnas adicionales si es necesario
+        if valores in ["Cumplimiento", "Puntaje_Ponderado"]:
+            df_filtrado['Valor_Normalizado'] = df_filtrado['Valor'].clip(0, 1)
             
-            df_filtrado['Puntaje_Ponderado'] = df_filtrado['Cumplimiento'] * df_filtrado['Peso'] / 100
+            if valores == "Cumplimiento":
+                df_filtrado['Cumplimiento'] = df_filtrado['Valor_Normalizado'] * 100
+            elif valores == "Puntaje_Ponderado":
+                # Para la tabla pivote, usamos el valor ponderado individual
+                df_filtrado['Puntaje_Ponderado'] = df_filtrado['Valor_Normalizado'] * df_filtrado.get('Peso', 1.0)
 
         tabla = pd.pivot_table(
             df_filtrado,
