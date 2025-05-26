@@ -25,18 +25,18 @@ class GeneralSummaryTab:
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
             
-            # Crear dos columnas para velocímetro y radar
-            col1, col2 = st.columns(2)
+            # Crear layout con velocímetro más pequeño
+            col1, col2 = st.columns([1, 2])
             
             with col1:
-                # Gráfico de velocímetro
+                # Gráfico de velocímetro (más pequeño)
                 st.plotly_chart(
                     ChartGenerator.gauge_chart(puntaje_general), 
                     use_container_width=True
                 )
             
             with col2:
-                # Gráfico de radar
+                # Gráfico de radar (más grande)
                 st.plotly_chart(
                     ChartGenerator.radar_chart(df, fecha_seleccionada), 
                     use_container_width=True
@@ -91,7 +91,15 @@ class ComponentSummaryTab:
             
             with col3:
                 ultima_medicion = df_componente['Fecha'].max()
-                st.metric("Última Medición", ultima_medicion.strftime('%d/%m/%Y'))
+                # Manejar fechas NaT de forma segura
+                if pd.notna(ultima_medicion):
+                    try:
+                        fecha_str = pd.to_datetime(ultima_medicion).strftime('%d/%m/%Y')
+                        st.metric("Última Medición", fecha_str)
+                    except:
+                        st.metric("Última Medición", "No disponible")
+                else:
+                    st.metric("Última Medición", "No disponible")
             
             # Gráfico de evolución del componente
             fig_evol = ChartGenerator.evolution_chart(df_componente, componente=componente_analisis)
@@ -176,12 +184,23 @@ class PivotTableTab:
                     use_container_width=True
                 )
                 
-                # Opción para descargar
+                # Opción para descargar - manejar fechas NaT
                 csv = tabla.to_csv(index=True)
+                
+                # Crear nombre de archivo seguro
+                if fecha_seleccionada is not None and pd.notna(fecha_seleccionada):
+                    try:
+                        fecha_str = pd.to_datetime(fecha_seleccionada).strftime('%Y%m%d')
+                        filename = f"tabla_dinamica_{fecha_str}.csv"
+                    except:
+                        filename = "tabla_dinamica.csv"
+                else:
+                    filename = "tabla_dinamica.csv"
+                
                 st.download_button(
                     label="Descargar tabla como CSV",
                     data=csv,
-                    file_name=f"tabla_dinamica_{fecha_seleccionada.strftime('%Y%m%d')}.csv",
+                    file_name=filename,
                     mime="text/csv"
                 )
         
@@ -219,12 +238,19 @@ class EditTab:
                 
                 with col1:
                     try:
-                        fechas_options = sorted(df['Fecha'].unique())
-                        fecha_editar = st.date_input(
-                            "Fecha",
-                            value=pd.to_datetime(fechas_options[-1]).date() if fechas_options else None
-                        )
-                    except:
+                        # Filtrar fechas válidas (no NaT)
+                        fechas_validas = df['Fecha'].dropna().unique()
+                        if len(fechas_validas) > 0:
+                            fechas_options = sorted(fechas_validas)
+                            ultima_fecha_valida = pd.to_datetime(fechas_options[-1])
+                            fecha_editar = st.date_input(
+                                "Fecha",
+                                value=ultima_fecha_valida.date() if pd.notna(ultima_fecha_valida) else None
+                            )
+                        else:
+                            fecha_editar = st.date_input("Fecha")
+                    except Exception as e:
+                        st.warning(f"Error al cargar fechas: {e}")
                         fecha_editar = st.date_input("Fecha")
                 
                 with col2:
