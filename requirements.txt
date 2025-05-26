@@ -1,0 +1,25 @@
+# Dashboard ICE - Dependencias del Proyecto
+# Infraestructura de Conocimiento Espacial - IDECA Bogotá
+
+# Framework principal
+streamlit>=1.28.0
+
+# Manipulación de datos
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Visualizaciones
+plotly>=5.15.0
+
+# Manejo de fechas
+python-dateutil>=2.8.0
+
+# Desarrollo y testing (opcional)
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+
+# Para futuras extensiones
+# sqlite3  # Incluido en Python estándar
+# openpyxl>=3.1.0  # Para manejo de Excel
+# sqlalchemy>=2.0.0  # Para bases de datos avanzadas
