@@ -4,10 +4,10 @@ Sistema de monitoreo y seguimiento de indicadores de la Infraestructura de Conoc
 """
 
 import streamlit as st
+import pandas as pd
 import os
 from config import configure_page, apply_dark_theme, CSV_FILENAME
 from data_utils import DataLoader
-from filters import FilterManager
 from tabs import TabManager
 
 def main():
@@ -17,9 +17,16 @@ def main():
     configure_page()
     apply_dark_theme()
     
-    # Título principal
-    st.title("Dashboard de Indicadores ICE")
-    st.markdown("Sistema de monitoreo y seguimiento de indicadores")
+    # Título principal con estilo corporativo
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+                border-radius: 10px; margin-bottom: 2rem; color: white;">
+        <h1 style="color: white; margin: 0;">🏢 Dashboard ICE</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.1rem;">
+            Sistema de Monitoreo - Infraestructura de Conocimiento Espacial
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Cargar datos
     data_loader = DataLoader()
@@ -27,26 +34,19 @@ def main():
     
     if df is not None:
         try:
-            # Crear sistema de filtros
-            filter_manager = FilterManager(df)
-            filters = filter_manager.create_sidebar_filters()
+            # Usar todos los datos sin filtros de barra lateral
+            df_filtrado = df.copy()
             
-            # Aplicar filtros
-            df_filtrado = filter_manager.apply_filters(df)
+            # Crear filtros simples (solo fecha) - sin barra lateral
+            filters = create_simple_filters(df)
             
-            # Mostrar información de filtros activos
-            active_filters = filter_manager.get_filter_info()
-            if active_filters:
-                st.sidebar.markdown("**Filtros activos:**")
-                for filter_info in active_filters:
-                    st.sidebar.markdown(f"- {filter_info}")
+            # Aplicar filtro de fecha si existe
+            if filters.get('fecha'):
+                df_filtrado = df_filtrado[df_filtrado['Fecha'] == filters['fecha']]
             
             # Renderizar pestañas
             tab_manager = TabManager(df, data_loader.csv_path)
             tab_manager.render_tabs(df_filtrado, filters)
-            
-            # Información adicional en sidebar
-            render_sidebar_info()
             
         except Exception as e:
             st.error(f"Error al procesar datos: {e}")
@@ -55,23 +55,35 @@ def main():
     else:
         show_error_message()
 
-def render_sidebar_info():
-    """Renderizar información adicional en la barra lateral"""
-    st.sidebar.markdown("---")
-    st.sidebar.info("""
-    Este dashboard permite monitorear y analizar los indicadores clave de desempeño,
-    con visualizaciones interactivas y cálculos automáticos de puntajes.
-    """)
+def create_simple_filters(df):
+    """Crear filtros simples sin barra lateral"""
+    st.markdown("### 📅 Selección de Fecha")
+    col1, col2, col3 = st.columns([1, 2, 1])
     
-    # Créditos
-    st.sidebar.markdown("---")
-    st.sidebar.text("© 2025 Dashboard ICE")
-    st.sidebar.text("IDECA - Bogotá D.C.")
+    with col2:
+        try:
+            # Filtrar solo fechas válidas (no NaT)
+            fechas_validas = df['Fecha'].dropna().unique()
+            if len(fechas_validas) > 0:
+                fechas = sorted(fechas_validas)
+                fecha_seleccionada = st.selectbox(
+                    "", 
+                    fechas, 
+                    index=len(fechas) - 1,
+                    help="Selecciona la fecha para el análisis"
+                )
+                return {'fecha': fecha_seleccionada}
+            else:
+                st.warning("No se encontraron fechas válidas en los datos")
+                return {'fecha': None}
+        except Exception as e:
+            st.warning(f"Error al procesar fechas: {e}")
+            return {'fecha': None}
 
 def show_error_message():
     """Mostrar mensaje de error cuando no se puede cargar el archivo"""
     st.error(f"""
-    ### Error al cargar el archivo de indicadores
+    ### ❌ Error al cargar el archivo de indicadores
 
     No se pudo encontrar o abrir el archivo "{CSV_FILENAME}". 
 
