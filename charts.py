@@ -127,7 +127,7 @@ class ChartGenerator:
             ),
             paper_bgcolor='rgba(0,0,0,0)',
             font_color='white',
-            title="Diagrama de Radar Puntaje por Componente",
+            title="Diagrama de Radar: Promedio Ponderado por Componente",
             height=450
         )
 
@@ -163,6 +163,49 @@ class ChartGenerator:
         return fig
 
     @staticmethod
+    def gauge_chart(puntaje_general):
+        """Generar gráfico de velocímetro para el puntaje general"""
+        # Convertir a porcentaje para mejor visualización
+        valor_porcentaje = puntaje_general * 100
+        
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number+delta",
+            value = valor_porcentaje,
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "Puntaje General ICE", 'font': {'color': 'white', 'size': 20}},
+            delta = {'reference': 80, 'increasing': {'color': "green"}, 'decreasing': {'color': "red"}},
+            gauge = {
+                'axis': {'range': [None, 100], 'tickcolor': "white", 'tickfont': {'color': 'white'}},
+                'bar': {'color': "#4CAF50"},
+                'bgcolor': "rgba(0,0,0,0)",
+                'borderwidth': 2,
+                'bordercolor': "white",
+                'steps': [
+                    {'range': [0, 30], 'color': '#FF4444'},
+                    {'range': [30, 60], 'color': '#FFAA00'},
+                    {'range': [60, 80], 'color': '#FFDD00'},
+                    {'range': [80, 100], 'color': '#44FF44'}
+                ],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 90
+                }
+            },
+            number = {'font': {'color': 'white', 'size': 30}}
+        ))
+
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font_color='white',
+            height=400,
+            margin=dict(l=20, r=20, t=60, b=20)
+        )
+        
+        return fig
+
+    @staticmethod
     def _empty_chart(message):
         """Crear gráfico vacío con mensaje"""
         fig = go.Figure()
@@ -183,24 +226,12 @@ class MetricsDisplay:
         """Mostrar métricas generales"""
         import streamlit as st
         
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric(label="Puntaje General", value=f"{puntaje_general:.3f}")
-
-        if not puntajes_componente.empty:
-            with col2:
-                mejor_componente = puntajes_componente.sort_values('Puntaje_Ponderado', ascending=False).iloc[0]
-                st.metric(
-                    label="Mejor Componente",
-                    value=mejor_componente['Componente'],
-                    delta=f"{mejor_componente['Puntaje_Ponderado']:.3f}"
-                )
-
-            with col3:
-                peor_componente = puntajes_componente.sort_values('Puntaje_Ponderado').iloc[0]
-                st.metric(
-                    label="Componente a Mejorar",
-                    value=peor_componente['Componente'],
-                    delta=f"{peor_componente['Puntaje_Ponderado']:.3f}"
-                )
+        # Solo mostrar el puntaje general como métrica numérica
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            st.metric(
+                label="Puntaje General ICE", 
+                value=f"{puntaje_general:.3f}",
+                delta=f"{(puntaje_general * 100):.1f}%"
+            )
