@@ -127,7 +127,7 @@ class ChartGenerator:
             ),
             paper_bgcolor='rgba(0,0,0,0)',
             font_color='white',
-            title="Diagrama de Radar: Promedio Ponderado por Componente",
+            title="Diagrama de Radar Puntaje por Componente",
             height=450
         )
 
