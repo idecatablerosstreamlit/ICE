@@ -46,28 +46,35 @@ class ChartGenerator:
         title = f"Evolución de {indicador if indicador else componente if componente else 'Indicadores'}"
         
         if tipo_grafico == "Línea":
-            fig = px.line(df_evolucion, x='Fecha', y='Valor', title=title, template="plotly_dark")
+            fig = px.line(df_evolucion, x='Fecha', y='Valor', title=title)
+            fig.update_traces(line_color='#3498DB', line_width=3)
         else:  # Barras
-            fig = px.bar(df_evolucion, x='Fecha', y='Valor', title=title, template="plotly_dark")
+            fig = px.bar(df_evolucion, x='Fecha', y='Valor', title=title)
+            fig.update_traces(marker_color='#3498DB')
 
         # Añadir línea de meta si se seleccionó
         if mostrar_meta:
             fig.add_hline(
                 y=1.0,
                 line_dash="dash",
-                line_color="green",
-                annotation_text="Meta",
-                annotation_font_color="green"
+                line_color="#E74C3C",
+                line_width=2,
+                annotation_text="Meta (100%)",
+                annotation_font_color="#E74C3C"
             )
 
         fig.update_layout(
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            font_color='white',
+            plot_bgcolor='rgba(248,249,250,0.9)',
+            paper_bgcolor='rgba(248,249,250,0.9)',
+            font_color='#2C3E50',
             xaxis_title="Fecha",
             yaxis_title="Valor",
             legend_title_text="",
-            height=400
+            height=400,
+            title_font_size=16,
+            title_font_color='#2C3E50',
+            xaxis=dict(gridcolor='#BDC3C7'),
+            yaxis=dict(gridcolor='#BDC3C7')
         )
 
         return fig
@@ -110,7 +117,8 @@ class ChartGenerator:
             theta=datos_radar['Componente'],
             fill='toself',
             name='Cumplimiento',
-            line_color='#4CAF50'
+            line_color='#3498DB',
+            fillcolor='rgba(52, 152, 219, 0.3)'
         ))
 
         fig.update_layout(
@@ -118,46 +126,63 @@ class ChartGenerator:
                 radialaxis=dict(
                     visible=True,
                     range=[0, 100],
-                    tickfont=dict(color='white')
+                    tickfont=dict(color='#2C3E50', size=10),
+                    gridcolor='#BDC3C7'
                 ),
                 angularaxis=dict(
-                    tickfont=dict(color='white')
+                    tickfont=dict(color='#2C3E50', size=11),
+                    gridcolor='#BDC3C7'
                 ),
-                bgcolor='rgba(0,0,0,0)'
+                bgcolor='rgba(248,249,250,0.8)'
             ),
-            paper_bgcolor='rgba(0,0,0,0)',
-            font_color='white',
-            title="Diagrama de Radar: Promedio Ponderado por Componente",
-            height=450
+            paper_bgcolor='rgba(248,249,250,0.9)',
+            font_color='#2C3E50',
+            title="Radar: Promedio por Componente",
+            title_font_size=16,
+            title_font_color='#2C3E50',
+            height=350
         )
 
         return fig
 
     @staticmethod
     def component_bar_chart(puntajes_componente):
-        """Generar gráfico de barras por componente"""
+        """Generar gráfico de barras por componente con colores específicos"""
         if puntajes_componente.empty:
             return ChartGenerator._empty_chart("No hay datos de componentes")
 
         # Ordenar de mayor a menor
         puntajes_componente = puntajes_componente.sort_values('Puntaje_Ponderado', ascending=True)
+        
+        # Asignar colores: verde al mejor, rojo al peor, amarillo al resto
+        colores = []
+        for i, valor in enumerate(puntajes_componente['Puntaje_Ponderado']):
+            if i == len(puntajes_componente) - 1:  # El último (mayor valor)
+                colores.append('#2E8B57')  # Verde corporativo
+            elif i == 0:  # El primero (menor valor)
+                colores.append('#DC143C')  # Rojo corporativo
+            else:
+                colores.append('#DAA520')  # Dorado/amarillo corporativo
 
-        fig = px.bar(
-            puntajes_componente,
-            y='Componente',
-            x='Puntaje_Ponderado',
-            title="Promedio Ponderado por Componente",
-            template="plotly_dark",
-            orientation='h'
-        )
+        fig = go.Figure(go.Bar(
+            y=puntajes_componente['Componente'],
+            x=puntajes_componente['Puntaje_Ponderado'],
+            orientation='h',
+            marker=dict(color=colores),
+            text=[f'{val:.3f}' for val in puntajes_componente['Puntaje_Ponderado']],
+            textposition='outside'
+        ))
         
         fig.update_layout(
+            title="Puntaje por Componente",
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font_color='white',
+            font_color='#2C3E50',
             yaxis_title="",
             xaxis_title="Puntaje (0-1)",
-            height=400
+            height=400,
+            title_font_size=18,
+            title_font_color='#2C3E50'
         )
         
         return fig
@@ -169,38 +194,37 @@ class ChartGenerator:
         valor_porcentaje = puntaje_general * 100
         
         fig = go.Figure(go.Indicator(
-            mode = "gauge+number+delta",
+            mode = "gauge+number",
             value = valor_porcentaje,
             domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': "Puntaje General ICE", 'font': {'color': 'white', 'size': 20}},
-            delta = {'reference': 80, 'increasing': {'color': "green"}, 'decreasing': {'color': "red"}},
+            title = {'text': "Puntaje General ICE", 'font': {'color': '#2C3E50', 'size': 16}},
             gauge = {
-                'axis': {'range': [None, 100], 'tickcolor': "white", 'tickfont': {'color': 'white'}},
-                'bar': {'color': "#4CAF50"},
-                'bgcolor': "rgba(0,0,0,0)",
+                'axis': {'range': [None, 100], 'tickcolor': "#34495E", 'tickfont': {'color': '#2C3E50', 'size': 12}},
+                'bar': {'color': "#3498DB"},
+                'bgcolor': "rgba(248,249,250,0.8)",
                 'borderwidth': 2,
-                'bordercolor': "white",
+                'bordercolor': "#BDC3C7",
                 'steps': [
-                    {'range': [0, 30], 'color': '#FF4444'},
-                    {'range': [30, 60], 'color': '#FFAA00'},
-                    {'range': [60, 80], 'color': '#FFDD00'},
-                    {'range': [80, 100], 'color': '#44FF44'}
+                    {'range': [0, 30], 'color': '#FFE5E5'},
+                    {'range': [30, 60], 'color': '#FFF4E5'},
+                    {'range': [60, 80], 'color': '#FFFDE5'},
+                    {'range': [80, 100], 'color': '#E8F5E8'}
                 ],
                 'threshold': {
-                    'line': {'color': "red", 'width': 4},
+                    'line': {'color': "#E74C3C", 'width': 3},
                     'thickness': 0.75,
-                    'value': 90
+                    'value': 85
                 }
             },
-            number = {'font': {'color': 'white', 'size': 30}}
+            number = {'font': {'color': '#2C3E50', 'size': 24}, 'suffix': '%'}
         ))
 
         fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font_color='white',
-            height=400,
-            margin=dict(l=20, r=20, t=60, b=20)
+            paper_bgcolor='rgba(248,249,250,0.9)',
+            plot_bgcolor='rgba(248,249,250,0.9)',
+            font_color='#2C3E50',
+            height=300,
+            margin=dict(l=20, r=20, t=50, b=20)
         )
         
         return fig
@@ -226,12 +250,21 @@ class MetricsDisplay:
         """Mostrar métricas generales"""
         import streamlit as st
         
-        # Solo mostrar el puntaje general como métrica numérica
+        # Crear una tarjeta corporativa para la métrica principal
         col1, col2, col3 = st.columns([1, 2, 1])
         
         with col2:
-            st.metric(
-                label="Puntaje General ICE", 
-                value=f"{puntaje_general:.3f}",
-                delta=f"{(puntaje_general * 100):.1f}%"
-            )
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 2rem; border-radius: 15px; text-align: center; 
+                        color: white; box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+                        margin-bottom: 1.5rem;">
+                <h3 style="color: white; margin: 0 0 0.5rem 0;">Puntaje General ICE</h3>
+                <h1 style="color: white; margin: 0; font-size: 3rem; font-weight: 700;">
+                    {puntaje_general:.3f}
+                </h1>
+                <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.2rem;">
+                    {(puntaje_general * 100):.1f}% de cumplimiento
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
