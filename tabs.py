@@ -78,16 +78,50 @@ class ComponentSummaryTab:
         df_componente = df[df['Componente'] == componente_analisis]
         
         if not df_componente.empty:
-            # Métricas del componente
+            # Métricas del componente con estilo personalizado (gris más claro)
+            st.markdown("""
+            <style>
+            .metric-gray {
+                background-color: rgba(248, 249, 250, 0.9);
+                padding: 1rem;
+                border-radius: 8px;
+                border-left: 4px solid #95A5A6;
+                margin-bottom: 1rem;
+            }
+            .metric-gray .metric-label {
+                color: #7F8C8D !important;
+                font-size: 0.875rem;
+                font-weight: 500;
+                margin-bottom: 0.25rem;
+            }
+            .metric-gray .metric-value {
+                color: #5D6D7E !important;
+                font-size: 1.5rem;
+                font-weight: 600;
+                margin: 0;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             col1, col2, col3 = st.columns(3)
             
             with col1:
                 valor_promedio = df_componente['Valor'].mean()
-                st.metric("Valor Promedio", f"{valor_promedio:.2f}")
+                st.markdown(f"""
+                <div class="metric-gray">
+                    <div class="metric-label">Valor Promedio</div>
+                    <div class="metric-value">{valor_promedio:.3f}</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col2:
                 total_indicadores = df_componente['Indicador'].nunique()
-                st.metric("Total Indicadores", total_indicadores)
+                st.markdown(f"""
+                <div class="metric-gray">
+                    <div class="metric-label">Total Indicadores</div>
+                    <div class="metric-value">{total_indicadores}</div>
+                </div>
+                """, unsafe_allow_html=True)
             
             with col3:
                 ultima_medicion = df_componente['Fecha'].max()
@@ -95,15 +129,33 @@ class ComponentSummaryTab:
                 if pd.notna(ultima_medicion):
                     try:
                         fecha_str = pd.to_datetime(ultima_medicion).strftime('%d/%m/%Y')
-                        st.metric("Última Medición", fecha_str)
+                        fecha_display = fecha_str
                     except:
-                        st.metric("Última Medición", "No disponible")
+                        fecha_display = "No disponible"
                 else:
-                    st.metric("Última Medición", "No disponible")
+                    fecha_display = "No disponible"
+                
+                st.markdown(f"""
+                <div class="metric-gray">
+                    <div class="metric-label">Última Medición</div>
+                    <div class="metric-value">{fecha_display}</div>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Gráfico de evolución del componente
-            fig_evol = ChartGenerator.evolution_chart(df_componente, componente=componente_analisis)
-            st.plotly_chart(fig_evol, use_container_width=True)
+            # Layout con gráficos lado a lado
+            col_izq, col_der = st.columns(2)
+            
+            with col_izq:
+                # Gráfico de evolución del componente
+                fig_evol = ChartGenerator.evolution_chart(df_componente, componente=componente_analisis)
+                st.plotly_chart(fig_evol, use_container_width=True)
+            
+            with col_der:
+                # Gráfico de radar por categorías del componente
+                fig_radar_cat = ChartGenerator.radar_chart_categories(
+                    df, componente_analisis, filters.get('fecha')
+                )
+                st.plotly_chart(fig_radar_cat, use_container_width=True)
             
             # Tabla de indicadores del componente
             st.subheader(f"Indicadores de {componente_analisis}")
