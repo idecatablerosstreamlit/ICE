@@ -25,11 +25,22 @@ class GeneralSummaryTab:
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
             
-            # Gráfico de radar
-            st.plotly_chart(
-                ChartGenerator.radar_chart(df, fecha_seleccionada), 
-                use_container_width=True
-            )
+            # Crear dos columnas para velocímetro y radar
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Gráfico de velocímetro
+                st.plotly_chart(
+                    ChartGenerator.gauge_chart(puntaje_general), 
+                    use_container_width=True
+                )
+            
+            with col2:
+                # Gráfico de radar
+                st.plotly_chart(
+                    ChartGenerator.radar_chart(df, fecha_seleccionada), 
+                    use_container_width=True
+                )
             
             # Puntajes por componente
             st.subheader("Puntajes por Componente")
