@@ -28,12 +28,38 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Cargar datos
-    data_loader = DataLoader()
-    df = data_loader.load_data()
+    # Sistema de recarga automática de datos
+    if 'data_timestamp' not in st.session_state:
+        st.session_state.data_timestamp = 0
     
-    if df is not None:
-        try:
+    # Cargar datos con cache que se invalida cuando hay cambios
+    @st.cache_data(ttl=1)  # Cache por 1 segundo para permitir recargas rápidas
+    def load_data_cached(timestamp):
+        data_loader = DataLoader()
+        return data_loader.load_data(), data_loader.csv_path
+    
+    try:
+        df, csv_path = load_data_cached(st.session_state.data_timestamp)
+        
+        if df is not None and not df.empty:
+            # Botón de recarga manual
+            col_reload1, col_reload2, col_reload3 = st.columns([2, 1, 2])
+            with col_reload2:
+                if st.button("🔄 Actualizar Datos", help="Recarga los datos desde el archivo CSV"):
+                    st.cache_data.clear()
+                    st.session_state.data_timestamp += 1
+                    st.rerun()
+            
+            # Mostrar información de estado de los datos
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.info(f"📊 **{len(df)}** registros cargados")
+            with col2:
+                st.info(f"🔢 **{df['Codigo'].nunique()}** indicadores únicos")
+            with col3:
+                fechas_disponibles = df['Fecha'].nunique()
+                st.info(f"📅 **{fechas_disponibles}** fechas diferentes")
+            
             # IMPORTANTE: No filtrar por fecha aquí - dejar que cada función maneje sus propios filtros
             # El cálculo de componentes y general siempre usa valores más recientes
             df_completo = df.copy()
@@ -42,19 +68,24 @@ def main():
             filters = create_simple_filters(df)
             
             # Renderizar pestañas - pasar datos completos
-            tab_manager = TabManager(df_completo, data_loader.csv_path)
+            tab_manager = TabManager(df_completo, csv_path)
             tab_manager.render_tabs(df_completo, filters)
             
-        except Exception as e:
-            st.error(f"Error al procesar datos: {e}")
-            st.info("Verifica que el archivo CSV contenga todas las columnas requeridas")
-            # Mostrar traceback para debug
-            import traceback
-            with st.expander("Detalles del error (para desarrolladores)"):
-                st.code(traceback.format_exc())
-    
-    else:
-        show_error_message()
+        else:
+            show_error_message()
+            
+    except Exception as e:
+        st.error(f"Error crítico al procesar datos: {e}")
+        st.info("Verifica que el archivo CSV contenga todas las columnas requeridas")
+        # Mostrar traceback para debug
+        import traceback
+        with st.expander("🔧 Detalles del error (para desarrolladores)"):
+            st.code(traceback.format_exc())
+            
+        # Botón para intentar recargar
+        if st.button("🔄 Intentar Recargar Datos"):
+            st.cache_data.clear()
+            st.rerun()
 
 def create_simple_filters(df):
     """Crear selector de fecha para referencia (no afecta cálculos principales)"""
