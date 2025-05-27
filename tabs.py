@@ -17,10 +17,16 @@ class GeneralSummaryTab:
         st.header("Resumen General")
         
         try:
-            # Calcular puntajes
-            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(
-                df, fecha_seleccionada
-            )
+            # IMPORTANTE: NO usar fecha_seleccionada para cálculos principales
+            # Siempre calcular con valores más recientes para consistencia
+            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
+            
+            # Mostrar información sobre qué datos se están usando
+            st.info("""
+            📊 **Cálculos basados en valores más recientes:** Los puntajes se calculan 
+            usando el valor más reciente de cada indicador, asegurando consistencia 
+            independientemente de cuándo se agregaron los datos.
+            """)
             
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
@@ -36,9 +42,9 @@ class GeneralSummaryTab:
                 )
             
             with col2:
-                # Gráfico de radar (más grande)
+                # Gráfico de radar (más grande) - también usando valores más recientes
                 st.plotly_chart(
-                    ChartGenerator.radar_chart(df, fecha_seleccionada), 
+                    ChartGenerator.radar_chart(df, None),  # None = usar valores más recientes
                     use_container_width=True
                 )
             
@@ -52,11 +58,17 @@ class GeneralSummaryTab:
             
         except Exception as e:
             st.error(f"Error al calcular puntajes: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             st.info("Comprueba que los datos contengan las columnas requeridas")
         
-        # Mostrar tabla de datos filtrados
-        with st.expander("Ver datos generales"):
-            st.dataframe(df, use_container_width=True)
+        # Mostrar tabla de datos más recientes
+        with st.expander("Ver datos más recientes por indicador"):
+            try:
+                df_latest = DataProcessor._get_latest_values_by_indicator(df)
+                st.dataframe(df_latest[['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Fecha']], use_container_width=True)
+            except Exception as e:
+                st.error(f"Error al mostrar datos: {e}")
 
 class ComponentSummaryTab:
     """Pestaña de resumen por componente"""
@@ -74,10 +86,17 @@ class ComponentSummaryTab:
             key="comp_analysis"
         )
         
-        # Filtrar datos por componente
-        df_componente = df[df['Componente'] == componente_analisis]
+        # Obtener valores más recientes y filtrar por componente
+        df_latest = DataProcessor._get_latest_values_by_indicator(df)
+        df_componente = df_latest[df_latest['Componente'] == componente_analisis]
         
         if not df_componente.empty:
+            # Información sobre los datos que se están usando
+            st.info(f"""
+            📊 **Análisis de {componente_analisis}:** Basado en los valores más recientes 
+            de cada indicador de este componente.
+            """)
+            
             # Métricas del componente con estilo personalizado (gris más claro)
             st.markdown("""
             <style>
@@ -142,9 +161,9 @@ class ComponentSummaryTab:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Tabla de categorías con colores
+            # Tabla de categorías con colores - usando valores más recientes
             tabla_html, error = ChartGenerator.category_summary_table(
-                df, componente_analisis, filters.get('fecha')
+                df, componente_analisis, None  # None = usar valores más recientes
             )
             
             if tabla_html:
@@ -156,21 +175,22 @@ class ComponentSummaryTab:
             col_izq, col_der = st.columns(2)
             
             with col_izq:
-                # Gráfico de evolución del componente
-                fig_evol = ChartGenerator.evolution_chart(df_componente, componente=componente_analisis)
+                # Gráfico de evolución del componente - usar datos históricos completos
+                df_componente_historico = df[df['Componente'] == componente_analisis]
+                fig_evol = ChartGenerator.evolution_chart(df_componente_historico, componente=componente_analisis)
                 st.plotly_chart(fig_evol, use_container_width=True)
             
             with col_der:
-                # Gráfico de radar por categorías del componente
+                # Gráfico de radar por categorías - usar valores más recientes
                 fig_radar_cat = ChartGenerator.radar_chart_categories(
-                    df, componente_analisis, filters.get('fecha')
+                    df, componente_analisis, None  # None = usar valores más recientes
                 )
                 st.plotly_chart(fig_radar_cat, use_container_width=True)
             
-            # Tabla de indicadores del componente
-            st.subheader(f"Indicadores de {componente_analisis}")
+            # Tabla de indicadores del componente - mostrar valores más recientes
+            st.subheader(f"Indicadores Más Recientes de {componente_analisis}")
             st.dataframe(
-                df_componente[['Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values('Fecha', ascending=False),
+                df_componente[['Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values('Valor', ascending=False),
                 use_container_width=True
             )
         else:
