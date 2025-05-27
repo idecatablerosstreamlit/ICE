@@ -224,14 +224,33 @@ class EditTab:
         st.subheader("Gestión de Indicadores")
         
         try:
+            # Validar que hay datos
+            if df.empty:
+                st.error("No hay datos disponibles")
+                return
+            
             # Seleccionar indicador por código
-            codigos = sorted(df['Codigo'].unique())
-            codigo_editar = st.selectbox("Seleccionar Código de Indicador", codigos, key="codigo_editar")
+            codigos_disponibles = sorted(df['Codigo'].dropna().unique())
+            if not codigos_disponibles:
+                st.error("No hay códigos de indicadores disponibles")
+                return
+                
+            codigo_editar = st.selectbox("Seleccionar Código de Indicador", codigos_disponibles, key="codigo_editar")
+            
+            # Validar que el código seleccionado existe en los datos
+            datos_indicador = df[df['Codigo'] == codigo_editar]
+            if datos_indicador.empty:
+                st.error(f"No se encontraron datos para el código {codigo_editar}")
+                return
             
             # Mostrar información del indicador
-            nombre_indicador = df[df['Codigo'] == codigo_editar]['Indicador'].iloc[0]
-            componente_indicador = df[df['Codigo'] == codigo_editar]['Componente'].iloc[0]
-            categoria_indicador = df[df['Codigo'] == codigo_editar]['Categoria'].iloc[0]
+            try:
+                nombre_indicador = datos_indicador['Indicador'].iloc[0]
+                componente_indicador = datos_indicador['Componente'].iloc[0]
+                categoria_indicador = datos_indicador['Categoria'].iloc[0]
+            except IndexError:
+                st.error(f"Error al obtener información del indicador {codigo_editar}")
+                return
             
             st.markdown(f"""
             **Indicador seleccionado:** {nombre_indicador}  
@@ -240,7 +259,7 @@ class EditTab:
             """)
             
             # Obtener registros existentes del indicador
-            registros_indicador = df[df['Codigo'] == codigo_editar].sort_values('Fecha', ascending=False)
+            registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
             
             # Crear pestañas para diferentes acciones
             tab_ver, tab_agregar, tab_editar, tab_eliminar = st.tabs([
@@ -271,7 +290,9 @@ class EditTab:
         
         except Exception as e:
             st.error(f"Error en la gestión de indicadores: {e}")
-            st.info("Asegúrate de que los datos contengan las columnas necesarias")
+            import traceback
+            st.code(traceback.format_exc())
+            st.info("Verifica que el archivo CSV contenga todas las columnas necesarias")
     
     @staticmethod
     def _render_add_form(df, codigo_editar, nombre_indicador, csv_path):
