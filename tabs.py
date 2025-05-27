@@ -162,14 +162,25 @@ class ComponentSummaryTab:
                 """, unsafe_allow_html=True)
             
             # Tabla de categorías con colores - usando valores más recientes
-            tabla_html, error = ChartGenerator.category_summary_table(
-                df, componente_analisis, None  # None = usar valores más recientes
-            )
-            
-            if tabla_html:
-                st.markdown(tabla_html, unsafe_allow_html=True)
-            elif error:
-                st.warning(error)
+            try:
+                ChartGenerator.show_category_table_simple(df, componente_analisis)
+            except Exception as e:
+                st.error(f"Error al mostrar categorías: {e}")
+                
+                # Fallback: mostrar datos básicos
+                st.subheader("📊 Datos por Categoría (Fallback)")
+                try:
+                    df_latest = DataProcessor._get_latest_values_by_indicator(df)
+                    df_comp = df_latest[df_latest['Componente'] == componente_analisis]
+                    
+                    if not df_comp.empty:
+                        categoria_stats = df_comp.groupby('Categoria')['Valor'].agg(['mean', 'count']).reset_index()
+                        categoria_stats.columns = ['Categoría', 'Puntaje Promedio', 'Num. Indicadores']
+                        st.dataframe(categoria_stats, use_container_width=True)
+                    else:
+                        st.warning("No hay datos del componente disponibles")
+                except Exception as e2:
+                    st.error(f"Error en fallback: {e2}")
             
             # Layout con gráficos lado a lado
             col_izq, col_der = st.columns(2)
