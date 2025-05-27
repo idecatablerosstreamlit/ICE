@@ -16,14 +16,28 @@ class DataLoader:
         self.csv_path = os.path.join(self.script_dir, CSV_FILENAME)
     
     def load_data(self):
-        """Cargar datos desde el archivo CSV"""
+        """Cargar datos desde el archivo CSV - CORREGIDO"""
         try:
             # Cargar el archivo CSV con punto y coma como separador
             self.df = pd.read_csv(self.csv_path, sep=CSV_SEPARATOR)
             
+            import streamlit as st
+            # Debug: Mostrar estructura original del CSV
+            with st.expander("🔧 Debug: Estructura del CSV cargado", expanded=False):
+                st.write(f"**Archivo:** {self.csv_path}")
+                st.write(f"**Shape original:** {self.df.shape}")
+                st.write(f"**Columnas originales:** {list(self.df.columns)}")
+                if not self.df.empty:
+                    st.write("**Primeras filas:**")
+                    st.dataframe(self.df.head())
+            
             # Renombrar columnas
             self._rename_columns()
             
+            # Debug: Mostrar después del renombrado
+            with st.expander("🔧 Debug: Después del renombrado de columnas", expanded=False):
+                st.write(f"**Columnas después del renombrado:** {list(self.df.columns)}")
+                
             # Procesar fechas y valores
             self._process_dates()
             self._process_values()
@@ -31,10 +45,30 @@ class DataLoader:
             # Añadir columnas por defecto
             self._add_default_columns()
             
+            # Verificación final
+            required_final_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
+            missing_final = [col for col in required_final_columns if col not in self.df.columns]
+            if missing_final:
+                st.error(f"❌ Faltan columnas esenciales después del procesamiento: {missing_final}")
+                st.write("**Columnas disponibles:**", list(self.df.columns))
+                return None
+            
+            # Limpiar datos problemáticos
+            self.df = self.df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
+            
+            if self.df.empty:
+                st.error("❌ No hay datos válidos después de la limpieza")
+                return None
+                
+            st.success(f"✅ Datos cargados correctamente: {len(self.df)} registros, {self.df['Codigo'].nunique()} indicadores únicos")
+            
             return self.df
             
         except Exception as e:
-            st.error(f"Error al cargar datos: {e}")
+            import streamlit as st
+            st.error(f"❌ Error crítico al cargar datos: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return None
     
     def _rename_columns(self):
@@ -82,49 +116,101 @@ class DataProcessor:
     def calculate_scores(df, fecha_filtro=None):
         """
         Calcular puntajes usando SIEMPRE el valor más reciente de cada indicador.
-        El parámetro fecha_filtro se ignora para mantener consistencia.
+        CORREGIDO: Manejo robusto de errores y validaciones.
         """
-        if df.empty:
-            return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
-                   pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
+        try:
+            if df.empty:
+                import streamlit as st
+                st.warning("DataFrame vacío para cálculo de puntajes")
+                return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
+                       pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
-        # SIEMPRE usar el valor más reciente de cada indicador
-        # Esto garantiza que el dashboard funcione correctamente sin importar las fechas
-        df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
+            # SIEMPRE usar el valor más reciente de cada indicador
+            df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
 
-        if len(df_filtrado) == 0:
+            if len(df_filtrado) == 0:
+                import streamlit as st
+                st.error("No se pudieron obtener valores más recientes de los indicadores")
+                return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
+                       pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
+
+            # Debug: Verificar estructura del DataFrame
             import streamlit as st
-            st.error("No se pudieron obtener valores más recientes de los indicadores")
+            with st.expander("🔧 Debug: Estructura de datos para cálculos", expanded=False):
+                st.write(f"**Shape del DataFrame filtrado:** {df_filtrado.shape}")
+                st.write(f"**Columnas disponibles:** {list(df_filtrado.columns)}")
+                st.write(f"**Tipos de datos:**")
+                st.write(df_filtrado.dtypes)
+                if len(df_filtrado) > 0:
+                    st.write("**Muestra de datos:**")
+                    st.dataframe(df_filtrado.head())
+
+            # Verificar columnas esenciales
+            required_columns = ['Valor', 'Peso', 'Componente', 'Categoria']
+            missing_columns = [col for col in required_columns if col not in df_filtrado.columns]
+            if missing_columns:
+                st.error(f"Faltan columnas esenciales: {missing_columns}")
+                return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
+                       pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
+
+            # Normalizar valores (0-1)
+            df_filtrado['Valor_Normalizado'] = df_filtrado['Valor'].clip(0, 1)
+            
+            # Verificar que tenemos datos después de la normalización
+            if df_filtrado['Valor_Normalizado'].isna().all():
+                st.error("Todos los valores normalizados son NaN")
+                return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
+                       pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
+            
+            # Calcular puntajes por componente
+            try:
+                puntajes_componente = DataProcessor._calculate_weighted_average_by_group(
+                    df_filtrado, 'Componente'
+                )
+            except Exception as e:
+                st.error(f"Error al calcular puntajes por componente: {e}")
+                puntajes_componente = pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []})
+            
+            # Calcular puntajes por categoría
+            try:
+                puntajes_categoria = DataProcessor._calculate_weighted_average_by_group(
+                    df_filtrado, 'Categoria'
+                )
+            except Exception as e:
+                st.error(f"Error al calcular puntajes por categoría: {e}")
+                puntajes_categoria = pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []})
+            
+            # Calcular puntaje general
+            try:
+                peso_total = df_filtrado['Peso'].sum()
+                if peso_total > 0:
+                    puntaje_general = (df_filtrado['Valor_Normalizado'] * df_filtrado['Peso']).sum() / peso_total
+                else:
+                    puntaje_general = df_filtrado['Valor_Normalizado'].mean()
+                
+                # Verificar que el puntaje general es válido
+                if pd.isna(puntaje_general):
+                    puntaje_general = 0.0
+                    
+            except Exception as e:
+                st.error(f"Error al calcular puntaje general: {e}")
+                puntaje_general = 0.0
+
+            return puntajes_componente, puntajes_categoria, puntaje_general
+            
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Error crítico en calculate_scores: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
-
-        # Normalizar valores (0-1)
-        df_filtrado['Valor_Normalizado'] = df_filtrado['Valor'].clip(0, 1)
-        
-        # Calcular puntajes por componente (promedio ponderado)
-        puntajes_componente = DataProcessor._calculate_weighted_average_by_group(
-            df_filtrado, 'Componente'
-        )
-        
-        # Calcular puntajes por categoría (promedio ponderado)
-        puntajes_categoria = DataProcessor._calculate_weighted_average_by_group(
-            df_filtrado, 'Categoria'
-        )
-        
-        # Calcular puntaje general (promedio ponderado de todos los indicadores)
-        peso_total = df_filtrado['Peso'].sum()
-        if peso_total > 0:
-            puntaje_general = (df_filtrado['Valor_Normalizado'] * df_filtrado['Peso']).sum() / peso_total
-        else:
-            puntaje_general = df_filtrado['Valor_Normalizado'].mean()
-
-        return puntajes_componente, puntajes_categoria, puntaje_general
     
     @staticmethod
     def _get_latest_values_by_indicator(df):
         """
         Obtener el valor más reciente de cada indicador.
-        Esta es la función CLAVE para el correcto funcionamiento del dashboard.
+        CORREGIDO: Evita problemas de estructura multidimensional.
         """
         try:
             if df.empty:
@@ -145,23 +231,23 @@ class DataProcessor:
                 st.warning("No hay datos válidos después de limpiar valores NaN")
                 return df
             
-            # Agrupar por código de indicador y tomar el registro con fecha más reciente
-            def get_latest_record(group):
-                # Ordenar por fecha y tomar el último registro
-                latest_idx = group['Fecha'].idxmax()
-                return group.loc[latest_idx]
-            
-            # Aplicar la función a cada grupo de indicadores
-            df_latest = df_clean.groupby('Codigo', as_index=False).apply(
-                lambda x: get_latest_record(x)
-            ).reset_index(drop=True)
+            # MÉTODO CORREGIDO: Usar sort_values y drop_duplicates
+            # Esto evita problemas con groupby().apply()
+            df_latest = (df_clean
+                        .sort_values(['Codigo', 'Fecha'])  # Ordenar por código y fecha
+                        .groupby('Codigo', as_index=False)  # Agrupar por código
+                        .last()  # Tomar el último registro de cada grupo
+                        .reset_index(drop=True))  # Resetear índice
             
             import streamlit as st
-            # Mostrar información de debug
-            with st.expander("🔍 Debug: Valores más recientes por indicador", expanded=False):
-                st.write(f"**Total indicadores únicos:** {df_clean['Codigo'].nunique()}")
-                st.write(f"**Registros después de filtrar:** {len(df_latest)}")
-                st.dataframe(df_latest[['Codigo', 'Indicador', 'Valor', 'Fecha', 'Componente']].sort_values('Fecha'))
+            # Mostrar información de debug solo si hay problemas
+            debug_info = len(df_clean['Codigo'].unique()) != len(df_latest)
+            if debug_info:
+                with st.expander("🔍 Debug: Valores más recientes por indicador", expanded=False):
+                    st.write(f"**Total indicadores únicos en datos originales:** {df_clean['Codigo'].nunique()}")
+                    st.write(f"**Registros después de filtrar:** {len(df_latest)}")
+                    st.write(f"**Estructura del DataFrame resultante:** {df_latest.shape}")
+                    st.dataframe(df_latest[['Codigo', 'Indicador', 'Valor', 'Fecha', 'Componente']].sort_values('Fecha'))
             
             return df_latest
             
@@ -175,22 +261,68 @@ class DataProcessor:
     
     @staticmethod
     def _calculate_weighted_average_by_group(df, group_column):
-        """Calcular promedio ponderado por grupo"""
-        def weighted_avg(group):
-            valores = group['Valor_Normalizado']
-            pesos = group['Peso']
-            peso_total = pesos.sum()
+        """Calcular promedio ponderado por grupo - CORREGIDO para evitar errores dimensionales"""
+        try:
+            # Verificar que el DataFrame y la columna de agrupación son válidos
+            if df.empty:
+                return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
             
-            if peso_total > 0:
-                return (valores * pesos).sum() / peso_total
-            else:
-                return valores.mean()
-        
-        # Calcular promedio ponderado por grupo
-        puntajes = df.groupby(group_column).apply(weighted_avg).reset_index()
-        puntajes.columns = [group_column, 'Puntaje_Ponderado']
-        
-        return puntajes
+            if group_column not in df.columns:
+                import streamlit as st
+                st.error(f"La columna '{group_column}' no existe en los datos")
+                return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
+            
+            # Verificar que tenemos las columnas necesarias
+            required_cols = ['Valor_Normalizado', 'Peso']
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            if missing_cols:
+                import streamlit as st
+                st.error(f"Faltan columnas necesarias: {missing_cols}")
+                return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
+            
+            # Función para calcular promedio ponderado
+            def weighted_avg(valores, pesos):
+                """Calcular promedio ponderado de forma segura"""
+                # Filtrar valores no nulos
+                mask = pd.notna(valores) & pd.notna(pesos)
+                if not mask.any():
+                    return 0.0
+                
+                valores_clean = valores[mask]
+                pesos_clean = pesos[mask]
+                peso_total = pesos_clean.sum()
+                
+                if peso_total > 0:
+                    return (valores_clean * pesos_clean).sum() / peso_total
+                else:
+                    return valores_clean.mean() if len(valores_clean) > 0 else 0.0
+            
+            # Calcular promedio ponderado por grupo usando agg()
+            result = df.groupby(group_column).agg({
+                'Valor_Normalizado': list,
+                'Peso': list
+            }).reset_index()
+            
+            # Aplicar la función de promedio ponderado
+            result['Puntaje_Ponderado'] = result.apply(
+                lambda row: weighted_avg(
+                    pd.Series(row['Valor_Normalizado']), 
+                    pd.Series(row['Peso'])
+                ), axis=1
+            )
+            
+            # Mantener solo las columnas necesarias
+            result = result[[group_column, 'Puntaje_Ponderado']]
+            
+            return result
+            
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Error en cálculo ponderado por {group_column}: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+            # Retornar DataFrame vacío pero con estructura correcta
+            return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
     
     @staticmethod
     def create_pivot_table(df, fecha=None, filas='Categoria', columnas='Componente', valores='Valor'):
@@ -207,34 +339,49 @@ class DataEditor:
     
     @staticmethod
     def add_new_record(df, codigo, fecha, valor, csv_path):
-        """Agregar un nuevo registro para un indicador"""
+        """Agregar un nuevo registro para un indicador - CORREGIDO"""
         try:
-            # Obtener información base del indicador
-            indicador_base = df[df['Codigo'] == codigo].iloc[0]
-            
-            # Crear nueva fila
-            nueva_fila = {
-                'Linea_Accion': indicador_base['Linea_Accion'],
-                'Componente': indicador_base['Componente'],
-                'Categoria': indicador_base['Categoria'],
-                'Codigo': codigo,
-                'Indicador': indicador_base['Indicador'],
-                'Valor': valor,
-                'Fecha': fecha,
-                'Meta': indicador_base.get('Meta', 1.0),
-                'Peso': indicador_base.get('Peso', 1.0)
-            }
-            
-            # Leer el CSV actual para evitar problemas de concurrencia
+            # Leer el CSV actual para mantener el formato original
             df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
             
-            # Agregar nueva fila
+            # Obtener información base del indicador desde df_actual
+            codigo_col = None
+            for col_name in ['COD', 'Codigo']:
+                if col_name in df_actual.columns:
+                    codigo_col = col_name
+                    break
+            
+            if codigo_col is None:
+                import streamlit as st
+                st.error("❌ No se encontró columna de código en el CSV")
+                return False
+            
+            # Buscar información base del indicador
+            indicador_base = df_actual[df_actual[codigo_col] == codigo].iloc[0] if len(df_actual[df_actual[codigo_col] == codigo]) > 0 else None
+            
+            if indicador_base is None:
+                import streamlit as st
+                st.error(f"❌ No se encontró información base para el código {codigo}")
+                return False
+            
+            # Crear nueva fila manteniendo la estructura original del CSV
+            nueva_fila = {}
+            for col in df_actual.columns:
+                if col == 'Fecha':
+                    nueva_fila[col] = fecha
+                elif col == 'Valor':
+                    nueva_fila[col] = valor
+                else:
+                    # Mantener el valor original de la primera fila del indicador
+                    nueva_fila[col] = indicador_base[col]
+            
+            # Agregar nueva fila al DataFrame
             df_nuevo = pd.concat([df_actual, pd.DataFrame([nueva_fila])], ignore_index=True)
             
-            # Guardar al CSV
+            # Guardar al CSV manteniendo el formato original
             df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
             
-            # IMPORTANTE: Forzar recarga de datos en Streamlit
+            # Forzar recarga de datos en Streamlit
             import streamlit as st
             if 'data_timestamp' not in st.session_state:
                 st.session_state.data_timestamp = 0
@@ -243,36 +390,44 @@ class DataEditor:
             return True
             
         except Exception as e:
-            st.error(f"Error al agregar nuevo registro: {e}")
+            import streamlit as st
+            st.error(f"❌ Error al agregar nuevo registro: {e}")
             import traceback
             st.code(traceback.format_exc())
             return False
     
     @staticmethod
     def update_record(df, codigo, fecha, nuevo_valor, csv_path):
-        """Actualizar un registro existente"""
+        """Actualizar un registro existente - CORREGIDO"""
         try:
-            # Leer el CSV actual
+            # Leer el CSV actual con el mismo separador
             df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
             
             # Procesar fechas si es necesario
             df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
             
-            # Encontrar el índice del registro a actualizar
-            idx = df_actual[(df_actual['COD'] == codigo) & (df_actual['Fecha'] == fecha)].index
+            # Determinar la columna de código correcta
+            codigo_col = None
+            for col_name in ['COD', 'Codigo']:
+                if col_name in df_actual.columns:
+                    codigo_col = col_name
+                    break
             
-            if len(idx) == 0:
-                # Buscar por columna 'Codigo' si 'COD' no existe
-                if 'Codigo' in df_actual.columns:
-                    idx = df_actual[(df_actual['Codigo'] == codigo) & (df_actual['Fecha'] == fecha)].index
+            if codigo_col is None:
+                import streamlit as st
+                st.error("❌ No se encontró columna de código en el CSV (COD o Codigo)")
+                return False
+            
+            # Encontrar el índice del registro a actualizar
+            idx = df_actual[(df_actual[codigo_col] == codigo) & (df_actual['Fecha'] == fecha)].index
             
             if len(idx) > 0:
                 # Actualizar el valor
                 df_actual.loc[idx, 'Valor'] = nuevo_valor
-                # Guardar al CSV
+                # Guardar al CSV manteniendo el formato original
                 df_actual.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
                 
-                # IMPORTANTE: Forzar recarga de datos en Streamlit
+                # Forzar recarga de datos en Streamlit
                 import streamlit as st
                 if 'data_timestamp' not in st.session_state:
                     st.session_state.data_timestamp = 0
@@ -280,18 +435,25 @@ class DataEditor:
                 
                 return True
             else:
-                st.error(f"No se encontró un registro para la fecha {fecha.strftime('%d/%m/%Y')}")
+                import streamlit as st
+                st.error(f"❌ No se encontró registro para código {codigo} en fecha {fecha.strftime('%d/%m/%Y')}")
+                # Debug: mostrar registros disponibles para este código
+                registros_codigo = df_actual[df_actual[codigo_col] == codigo]
+                if not registros_codigo.empty:
+                    st.write("**Registros disponibles para este código:**")
+                    st.dataframe(registros_codigo[['Fecha', 'Valor']])
                 return False
                 
         except Exception as e:
-            st.error(f"Error al actualizar el registro: {e}")
+            import streamlit as st
+            st.error(f"❌ Error al actualizar el registro: {e}")
             import traceback
             st.code(traceback.format_exc())
             return False
     
     @staticmethod
     def delete_record(df, codigo, fecha, csv_path):
-        """Eliminar un registro existente"""
+        """Eliminar un registro existente - CORREGIDO"""
         try:
             # Leer el CSV actual
             df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
@@ -299,13 +461,20 @@ class DataEditor:
             # Procesar fechas si es necesario
             df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
             
-            # Encontrar el índice del registro a eliminar
-            idx = df_actual[(df_actual['COD'] == codigo) & (df_actual['Fecha'] == fecha)].index
+            # Determinar la columna de código correcta
+            codigo_col = None
+            for col_name in ['COD', 'Codigo']:
+                if col_name in df_actual.columns:
+                    codigo_col = col_name
+                    break
             
-            if len(idx) == 0:
-                # Buscar por columna 'Codigo' si 'COD' no existe
-                if 'Codigo' in df_actual.columns:
-                    idx = df_actual[(df_actual['Codigo'] == codigo) & (df_actual['Fecha'] == fecha)].index
+            if codigo_col is None:
+                import streamlit as st
+                st.error("❌ No se encontró columna de código en el CSV")
+                return False
+            
+            # Encontrar el índice del registro a eliminar
+            idx = df_actual[(df_actual[codigo_col] == codigo) & (df_actual['Fecha'] == fecha)].index
             
             if len(idx) > 0:
                 # Eliminar la fila
@@ -313,7 +482,7 @@ class DataEditor:
                 # Guardar al CSV
                 df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
                 
-                # IMPORTANTE: Forzar recarga de datos en Streamlit
+                # Forzar recarga de datos en Streamlit
                 import streamlit as st
                 if 'data_timestamp' not in st.session_state:
                     st.session_state.data_timestamp = 0
@@ -321,11 +490,13 @@ class DataEditor:
                 
                 return True
             else:
-                st.error(f"No se encontró un registro para la fecha {fecha.strftime('%d/%m/%Y')}")
+                import streamlit as st
+                st.error(f"❌ No se encontró registro para eliminar")
                 return False
                 
         except Exception as e:
-            st.error(f"Error al eliminar el registro: {e}")
+            import streamlit as st
+            st.error(f"❌ Error al eliminar el registro: {e}")
             import traceback
             st.code(traceback.format_exc())
             return False
