@@ -34,19 +34,16 @@ def main():
     
     if df is not None:
         try:
-            # Usar todos los datos sin filtros de barra lateral
-            df_filtrado = df.copy()
+            # IMPORTANTE: No filtrar por fecha aquí - dejar que cada función maneje sus propios filtros
+            # El cálculo de componentes y general siempre usa valores más recientes
+            df_completo = df.copy()
             
-            # Crear filtros simples (solo fecha) - sin barra lateral
+            # Crear filtros simples (solo para referencia, no para filtrado directo)
             filters = create_simple_filters(df)
             
-            # Aplicar filtro de fecha si existe
-            if filters.get('fecha'):
-                df_filtrado = df_filtrado[df_filtrado['Fecha'] == filters['fecha']]
-            
-            # Renderizar pestañas
-            tab_manager = TabManager(df, data_loader.csv_path)
-            tab_manager.render_tabs(df_filtrado, filters)
+            # Renderizar pestañas - pasar datos completos
+            tab_manager = TabManager(df_completo, data_loader.csv_path)
+            tab_manager.render_tabs(df_completo, filters)
             
         except Exception as e:
             st.error(f"Error al procesar datos: {e}")
@@ -60,8 +57,15 @@ def main():
         show_error_message()
 
 def create_simple_filters(df):
-    """Crear filtros simples sin barra lateral"""
-    st.markdown("### 📅 Selección de Fecha")
+    """Crear selector de fecha para referencia (no afecta cálculos principales)"""
+    st.markdown("### 📅 Fecha de Referencia")
+    
+    # Mostrar información explicativa
+    st.info("""
+    ℹ️ **Nota importante:** Los cálculos de componentes y puntaje general siempre usan 
+    el **valor más reciente** de cada indicador. Esta fecha es solo para visualizaciones específicas.
+    """)
+    
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
@@ -71,10 +75,10 @@ def create_simple_filters(df):
             if len(fechas_validas) > 0:
                 fechas = sorted(fechas_validas)
                 fecha_seleccionada = st.selectbox(
-                    "", 
+                    "Seleccionar fecha (solo para visualizaciones específicas)", 
                     fechas, 
                     index=len(fechas) - 1,
-                    help="Selecciona la fecha para el análisis (opcional - por defecto usa valores más recientes)"
+                    help="Esta fecha se usa solo en algunas visualizaciones. Los cálculos principales usan valores más recientes."
                 )
                 return {'fecha': fecha_seleccionada}
             else:
