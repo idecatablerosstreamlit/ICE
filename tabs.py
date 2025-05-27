@@ -4,10 +4,9 @@ Interfaces de usuario para las pestañas del Dashboard ICE
 
 import streamlit as st
 import pandas as pd
-import time
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
-from filters import EvolutionFilters
+from filters import EvolutionFilters, PivotTableFilters
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
@@ -18,98 +17,35 @@ class GeneralSummaryTab:
         st.header("Resumen General")
         
         try:
-            # IMPORTANTE: NO usar fecha_seleccionada para cálculos principales
-            # Siempre calcular con valores más recientes para consistencia
-            
-            # Verificación previa de datos
-            if df.empty:
-                st.error("❌ No hay datos disponibles para el análisis")
-                return
-                
-            required_cols = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria']
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            if missing_cols:
-                st.error(f"❌ Faltan columnas esenciales: {missing_cols}")
-                st.write("**Columnas disponibles:**", list(df.columns))
-                return
-            
-            # Intentar cálculo de puntajes
-            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
-            
-            # Verificar que los cálculos fueron exitosos
-            if puntajes_componente.empty and puntajes_categoria.empty and puntaje_general == 0:
-                st.error("❌ No se pudieron calcular los puntajes. Revisar la estructura de los datos.")
-                return
-            
-            # Mostrar información sobre qué datos se están usando
-            st.info("""
-            📊 **Cálculos basados en valores más recientes:** Los puntajes se calculan 
-            usando el valor más reciente de cada indicador, asegurando consistencia 
-            independientemente de cuándo se agregaron los datos.
-            """)
+            # Calcular puntajes
+            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(
+                df, fecha_seleccionada
+            )
             
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
             
-            # Crear layout con velocímetro más pequeño
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                # Gráfico de velocímetro (más pequeño)
-                try:
-                    st.plotly_chart(
-                        ChartGenerator.gauge_chart(puntaje_general), 
-                        use_container_width=True
-                    )
-                except Exception as e:
-                    st.error(f"Error en velocímetro: {e}")
-            
-            with col2:
-                # Gráfico de radar (más grande) - también usando valores más recientes
-                try:
-                    st.plotly_chart(
-                        ChartGenerator.radar_chart(df, None),  # None = usar valores más recientes
-                        use_container_width=True
-                    )
-                except Exception as e:
-                    st.error(f"Error en gráfico radar: {e}")
+            # Gráfico de radar
+            st.plotly_chart(
+                ChartGenerator.radar_chart(df, fecha_seleccionada), 
+                use_container_width=True
+            )
             
             # Puntajes por componente
             st.subheader("Puntajes por Componente")
             if not puntajes_componente.empty:
-                try:
-                    fig_comp = ChartGenerator.component_bar_chart(puntajes_componente)
-                    st.plotly_chart(fig_comp, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error en gráfico de componentes: {e}")
-                    # Fallback: mostrar como tabla
-                    st.dataframe(puntajes_componente, use_container_width=True)
+                fig_comp = ChartGenerator.component_bar_chart(puntajes_componente)
+                st.plotly_chart(fig_comp, use_container_width=True)
             else:
                 st.info("No hay datos suficientes para mostrar puntajes por componente")
             
         except Exception as e:
-            st.error(f"❌ Error crítico al calcular puntajes: {e}")
-            import traceback
-            with st.expander("🔧 Detalles técnicos del error"):
-                st.code(traceback.format_exc())
-                st.write("**Información de debug:**")
-                st.write(f"- Shape del DataFrame: {df.shape if df is not None else 'None'}")
-                st.write(f"- Columnas: {list(df.columns) if df is not None else 'None'}")
-                if df is not None and not df.empty:
-                    st.write(f"- Códigos únicos: {df['Codigo'].nunique()}")
-                    st.write(f"- Fechas únicas: {df['Fecha'].nunique()}")
-            st.info("💡 Intenta recargar los datos usando el botón '🔄 Actualizar Datos'")
+            st.error(f"Error al calcular puntajes: {e}")
+            st.info("Comprueba que los datos contengan las columnas requeridas")
         
-        # Mostrar tabla de datos más recientes
-        with st.expander("📋 Ver datos más recientes por indicador"):
-            try:
-                df_latest = DataProcessor._get_latest_values_by_indicator(df)
-                if not df_latest.empty:
-                    st.dataframe(df_latest[['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Fecha']], use_container_width=True)
-                else:
-                    st.warning("No se pudieron obtener datos más recientes")
-            except Exception as e:
-                st.error(f"Error al mostrar datos: {e}")
+        # Mostrar tabla de datos filtrados
+        with st.expander("Ver datos generales"):
+            st.dataframe(df, use_container_width=True)
 
 class ComponentSummaryTab:
     """Pestaña de resumen por componente"""
@@ -127,457 +63,227 @@ class ComponentSummaryTab:
             key="comp_analysis"
         )
         
-        # Obtener valores más recientes y filtrar por componente
-        df_latest = DataProcessor._get_latest_values_by_indicator(df)
-        df_componente = df_latest[df_latest['Componente'] == componente_analisis]
+        # Filtrar datos por componente
+        df_componente = df[df['Componente'] == componente_analisis]
         
         if not df_componente.empty:
-            # Información sobre los datos que se están usando
-            st.info(f"""
-            📊 **Análisis de {componente_analisis}:** Basado en los valores más recientes 
-            de cada indicador de este componente.
-            """)
-            
-            # Métricas del componente con estilo personalizado (gris más claro)
-            st.markdown("""
-            <style>
-            .metric-gray {
-                background-color: rgba(248, 249, 250, 0.9);
-                padding: 1rem;
-                border-radius: 8px;
-                border-left: 4px solid #95A5A6;
-                margin-bottom: 1rem;
-            }
-            .metric-gray .metric-label {
-                color: #7F8C8D !important;
-                font-size: 0.875rem;
-                font-weight: 500;
-                margin-bottom: 0.25rem;
-            }
-            .metric-gray .metric-value {
-                color: #5D6D7E !important;
-                font-size: 1.5rem;
-                font-weight: 600;
-                margin: 0;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
+            # Métricas del componente con HTML personalizado
             col1, col2, col3 = st.columns(3)
             
             with col1:
                 valor_promedio = df_componente['Valor'].mean()
-                st.markdown(f"""
-                <div class="metric-gray">
-                    <div class="metric-label">Valor Promedio</div>
-                    <div class="metric-value">{valor_promedio:.3f}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                ComponentSummaryTab._render_custom_metric(
+                    "Valor Promedio", 
+                    f"{valor_promedio:.2f}",
+                    f"{valor_promedio*100:.1f}%"
+                )
             
             with col2:
                 total_indicadores = df_componente['Indicador'].nunique()
-                st.markdown(f"""
-                <div class="metric-gray">
-                    <div class="metric-label">Total Indicadores</div>
-                    <div class="metric-value">{total_indicadores}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                ComponentSummaryTab._render_custom_metric(
+                    "Total Indicadores", 
+                    str(total_indicadores),
+                    "indicadores"
+                )
             
             with col3:
                 ultima_medicion = df_componente['Fecha'].max()
-                # Manejar fechas NaT de forma segura
-                if pd.notna(ultima_medicion):
-                    try:
-                        fecha_str = pd.to_datetime(ultima_medicion).strftime('%d/%m/%Y')
-                        fecha_display = fecha_str
-                    except:
-                        fecha_display = "No disponible"
-                else:
-                    fecha_display = "No disponible"
-                
-                st.markdown(f"""
-                <div class="metric-gray">
-                    <div class="metric-label">Última Medición</div>
-                    <div class="metric-value">{fecha_display}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Tabla de categorías con colores - usando valores más recientes
-            try:
-                ChartGenerator.show_category_table_simple(df, componente_analisis)
-            except Exception as e:
-                st.error(f"Error al mostrar categorías: {e}")
-                
-                # Fallback: mostrar datos básicos
-                st.subheader("📊 Datos por Categoría (Fallback)")
-                try:
-                    df_latest = DataProcessor._get_latest_values_by_indicator(df)
-                    df_comp = df_latest[df_latest['Componente'] == componente_analisis]
-                    
-                    if not df_comp.empty:
-                        categoria_stats = df_comp.groupby('Categoria')['Valor'].agg(['mean', 'count']).reset_index()
-                        categoria_stats.columns = ['Categoría', 'Puntaje Promedio', 'Num. Indicadores']
-                        st.dataframe(categoria_stats, use_container_width=True)
-                    else:
-                        st.warning("No hay datos del componente disponibles")
-                except Exception as e2:
-                    st.error(f"Error en fallback: {e2}")
-            
-            # Layout con gráficos lado a lado
-            col_izq, col_der = st.columns(2)
-            
-            with col_izq:
-                # Gráfico de evolución del componente - usar datos históricos completos
-                df_componente_historico = df[df['Componente'] == componente_analisis]
-                fig_evol = ChartGenerator.evolution_chart(df_componente_historico, componente=componente_analisis)
-                st.plotly_chart(fig_evol, use_container_width=True)
-            
-            with col_der:
-                # Gráfico de radar por categorías - usar valores más recientes
-                fig_radar_cat = ChartGenerator.radar_chart_categories(
-                    df, componente_analisis, None  # None = usar valores más recientes
+                ComponentSummaryTab._render_custom_metric(
+                    "Última Medición", 
+                    ultima_medicion.strftime('%d/%m/%Y'),
+                    ""
                 )
-                st.plotly_chart(fig_radar_cat, use_container_width=True)
             
-            # Tabla de indicadores del componente - mostrar valores más recientes
-            st.subheader(f"Indicadores Más Recientes de {componente_analisis}")
+            # Gráfico de evolución del componente
+            fig_evol = ChartGenerator.evolution_chart(df_componente, componente=componente_analisis)
+            st.plotly_chart(fig_evol, use_container_width=True)
+            
+            # Tabla de indicadores del componente
+            st.subheader(f"Indicadores de {componente_analisis}")
             st.dataframe(
-                df_componente[['Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values('Valor', ascending=False),
+                df_componente[['Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values('Fecha', ascending=False),
                 use_container_width=True
             )
         else:
             st.warning("No hay datos para el componente seleccionado")
+    
+    @staticmethod
+    def _render_custom_metric(label, value, subtitle=""):
+        """Renderizar métrica personalizada con mejor visibilidad"""
+        st.markdown(f"""
+        <div style="
+            background-color: #2D2D2D;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #404040;
+            text-align: center;
+            margin-bottom: 1rem;
+        ">
+            <h4 style="
+                color: #B0B0B0;
+                font-size: 0.9rem;
+                margin: 0 0 0.5rem 0;
+                font-weight: normal;
+            ">{label}</h4>
+            <h2 style="
+                color: #FFFFFF;
+                font-size: 2rem;
+                margin: 0;
+                font-weight: bold;
+            ">{value}</h2>
+            {f'<p style="color: #90CAF9; font-size: 0.8rem; margin: 0.5rem 0 0 0;">{subtitle}</p>' if subtitle else ''}
+        </div>
+        """, unsafe_allow_html=True)
 
 class EvolutionTab:
-    """Pestaña de evolución - CORREGIDA"""
+    """Pestaña de evolución"""
     
     @staticmethod
     def render(df, filters):
         """Renderizar la pestaña de evolución"""
-        st.subheader("📈 Evolución Temporal de Indicadores")
+        st.subheader("Evolución de Indicadores")
         
         try:
-            # Verificar que tenemos datos
-            if df.empty:
-                st.warning("No hay datos disponibles para mostrar evolución")
-                return
-            
-            # Información sobre los datos disponibles
-            st.info(f"""
-            📊 **Datos disponibles:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos
-            📅 **Rango de fechas:** {df['Fecha'].min().strftime('%d/%m/%Y')} - {df['Fecha'].max().strftime('%d/%m/%Y')}
-            """)
-            
             # Crear filtros específicos de evolución
             evolution_filters = EvolutionFilters.create_evolution_filters(df)
             
-            # Mostrar información del filtro seleccionado
+            # Mostrar nombre del indicador seleccionado
             if evolution_filters['indicador']:
-                st.success(f"**📊 Indicador seleccionado:** {evolution_filters['indicador']}")
-                
-                # Mostrar datos específicos del indicador
-                datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
-                
-                if not datos_indicador.empty:
-                    st.write(f"**Registros históricos encontrados:** {len(datos_indicador)}")
-                    
-                    # Mostrar tabla de datos del indicador
-                    with st.expander("📋 Ver datos históricos del indicador"):
-                        st.dataframe(
-                            datos_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
-                            use_container_width=True
-                        )
-                else:
-                    st.warning("No se encontraron datos históricos para este indicador")
-                    return
-            else:
-                st.info("**📊 Vista general:** Mostrando evolución promedio de todos los indicadores")
+                st.write(f"**Indicador seleccionado:** {evolution_filters['indicador']}")
             
             # Generar gráfico de evolución
-            try:
-                fig = ChartGenerator.evolution_chart(
-                    df,
-                    indicador=evolution_filters['indicador'],
-                    componente=None,  # No filtrar por componente aquí
-                    tipo_grafico=evolution_filters['tipo_grafico'],
-                    mostrar_meta=evolution_filters['mostrar_meta']
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-            except Exception as e:
-                st.error(f"Error al generar gráfico: {e}")
-                import traceback
-                with st.expander("Detalles del error"):
-                    st.code(traceback.format_exc())
+            fig = ChartGenerator.evolution_chart(
+                df,
+                indicador=evolution_filters['indicador'],
+                componente=filters.get('componente'),
+                tipo_grafico=evolution_filters['tipo_grafico'],
+                mostrar_meta=evolution_filters['mostrar_meta']
+            )
             
-            # Mostrar análisis adicional si hay un indicador seleccionado
-            if evolution_filters['codigo'] and evolution_filters['indicador']:
-                st.subheader(f"📊 Análisis Detallado: {evolution_filters['indicador']}")
-                
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Mostrar tabla de datos del indicador seleccionado
+            if evolution_filters['codigo']:
+                st.subheader(f"Datos del indicador: {evolution_filters['indicador']}")
                 datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
-                
-                if len(datos_indicador) > 1:
-                    # Métricas de evolución
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    with col1:
-                        valor_inicial = datos_indicador.iloc[0]['Valor']
-                        st.metric("Valor Inicial", f"{valor_inicial:.3f}")
-                    
-                    with col2:
-                        valor_actual = datos_indicador.iloc[-1]['Valor']
-                        st.metric("Valor Actual", f"{valor_actual:.3f}")
-                    
-                    with col3:
-                        cambio = valor_actual - valor_inicial
-                        st.metric("Cambio Total", f"{cambio:+.3f}")
-                    
-                    with col4:
-                        if valor_inicial != 0:
-                            cambio_pct = (cambio / valor_inicial) * 100
-                            st.metric("Cambio %", f"{cambio_pct:+.1f}%")
-                        else:
-                            st.metric("Cambio %", "N/A")
-                
-                # Tabla de datos históricos
                 st.dataframe(
                     datos_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
                     use_container_width=True
                 )
         
         except Exception as e:
-            st.error(f"Error crítico en pestaña de evolución: {e}")
-            import traceback
-            with st.expander("🔧 Debug: Detalles del error"):
-                st.code(traceback.format_exc())
-                st.write("**Datos de entrada:**")
-                st.write(f"- DataFrame shape: {df.shape if df is not None else 'None'}")
-                st.write(f"- Filtros: {filters}")
-                if df is not None and not df.empty:
-                    st.write(f"- Columnas: {list(df.columns)}")
-                    st.write(f"- Códigos únicos: {df['Codigo'].nunique() if 'Codigo' in df.columns else 'N/A'}")
+            st.error(f"Error al generar gráfico de evolución: {e}")
+
+class PivotTableTab:
+    """Pestaña de tabla dinámica"""
+    
+    @staticmethod
+    def render(df, fecha_seleccionada):
+        """Renderizar la pestaña de tabla dinámica"""
+        st.subheader("Tabla Dinámica de Indicadores")
+        
+        try:
+            # Crear filtros para tabla dinámica
+            pivot_filters = PivotTableFilters.create_pivot_filters()
+            
+            # Validar que filas y columnas sean diferentes
+            if pivot_filters['filas'] == pivot_filters['columnas']:
+                st.warning("Las filas y columnas deben ser diferentes.")
+            else:
+                # Crear tabla dinámica
+                tabla = DataProcessor.create_pivot_table(
+                    df,
+                    fecha=fecha_seleccionada,
+                    filas=pivot_filters['filas'],
+                    columnas=pivot_filters['columnas'],
+                    valores=pivot_filters['valores']
+                )
+                
+                # Mostrar tabla con formato condicional
+                st.dataframe(
+                    tabla.style.background_gradient(cmap='YlGn'), 
+                    use_container_width=True
+                )
+                
+                # Opción para descargar
+                csv = tabla.to_csv(index=True)
+                st.download_button(
+                    label="Descargar tabla como CSV",
+                    data=csv,
+                    file_name=f"tabla_dinamica_{fecha_seleccionada.strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+        
+        except Exception as e:
+            st.error(f"Error al generar tabla dinámica: {e}")
+            st.info("Comprueba que los datos contengan las columnas seleccionadas")
 
 class EditTab:
-    """Pestaña de edición mejorada"""
+    """Pestaña de edición"""
     
     @staticmethod
     def render(df, csv_path):
-        """Renderizar la pestaña de edición con capacidades completas"""
-        st.subheader("Gestión de Indicadores")
+        """Renderizar la pestaña de edición"""
+        st.subheader("Edición de Indicadores")
         
         try:
-            # Validar que hay datos
-            if df.empty:
-                st.error("No hay datos disponibles")
-                return
-            
             # Seleccionar indicador por código
-            codigos_disponibles = sorted(df['Codigo'].dropna().unique())
-            if not codigos_disponibles:
-                st.error("No hay códigos de indicadores disponibles")
-                return
-                
-            codigo_editar = st.selectbox("Seleccionar Código de Indicador", codigos_disponibles, key="codigo_editar")
-            
-            # Validar que el código seleccionado existe en los datos
-            datos_indicador = df[df['Codigo'] == codigo_editar]
-            if datos_indicador.empty:
-                st.error(f"No se encontraron datos para el código {codigo_editar}")
-                return
+            codigos = sorted(df['Codigo'].unique())
+            codigo_editar = st.selectbox("Seleccionar Código de Indicador", codigos, key="codigo_editar")
             
             # Mostrar información del indicador
-            try:
-                nombre_indicador = datos_indicador['Indicador'].iloc[0]
-                componente_indicador = datos_indicador['Componente'].iloc[0]
-                categoria_indicador = datos_indicador['Categoria'].iloc[0]
-            except IndexError:
-                st.error(f"Error al obtener información del indicador {codigo_editar}")
-                return
+            nombre_indicador = df[df['Codigo'] == codigo_editar]['Indicador'].iloc[0]
+            st.write(f"**Indicador seleccionado:** {nombre_indicador}")
             
-            st.markdown(f"""
-            **Indicador seleccionado:** {nombre_indicador}  
-            **Componente:** {componente_indicador}  
-            **Categoría:** {categoria_indicador}
-            """)
+            # Mostrar información actual
+            info_indicador = df[df['Codigo'] == codigo_editar]
+            st.dataframe(
+                info_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
+                use_container_width=True
+            )
             
-            # Obtener registros existentes del indicador
-            registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
-            
-            # Crear pestañas para diferentes acciones
-            tab_ver, tab_agregar, tab_editar, tab_eliminar = st.tabs([
-                "📋 Ver Registros", 
-                "➕ Agregar Nuevo", 
-                "✏️ Editar Existente", 
-                "🗑️ Eliminar Registro"
-            ])
-            
-            with tab_ver:
-                st.subheader("Registros Existentes")
-                if not registros_indicador.empty:
-                    st.dataframe(
-                        registros_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
-                        use_container_width=True
-                    )
-                else:
-                    st.info("No hay registros para este indicador")
-            
-            with tab_agregar:
-                EditTab._render_add_form(df, codigo_editar, nombre_indicador, csv_path)
-            
-            with tab_editar:
-                EditTab._render_edit_form(df, codigo_editar, registros_indicador, csv_path)
-            
-            with tab_eliminar:
-                EditTab._render_delete_form(df, codigo_editar, registros_indicador, csv_path)
-        
-        except Exception as e:
-            st.error(f"Error en la gestión de indicadores: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-            st.info("Verifica que el archivo CSV contenga todas las columnas necesarias")
-    
-    @staticmethod
-    def _render_add_form(df, codigo_editar, nombre_indicador, csv_path):
-        """Formulario para agregar nuevo registro"""
-        st.subheader("Agregar Nuevo Registro")
-        
-        with st.form("form_agregar"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                nueva_fecha = st.date_input(
-                    "Nueva Fecha",
-                    help="Selecciona la fecha para el nuevo registro"
-                )
-            
-            with col2:
-                nuevo_valor = st.number_input(
-                    "Nuevo Valor",
-                    value=0.5,
-                    min_value=0.0,
-                    max_value=1.0,
-                    step=0.01,
-                    help="Valor entre 0 y 1, donde 1 = 100% de cumplimiento"
-                )
-            
-            submitted = st.form_submit_button("➕ Agregar Registro", use_container_width=True)
-            
-            if submitted:
-                # Verificar si ya existe un registro para esa fecha
-                fecha_dt = pd.to_datetime(nueva_fecha)
-                registro_existente = df[(df['Codigo'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
-                
-                if not registro_existente.empty:
-                    st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')}. Usa la pestaña 'Editar' para modificarlo.")
-                else:
-                    if DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, csv_path):
-                        st.success("✅ Nuevo registro agregado correctamente")
-                        st.rerun()
-                    else:
-                        st.error("❌ Error al agregar el nuevo registro")
-    
-    @staticmethod
-    def _render_edit_form(df, codigo_editar, registros_indicador, csv_path):
-        """Formulario para editar registro existente"""
-        st.subheader("Editar Registro Existente")
-        
-        if registros_indicador.empty:
-            st.info("No hay registros existentes para editar")
-            return
-        
-        # Seleccionar registro a editar
-        fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
-        fecha_seleccionada_str = st.selectbox(
-            "Seleccionar fecha a editar",
-            fechas_disponibles,
-            help="Selecciona el registro que deseas modificar"
-        )
-        
-        if fecha_seleccionada_str:
-            # Obtener la fecha real
-            idx_seleccionado = fechas_disponibles.index(fecha_seleccionada_str)
-            fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
-            valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
-            
-            with st.form("form_editar"):
+            # Formulario de edición
+            with st.form("form_edicion"):
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.info(f"📅 Fecha: {fecha_real.strftime('%d/%m/%Y')}")
-                    st.info(f"📊 Valor actual: {valor_actual:.3f}")
+                    try:
+                        fechas_options = sorted(df['Fecha'].unique())
+                        fecha_editar = st.date_input(
+                            "Fecha",
+                            value=pd.to_datetime(fechas_options[-1]).date() if fechas_options else None
+                        )
+                    except:
+                        fecha_editar = st.date_input("Fecha")
                 
                 with col2:
-                    nuevo_valor = st.number_input(
-                        "Nuevo Valor",
-                        value=float(valor_actual),
+                    valor_actual = info_indicador[
+                        info_indicador['Fecha'] == pd.to_datetime(fecha_editar)
+                    ]['Valor'].values
+                    
+                    valor_editar = st.number_input(
+                        "Nuevo valor",
+                        value=float(valor_actual[0]) if len(valor_actual) > 0 else 0.5,
                         min_value=0.0,
                         max_value=1.0,
-                        step=0.01,
-                        help="Nuevo valor para este registro"
+                        step=0.1
                     )
+                    st.caption("Los valores deben estar entre 0 y 1, donde 1 representa el 100%")
                 
-                submitted = st.form_submit_button("✏️ Actualizar Registro", use_container_width=True)
+                # Botón para guardar
+                submitted = st.form_submit_button("Guardar cambios")
                 
                 if submitted:
-                    if DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, csv_path):
-                        st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente")
-                        st.balloons()
-                        # Forzar recarga inmediata
-                        st.cache_data.clear()
-                        time.sleep(0.5)
+                    fecha_dt = pd.to_datetime(fecha_editar)
+                    if DataEditor.save_edit(df, codigo_editar, fecha_dt, valor_editar, csv_path):
+                        st.success("Datos actualizados correctamente")
                         st.rerun()
                     else:
-                        st.error("❌ Error al actualizar el registro")
-    
-    @staticmethod
-    def _render_delete_form(df, codigo_editar, registros_indicador, csv_path):
-        """Formulario para eliminar registro"""
-        st.subheader("Eliminar Registro")
+                        st.error("Error al actualizar datos")
         
-        if registros_indicador.empty:
-            st.info("No hay registros existentes para eliminar")
-            return
-        
-        # Seleccionar registro a eliminar
-        fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
-        fecha_seleccionada_str = st.selectbox(
-            "Seleccionar fecha a eliminar",
-            fechas_disponibles,
-            help="⚠️ CUIDADO: Esta acción no se puede deshacer"
-        )
-        
-        if fecha_seleccionada_str:
-            # Obtener la fecha real
-            idx_seleccionado = fechas_disponibles.index(fecha_seleccionada_str)
-            fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
-            valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
-            
-            st.warning(f"""
-            ⚠️ **ATENCIÓN**: Estás a punto de eliminar el registro:
-            - **Fecha**: {fecha_real.strftime('%d/%m/%Y')}
-            - **Valor**: {valor_actual:.3f}
-            
-            Esta acción **NO SE PUEDE DESHACER**.
-            """)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                confirmar = st.checkbox("Confirmo que quiero eliminar este registro", key="confirm_delete")
-            
-            with col2:
-                if confirmar:
-                    if st.button("🗑️ ELIMINAR REGISTRO", type="primary", use_container_width=True):
-                        if DataEditor.delete_record(df, codigo_editar, fecha_real, csv_path):
-                            st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente")
-                            st.balloons()
-                            # Forzar recarga inmediata
-                            st.cache_data.clear()
-                            time.sleep(0.5)
-                            st.rerun()
-                        else:
-                            st.error("❌ Error al eliminar el registro")
+        except Exception as e:
+            st.error(f"Error en la edición de indicadores: {e}")
+            st.info("Asegúrate de que los datos contengan las columnas necesarias")
 
 class TabManager:
     """Gestor de pestañas del dashboard"""
@@ -587,12 +293,13 @@ class TabManager:
         self.csv_path = csv_path
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar todas las pestañas (sin tabla dinámica)"""
-        tab1, tab2, tab3, tab4 = st.tabs([
+        """Renderizar todas las pestañas"""
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "Resumen General", 
             "Resumen por Componente", 
             "Evolución", 
-            "Gestión de Datos"
+            "Tabla Dinámica", 
+            "Edición"
         ])
         
         with tab1:
@@ -605,4 +312,7 @@ class TabManager:
             EvolutionTab.render(self.df, filters)
         
         with tab4:
+            PivotTableTab.render(self.df, filters.get('fecha'))
+        
+        with tab5:
             EditTab.render(self.df, self.csv_path)
