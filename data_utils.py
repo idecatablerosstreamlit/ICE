@@ -162,25 +162,82 @@ class DataProcessor:
         return tabla
 
 class DataEditor:
-    """Clase para editar datos"""
+    """Clase para editar datos con operaciones CRUD completas"""
     
     @staticmethod
     def save_edit(df, codigo, fecha, nuevo_valor, csv_path):
-        """Guardar edición de un indicador"""
+        """Guardar edición de un indicador (función heredada para compatibilidad)"""
+        return DataEditor.update_record(df, codigo, fecha, nuevo_valor, csv_path)
+    
+    @staticmethod
+    def add_new_record(df, codigo, fecha, valor, csv_path):
+        """Agregar un nuevo registro para un indicador"""
         try:
+            # Obtener información base del indicador
+            indicador_base = df[df['Codigo'] == codigo].iloc[0]
+            
+            # Crear nueva fila
+            nueva_fila = {
+                'Linea_Accion': indicador_base['Linea_Accion'],
+                'Componente': indicador_base['Componente'],
+                'Categoria': indicador_base['Categoria'],
+                'Codigo': codigo,
+                'Indicador': indicador_base['Indicador'],
+                'Valor': valor,
+                'Fecha': fecha,
+                'Meta': indicador_base.get('Meta', 1.0),
+                'Peso': indicador_base.get('Peso', 1.0)
+            }
+            
+            # Agregar al DataFrame
+            df_nuevo = pd.concat([df, pd.DataFrame([nueva_fila])], ignore_index=True)
+            
+            # Guardar al CSV
+            df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
+            return True
+            
+        except Exception as e:
+            st.error(f"Error al agregar nuevo registro: {e}")
+            return False
+    
+    @staticmethod
+    def update_record(df, codigo, fecha, nuevo_valor, csv_path):
+        """Actualizar un registro existente"""
+        try:
+            # Encontrar el índice del registro a actualizar
             idx = df[(df['Codigo'] == codigo) & (df['Fecha'] == fecha)].index
-
+            
             if len(idx) > 0:
+                # Actualizar el valor
                 df.loc[idx, 'Valor'] = nuevo_valor
+                # Guardar al CSV
                 df.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
                 return True
             else:
-                nueva_fila = df[df['Codigo'] == codigo].iloc[0].copy()
-                nueva_fila['Fecha'] = fecha
-                nueva_fila['Valor'] = nuevo_valor
-                df_nuevo = pd.concat([df, pd.DataFrame([nueva_fila])], ignore_index=True)
+                st.error(f"No se encontró un registro para la fecha {fecha.strftime('%d/%m/%Y')}")
+                return False
+                
+        except Exception as e:
+            st.error(f"Error al actualizar el registro: {e}")
+            return False
+    
+    @staticmethod
+    def delete_record(df, codigo, fecha, csv_path):
+        """Eliminar un registro existente"""
+        try:
+            # Encontrar el índice del registro a eliminar
+            idx = df[(df['Codigo'] == codigo) & (df['Fecha'] == fecha)].index
+            
+            if len(idx) > 0:
+                # Eliminar la fila
+                df_nuevo = df.drop(idx).reset_index(drop=True)
+                # Guardar al CSV
                 df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
                 return True
+            else:
+                st.error(f"No se encontró un registro para la fecha {fecha.strftime('%d/%m/%Y')}")
+                return False
+                
         except Exception as e:
-            st.error(f"Error al guardar edición: {e}")
+            st.error(f"Error al eliminar el registro: {e}")
             return False
