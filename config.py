@@ -38,10 +38,14 @@ def apply_dark_theme():
         }
         div.stButton > button {
             background-color: #4CAF50;
-            color: white;
+            color: white !important;
+            border: 1px solid #4CAF50;
+            font-weight: 600;
         }
         div.stButton > button:hover {
             background-color: #45a049;
+            color: white !important;
+            border: 1px solid #45a049;
         }
         [data-testid="stSidebar"] {
             background-color: #1E1E1E;
@@ -54,6 +58,54 @@ def apply_dark_theme():
         }
         .css-1d0tddh {
             color: white;
+        }
+        /* Mejorar visibilidad de métricas */
+        [data-testid="metric-container"] {
+            background-color: #2D2D2D !important;
+            border: 1px solid #404040;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        [data-testid="metric-container"] > div {
+            color: white !important;
+        }
+        [data-testid="metric-container"] [data-testid="stMetricValue"] {
+            color: #E0E0E0 !important;
+            font-size: 1.5rem !important;
+            font-weight: 600 !important;
+        }
+        [data-testid="metric-container"] [data-testid="stMetricLabel"] {
+            color: #B0B0B0 !important;
+            font-size: 0.9rem !important;
+        }
+        [data-testid="metric-container"] [data-testid="stMetricDelta"] {
+            color: #90CAF9 !important;
+        }
+        /* Mejorar selectboxes */
+        .stSelectbox > div > div {
+            background-color: #2D2D2D;
+            color: white;
+        }
+        /* Mejorar radio buttons */
+        .stRadio label {
+            color: white !important;
+        }
+        /* Mejorar checkboxes */
+        .stCheckbox label {
+            color: white !important;
+        }
+        /* Mejorar form labels */
+        .stFormSubmitButton > button {
+            background-color: #2196F3 !important;
+            color: white !important;
+            border: 1px solid #2196F3 !important;
+            font-weight: 600 !important;
+        }
+        .stFormSubmitButton > button:hover {
+            background-color: #1976D2 !important;
+            color: white !important;
+            border: 1px solid #1976D2 !important;
         }
     </style>
     """, unsafe_allow_html=True)
