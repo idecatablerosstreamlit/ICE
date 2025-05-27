@@ -3,16 +3,17 @@
 
 # Framework principal
 streamlit>=1.28.0
+streamlit>=1.28.0
 
 # Manipulación de datos
-pandas>=2.0.0
+pandas>=1.5.0
 numpy>=1.24.0
 
 dash
 matplotlib
 
 # Visualizaciones
-plotly>=5.15.0
+plotly>=5.0.0
 
 # Manejo de fechas
 python-dateutil>=2.8.0
