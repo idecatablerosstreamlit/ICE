@@ -6,7 +6,71 @@ import streamlit as st
 import pandas as pd
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
-from filters import EvolutionFilters, PivotTableFilters
+
+# Funciones de filtros integradas directamente
+def create_evolution_filters(df):
+    """Crear filtros para la pestaña de evolución"""
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Por código de indicador
+        codigos = sorted(df['Codigo'].unique())
+        codigo_seleccionado = st.selectbox("Código de Indicador", ["Todos"] + list(codigos))
+        
+        if codigo_seleccionado == "Todos":
+            codigo_seleccionado = None
+            indicador_seleccionado = None
+        else:
+            indicador_seleccionado = df[df['Codigo'] == codigo_seleccionado]['Indicador'].iloc[0]
+    
+    with col2:
+        # Opción para mostrar línea de meta
+        mostrar_meta = st.checkbox("Mostrar línea de referencia (Meta = 1.0)", value=True)
+        
+        # Seleccionar tipo de gráfico
+        tipo_grafico = st.radio(
+            "Tipo de gráfico",
+            options=["Línea", "Barras"],
+            horizontal=True
+        )
+    
+    return {
+        'codigo': codigo_seleccionado,
+        'indicador': indicador_seleccionado,
+        'mostrar_meta': mostrar_meta,
+        'tipo_grafico': tipo_grafico
+    }
+
+def create_pivot_filters():
+    """Crear filtros para la tabla dinámica"""
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        filas = st.selectbox(
+            "Filas",
+            options=["Categoria", "Componente", "Linea_Accion", "Codigo"],
+            index=0
+        )
+    
+    with col2:
+        columnas = st.selectbox(
+            "Columnas",
+            options=["Componente", "Categoria", "Linea_Accion", "Codigo"],
+            index=0
+        )
+    
+    with col3:
+        valores = st.selectbox(
+            "Valores",
+            options=["Valor", "Cumplimiento", "Puntaje_Ponderado"],
+            index=0
+        )
+    
+    return {
+        'filas': filas,
+        'columnas': columnas,
+        'valores': valores
+    }
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
@@ -122,7 +186,7 @@ class EvolutionTab:
         
         try:
             # Crear filtros específicos de evolución
-            evolution_filters = EvolutionFilters.create_evolution_filters(df)
+            evolution_filters = create_evolution_filters(df)
             
             # Mostrar nombre del indicador seleccionado
             if evolution_filters['indicador']:
@@ -161,7 +225,7 @@ class PivotTableTab:
         
         try:
             # Crear filtros para tabla dinámica
-            pivot_filters = PivotTableFilters.create_pivot_filters()
+            pivot_filters = create_pivot_filters()
             
             # Validar que filas y columnas sean diferentes
             if pivot_filters['filas'] == pivot_filters['columnas']:
