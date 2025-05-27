@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
-from filters import EvolutionFilters, PivotTableFilters
+from filters import EvolutionFilters
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
@@ -142,6 +142,16 @@ class ComponentSummaryTab:
                 </div>
                 """, unsafe_allow_html=True)
             
+            # Tabla de categorías con colores
+            tabla_html, error = ChartGenerator.category_summary_table(
+                df, componente_analisis, filters.get('fecha')
+            )
+            
+            if tabla_html:
+                st.markdown(tabla_html, unsafe_allow_html=True)
+            elif error:
+                st.warning(error)
+            
             # Layout con gráficos lado a lado
             col_izq, col_der = st.columns(2)
             
@@ -205,68 +215,13 @@ class EvolutionTab:
         except Exception as e:
             st.error(f"Error al generar gráfico de evolución: {e}")
 
-class PivotTableTab:
-    """Pestaña de tabla dinámica"""
-    
-    @staticmethod
-    def render(df, fecha_seleccionada):
-        """Renderizar la pestaña de tabla dinámica"""
-        st.subheader("Tabla Dinámica de Indicadores")
-        
-        try:
-            # Crear filtros para tabla dinámica
-            pivot_filters = PivotTableFilters.create_pivot_filters()
-            
-            # Validar que filas y columnas sean diferentes
-            if pivot_filters['filas'] == pivot_filters['columnas']:
-                st.warning("Las filas y columnas deben ser diferentes.")
-            else:
-                # Crear tabla dinámica
-                tabla = DataProcessor.create_pivot_table(
-                    df,
-                    fecha=fecha_seleccionada,
-                    filas=pivot_filters['filas'],
-                    columnas=pivot_filters['columnas'],
-                    valores=pivot_filters['valores']
-                )
-                
-                # Mostrar tabla con formato condicional
-                st.dataframe(
-                    tabla.style.background_gradient(cmap='YlGn'), 
-                    use_container_width=True
-                )
-                
-                # Opción para descargar - manejar fechas NaT
-                csv = tabla.to_csv(index=True)
-                
-                # Crear nombre de archivo seguro
-                if fecha_seleccionada is not None and pd.notna(fecha_seleccionada):
-                    try:
-                        fecha_str = pd.to_datetime(fecha_seleccionada).strftime('%Y%m%d')
-                        filename = f"tabla_dinamica_{fecha_str}.csv"
-                    except:
-                        filename = "tabla_dinamica.csv"
-                else:
-                    filename = "tabla_dinamica.csv"
-                
-                st.download_button(
-                    label="Descargar tabla como CSV",
-                    data=csv,
-                    file_name=filename,
-                    mime="text/csv"
-                )
-        
-        except Exception as e:
-            st.error(f"Error al generar tabla dinámica: {e}")
-            st.info("Comprueba que los datos contengan las columnas seleccionadas")
-
 class EditTab:
-    """Pestaña de edición"""
+    """Pestaña de edición mejorada"""
     
     @staticmethod
     def render(df, csv_path):
-        """Renderizar la pestaña de edición"""
-        st.subheader("Edición de Indicadores")
+        """Renderizar la pestaña de edición con capacidades completas"""
+        st.subheader("Gestión de Indicadores")
         
         try:
             # Seleccionar indicador por código
@@ -275,64 +230,182 @@ class EditTab:
             
             # Mostrar información del indicador
             nombre_indicador = df[df['Codigo'] == codigo_editar]['Indicador'].iloc[0]
-            st.write(f"**Indicador seleccionado:** {nombre_indicador}")
+            componente_indicador = df[df['Codigo'] == codigo_editar]['Componente'].iloc[0]
+            categoria_indicador = df[df['Codigo'] == codigo_editar]['Categoria'].iloc[0]
             
-            # Mostrar información actual
-            info_indicador = df[df['Codigo'] == codigo_editar]
-            st.dataframe(
-                info_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
-                use_container_width=True
-            )
+            st.markdown(f"""
+            **Indicador seleccionado:** {nombre_indicador}  
+            **Componente:** {componente_indicador}  
+            **Categoría:** {categoria_indicador}
+            """)
             
-            # Formulario de edición
-            with st.form("form_edicion"):
+            # Obtener registros existentes del indicador
+            registros_indicador = df[df['Codigo'] == codigo_editar].sort_values('Fecha', ascending=False)
+            
+            # Crear pestañas para diferentes acciones
+            tab_ver, tab_agregar, tab_editar, tab_eliminar = st.tabs([
+                "📋 Ver Registros", 
+                "➕ Agregar Nuevo", 
+                "✏️ Editar Existente", 
+                "🗑️ Eliminar Registro"
+            ])
+            
+            with tab_ver:
+                st.subheader("Registros Existentes")
+                if not registros_indicador.empty:
+                    st.dataframe(
+                        registros_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
+                        use_container_width=True
+                    )
+                else:
+                    st.info("No hay registros para este indicador")
+            
+            with tab_agregar:
+                EditTab._render_add_form(df, codigo_editar, nombre_indicador, csv_path)
+            
+            with tab_editar:
+                EditTab._render_edit_form(df, codigo_editar, registros_indicador, csv_path)
+            
+            with tab_eliminar:
+                EditTab._render_delete_form(df, codigo_editar, registros_indicador, csv_path)
+        
+        except Exception as e:
+            st.error(f"Error en la gestión de indicadores: {e}")
+            st.info("Asegúrate de que los datos contengan las columnas necesarias")
+    
+    @staticmethod
+    def _render_add_form(df, codigo_editar, nombre_indicador, csv_path):
+        """Formulario para agregar nuevo registro"""
+        st.subheader("Agregar Nuevo Registro")
+        
+        with st.form("form_agregar"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                nueva_fecha = st.date_input(
+                    "Nueva Fecha",
+                    help="Selecciona la fecha para el nuevo registro"
+                )
+            
+            with col2:
+                nuevo_valor = st.number_input(
+                    "Nuevo Valor",
+                    value=0.5,
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.01,
+                    help="Valor entre 0 y 1, donde 1 = 100% de cumplimiento"
+                )
+            
+            submitted = st.form_submit_button("➕ Agregar Registro", use_container_width=True)
+            
+            if submitted:
+                # Verificar si ya existe un registro para esa fecha
+                fecha_dt = pd.to_datetime(nueva_fecha)
+                registro_existente = df[(df['Codigo'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
+                
+                if not registro_existente.empty:
+                    st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')}. Usa la pestaña 'Editar' para modificarlo.")
+                else:
+                    if DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, csv_path):
+                        st.success("✅ Nuevo registro agregado correctamente")
+                        st.rerun()
+                    else:
+                        st.error("❌ Error al agregar el nuevo registro")
+    
+    @staticmethod
+    def _render_edit_form(df, codigo_editar, registros_indicador, csv_path):
+        """Formulario para editar registro existente"""
+        st.subheader("Editar Registro Existente")
+        
+        if registros_indicador.empty:
+            st.info("No hay registros existentes para editar")
+            return
+        
+        # Seleccionar registro a editar
+        fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
+        fecha_seleccionada_str = st.selectbox(
+            "Seleccionar fecha a editar",
+            fechas_disponibles,
+            help="Selecciona el registro que deseas modificar"
+        )
+        
+        if fecha_seleccionada_str:
+            # Obtener la fecha real
+            idx_seleccionado = fechas_disponibles.index(fecha_seleccionada_str)
+            fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
+            valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
+            
+            with st.form("form_editar"):
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    try:
-                        # Filtrar fechas válidas (no NaT)
-                        fechas_validas = df['Fecha'].dropna().unique()
-                        if len(fechas_validas) > 0:
-                            fechas_options = sorted(fechas_validas)
-                            ultima_fecha_valida = pd.to_datetime(fechas_options[-1])
-                            fecha_editar = st.date_input(
-                                "Fecha",
-                                value=ultima_fecha_valida.date() if pd.notna(ultima_fecha_valida) else None
-                            )
-                        else:
-                            fecha_editar = st.date_input("Fecha")
-                    except Exception as e:
-                        st.warning(f"Error al cargar fechas: {e}")
-                        fecha_editar = st.date_input("Fecha")
+                    st.info(f"📅 Fecha: {fecha_real.strftime('%d/%m/%Y')}")
+                    st.info(f"📊 Valor actual: {valor_actual:.3f}")
                 
                 with col2:
-                    valor_actual = info_indicador[
-                        info_indicador['Fecha'] == pd.to_datetime(fecha_editar)
-                    ]['Valor'].values
-                    
-                    valor_editar = st.number_input(
-                        "Nuevo valor",
-                        value=float(valor_actual[0]) if len(valor_actual) > 0 else 0.5,
+                    nuevo_valor = st.number_input(
+                        "Nuevo Valor",
+                        value=float(valor_actual),
                         min_value=0.0,
                         max_value=1.0,
-                        step=0.1
+                        step=0.01,
+                        help="Nuevo valor para este registro"
                     )
-                    st.caption("Los valores deben estar entre 0 y 1, donde 1 representa el 100%")
                 
-                # Botón para guardar
-                submitted = st.form_submit_button("Guardar cambios")
+                submitted = st.form_submit_button("✏️ Actualizar Registro", use_container_width=True)
                 
                 if submitted:
-                    fecha_dt = pd.to_datetime(fecha_editar)
-                    if DataEditor.save_edit(df, codigo_editar, fecha_dt, valor_editar, csv_path):
-                        st.success("Datos actualizados correctamente")
+                    if DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, csv_path):
+                        st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente")
                         st.rerun()
                     else:
-                        st.error("Error al actualizar datos")
+                        st.error("❌ Error al actualizar el registro")
+    
+    @staticmethod
+    def _render_delete_form(df, codigo_editar, registros_indicador, csv_path):
+        """Formulario para eliminar registro"""
+        st.subheader("Eliminar Registro")
         
-        except Exception as e:
-            st.error(f"Error en la edición de indicadores: {e}")
-            st.info("Asegúrate de que los datos contengan las columnas necesarias")
+        if registros_indicador.empty:
+            st.info("No hay registros existentes para eliminar")
+            return
+        
+        # Seleccionar registro a eliminar
+        fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
+        fecha_seleccionada_str = st.selectbox(
+            "Seleccionar fecha a eliminar",
+            fechas_disponibles,
+            help="⚠️ CUIDADO: Esta acción no se puede deshacer"
+        )
+        
+        if fecha_seleccionada_str:
+            # Obtener la fecha real
+            idx_seleccionado = fechas_disponibles.index(fecha_seleccionada_str)
+            fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
+            valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
+            
+            st.warning(f"""
+            ⚠️ **ATENCIÓN**: Estás a punto de eliminar el registro:
+            - **Fecha**: {fecha_real.strftime('%d/%m/%Y')}
+            - **Valor**: {valor_actual:.3f}
+            
+            Esta acción **NO SE PUEDE DESHACER**.
+            """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                confirmar = st.checkbox("Confirmo que quiero eliminar este registro", key="confirm_delete")
+            
+            with col2:
+                if confirmar:
+                    if st.button("🗑️ ELIMINAR REGISTRO", type="primary", use_container_width=True):
+                        if DataEditor.delete_record(df, codigo_editar, fecha_real, csv_path):
+                            st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente")
+                            st.rerun()
+                        else:
+                            st.error("❌ Error al eliminar el registro")
 
 class TabManager:
     """Gestor de pestañas del dashboard"""
@@ -342,13 +415,12 @@ class TabManager:
         self.csv_path = csv_path
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar todas las pestañas"""
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        """Renderizar todas las pestañas (sin tabla dinámica)"""
+        tab1, tab2, tab3, tab4 = st.tabs([
             "Resumen General", 
             "Resumen por Componente", 
             "Evolución", 
-            "Tabla Dinámica", 
-            "Edición"
+            "Gestión de Datos"
         ])
         
         with tab1:
@@ -361,7 +433,4 @@ class TabManager:
             EvolutionTab.render(self.df, filters)
         
         with tab4:
-            PivotTableTab.render(self.df, filters.get('fecha'))
-        
-        with tab5:
             EditTab.render(self.df, self.csv_path)
