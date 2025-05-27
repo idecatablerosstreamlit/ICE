@@ -24,19 +24,32 @@ class GeneralSummaryTab:
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
             
-            # Gráfico de radar
+            # Gráfico de radar (spider)
             st.plotly_chart(
                 ChartGenerator.radar_chart(df, fecha_seleccionada), 
                 use_container_width=True
             )
+            
+            # Gráfico de score general - evolución temporal del puntaje general
+            st.subheader("Evolución del Score General")
+            fig_score = ChartGenerator.evolution_chart(df, tipo_grafico="Línea", mostrar_meta=True)
+            st.plotly_chart(fig_score, use_container_width=True)
             
             # Puntajes por componente
             st.subheader("Puntajes por Componente")
             if not puntajes_componente.empty:
                 fig_comp = ChartGenerator.component_bar_chart(puntajes_componente)
                 st.plotly_chart(fig_comp, use_container_width=True)
+                
+                # Tabla de puntajes por componente
+                st.dataframe(puntajes_componente, use_container_width=True)
             else:
                 st.info("No hay datos suficientes para mostrar puntajes por componente")
+            
+            # Tabla de puntajes por categoría
+            st.subheader("Puntajes por Categoría")
+            if not puntajes_categoria.empty:
+                st.dataframe(puntajes_categoria, use_container_width=True)
             
         except Exception as e:
             st.error(f"Error al calcular puntajes: {e}")
@@ -81,16 +94,42 @@ class ComponentSummaryTab:
                 ultima_medicion = df_componente['Fecha'].max()
                 st.metric("Última Medición", ultima_medicion.strftime('%d/%m/%Y'))
             
+            # Gráfico spider/radar para el componente seleccionado
+            st.subheader(f"Diagrama Spider - {componente_analisis}")
+            fig_spider = ChartGenerator.radar_chart(df_componente, filters.get('fecha'))
+            st.plotly_chart(fig_spider, use_container_width=True)
+            
             # Gráfico de evolución del componente
+            st.subheader(f"Evolución Temporal - {componente_analisis}")
             fig_evol = ChartGenerator.evolution_chart(df_componente, componente=componente_analisis)
             st.plotly_chart(fig_evol, use_container_width=True)
             
-            # Tabla de indicadores del componente
-            st.subheader(f"Indicadores de {componente_analisis}")
-            st.dataframe(
-                df_componente[['Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values('Fecha', ascending=False),
-                use_container_width=True
-            )
+            # Tabla de métricas y avances por categoría dentro del componente
+            st.subheader(f"Métricas por Categoría - {componente_analisis}")
+            try:
+                puntajes_componente, puntajes_categoria_comp, puntaje_general_comp = DataProcessor.calculate_scores(
+                    df_componente, filters.get('fecha')
+                )
+                
+                # Mostrar tabla de avances por categoría
+                categorias_componente = df_componente.groupby('Categoria').agg({
+                    'Valor': ['mean', 'count', 'min', 'max'],
+                    'Indicador': 'nunique'
+                }).round(3)
+                
+                categorias_componente.columns = ['Promedio', 'Total_Mediciones', 'Mínimo', 'Máximo', 'Num_Indicadores']
+                categorias_componente['Cumplimiento_%'] = (categorias_componente['Promedio'] * 100).round(1)
+                
+                st.dataframe(categorias_componente, use_container_width=True)
+                
+            except Exception as e:
+                st.warning(f"No se pudieron calcular métricas por categoría: {e}")
+            
+            # Tabla detallada de indicadores del componente
+            st.subheader(f"Detalle de Indicadores - {componente_analisis}")
+            tabla_detalle = df_componente[['Codigo', 'Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values(['Categoria', 'Fecha'], ascending=[True, False])
+            st.dataframe(tabla_detalle, use_container_width=True)
+            
         else:
             st.warning("No hay datos para el componente seleccionado")
 
@@ -103,7 +142,7 @@ class EvolutionTab:
         st.subheader("Evolución de Indicadores")
         
         try:
-            # Crear filtros específicos de evolución - funcionalidad integrada
+            # Crear filtros específicos de evolución
             col1, col2 = st.columns(2)
             
             with col1:
@@ -164,7 +203,7 @@ class PivotTableTab:
         st.subheader("Tabla Dinámica de Indicadores")
         
         try:
-            # Crear filtros para tabla dinámica - funcionalidad integrada
+            # Crear filtros para tabla dinámica
             col1, col2, col3 = st.columns(3)
             
             with col1:
