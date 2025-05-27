@@ -80,22 +80,21 @@ class DataProcessor:
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """Calcular puntajes usando el valor más reciente de cada indicador"""
+        """
+        Calcular puntajes usando SIEMPRE el valor más reciente de cada indicador.
+        El parámetro fecha_filtro se ignora para mantener consistencia.
+        """
         if df.empty:
             return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
-        # Si se especifica una fecha, usar solo esa fecha
-        if fecha_filtro:
-            df_filtrado = df[df['Fecha'] == fecha_filtro].copy()
-            # Si no hay datos para esa fecha, tomar los más recientes por indicador
-            if df_filtrado.empty:
-                df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
-        else:
-            # Obtener el valor más reciente de cada indicador
-            df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
+        # SIEMPRE usar el valor más reciente de cada indicador
+        # Esto garantiza que el dashboard funcione correctamente sin importar las fechas
+        df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
 
         if len(df_filtrado) == 0:
+            import streamlit as st
+            st.error("No se pudieron obtener valores más recientes de los indicadores")
             return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
@@ -123,19 +122,55 @@ class DataProcessor:
     
     @staticmethod
     def _get_latest_values_by_indicator(df):
-        """Obtener el valor más reciente de cada indicador"""
+        """
+        Obtener el valor más reciente de cada indicador.
+        Esta es la función CLAVE para el correcto funcionamiento del dashboard.
+        """
         try:
+            if df.empty:
+                return df
+            
+            # Verificar que tenemos las columnas necesarias
+            required_columns = ['Codigo', 'Fecha', 'Valor']
+            if not all(col in df.columns for col in required_columns):
+                import streamlit as st
+                st.error(f"Faltan columnas requeridas: {required_columns}")
+                return df
+            
+            # Remover filas con valores NaN en columnas críticas
+            df_clean = df.dropna(subset=['Codigo', 'Fecha', 'Valor']).copy()
+            
+            if df_clean.empty:
+                import streamlit as st
+                st.warning("No hay datos válidos después de limpiar valores NaN")
+                return df
+            
             # Agrupar por código de indicador y tomar el registro con fecha más reciente
             def get_latest_record(group):
-                return group.loc[group['Fecha'].idxmax()]
+                # Ordenar por fecha y tomar el último registro
+                latest_idx = group['Fecha'].idxmax()
+                return group.loc[latest_idx]
             
-            df_latest = df.groupby('Codigo').apply(get_latest_record).reset_index(drop=True)
+            # Aplicar la función a cada grupo de indicadores
+            df_latest = df_clean.groupby('Codigo', as_index=False).apply(
+                lambda x: get_latest_record(x)
+            ).reset_index(drop=True)
+            
+            import streamlit as st
+            # Mostrar información de debug
+            with st.expander("🔍 Debug: Valores más recientes por indicador", expanded=False):
+                st.write(f"**Total indicadores únicos:** {df_clean['Codigo'].nunique()}")
+                st.write(f"**Registros después de filtrar:** {len(df_latest)}")
+                st.dataframe(df_latest[['Codigo', 'Indicador', 'Valor', 'Fecha', 'Componente']].sort_values('Fecha'))
+            
             return df_latest
             
         except Exception as e:
             import streamlit as st
-            st.warning(f"Error al obtener valores más recientes: {e}")
-            # Fallback: retornar el DataFrame original
+            st.error(f"Error crítico al obtener valores más recientes: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+            # En caso de error, retornar DataFrame original como fallback
             return df
     
     @staticmethod
