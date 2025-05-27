@@ -187,38 +187,3 @@ class EvolutionFilters:
             'mostrar_meta': mostrar_meta,
             'tipo_grafico': tipo_grafico
         }
-
-class PivotTableFilters:
-    """Filtros para la tabla dinámica"""
-    
-    @staticmethod
-    def create_pivot_filters():
-        """Crear filtros para la tabla dinámica"""
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            filas = st.selectbox(
-                "Filas",
-                options=["Categoria", "Componente", "Linea_Accion", "Codigo"],
-                index=0
-            )
-        
-        with col2:
-            columnas = st.selectbox(
-                "Columnas",
-                options=["Componente", "Categoria", "Linea_Accion", "Codigo"],
-                index=0
-            )
-        
-        with col3:
-            valores = st.selectbox(
-                "Valores",
-                options=["Valor", "Cumplimiento", "Puntaje_Ponderado"],
-                index=0
-            )
-        
-        return {
-            'filas': filas,
-            'columnas': columnas,
-            'valores': valores
-        }
