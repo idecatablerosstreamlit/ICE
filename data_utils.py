@@ -225,29 +225,59 @@ class DataEditor:
                 'Peso': indicador_base.get('Peso', 1.0)
             }
             
-            # Agregar al DataFrame
-            df_nuevo = pd.concat([df, pd.DataFrame([nueva_fila])], ignore_index=True)
+            # Leer el CSV actual para evitar problemas de concurrencia
+            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+            
+            # Agregar nueva fila
+            df_nuevo = pd.concat([df_actual, pd.DataFrame([nueva_fila])], ignore_index=True)
             
             # Guardar al CSV
             df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
+            
+            # IMPORTANTE: Forzar recarga de datos en Streamlit
+            import streamlit as st
+            if 'data_timestamp' not in st.session_state:
+                st.session_state.data_timestamp = 0
+            st.session_state.data_timestamp += 1
+            
             return True
             
         except Exception as e:
             st.error(f"Error al agregar nuevo registro: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
     
     @staticmethod
     def update_record(df, codigo, fecha, nuevo_valor, csv_path):
         """Actualizar un registro existente"""
         try:
+            # Leer el CSV actual
+            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+            
+            # Procesar fechas si es necesario
+            df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
+            
             # Encontrar el índice del registro a actualizar
-            idx = df[(df['Codigo'] == codigo) & (df['Fecha'] == fecha)].index
+            idx = df_actual[(df_actual['COD'] == codigo) & (df_actual['Fecha'] == fecha)].index
+            
+            if len(idx) == 0:
+                # Buscar por columna 'Codigo' si 'COD' no existe
+                if 'Codigo' in df_actual.columns:
+                    idx = df_actual[(df_actual['Codigo'] == codigo) & (df_actual['Fecha'] == fecha)].index
             
             if len(idx) > 0:
                 # Actualizar el valor
-                df.loc[idx, 'Valor'] = nuevo_valor
+                df_actual.loc[idx, 'Valor'] = nuevo_valor
                 # Guardar al CSV
-                df.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
+                df_actual.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
+                
+                # IMPORTANTE: Forzar recarga de datos en Streamlit
+                import streamlit as st
+                if 'data_timestamp' not in st.session_state:
+                    st.session_state.data_timestamp = 0
+                st.session_state.data_timestamp += 1
+                
                 return True
             else:
                 st.error(f"No se encontró un registro para la fecha {fecha.strftime('%d/%m/%Y')}")
@@ -255,20 +285,40 @@ class DataEditor:
                 
         except Exception as e:
             st.error(f"Error al actualizar el registro: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
     
     @staticmethod
     def delete_record(df, codigo, fecha, csv_path):
         """Eliminar un registro existente"""
         try:
+            # Leer el CSV actual
+            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+            
+            # Procesar fechas si es necesario
+            df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
+            
             # Encontrar el índice del registro a eliminar
-            idx = df[(df['Codigo'] == codigo) & (df['Fecha'] == fecha)].index
+            idx = df_actual[(df_actual['COD'] == codigo) & (df_actual['Fecha'] == fecha)].index
+            
+            if len(idx) == 0:
+                # Buscar por columna 'Codigo' si 'COD' no existe
+                if 'Codigo' in df_actual.columns:
+                    idx = df_actual[(df_actual['Codigo'] == codigo) & (df_actual['Fecha'] == fecha)].index
             
             if len(idx) > 0:
                 # Eliminar la fila
-                df_nuevo = df.drop(idx).reset_index(drop=True)
+                df_nuevo = df_actual.drop(idx).reset_index(drop=True)
                 # Guardar al CSV
                 df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
+                
+                # IMPORTANTE: Forzar recarga de datos en Streamlit
+                import streamlit as st
+                if 'data_timestamp' not in st.session_state:
+                    st.session_state.data_timestamp = 0
+                st.session_state.data_timestamp += 1
+                
                 return True
             else:
                 st.error(f"No se encontró un registro para la fecha {fecha.strftime('%d/%m/%Y')}")
@@ -276,4 +326,6 @@ class DataEditor:
                 
         except Exception as e:
             st.error(f"Error al eliminar el registro: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
