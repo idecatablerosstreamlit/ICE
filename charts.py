@@ -10,93 +10,121 @@ class ChartGenerator:
     """Clase para generar diferentes tipos de gráficos"""
     
     @staticmethod
+    def _get_latest_values_by_indicator(df):
+        """Obtener el valor más reciente de cada indicador"""
+        try:
+            # Agrupar por código de indicador y tomar el registro con fecha más reciente
+            def get_latest_record(group):
+                return group.loc[group['Fecha'].idxmax()]
+            
+            df_latest = df.groupby('Codigo').apply(get_latest_record).reset_index(drop=True)
+            return df_latest
+            
+        except Exception as e:
+            import streamlit as st
+            st.warning(f"Error al obtener valores más recientes en gráficos: {e}")
+            # Fallback: retornar el DataFrame original
+            return df
+    
+    @staticmethod
     def category_summary_table(df, componente, fecha=None):
-        """Generar tabla de resumen de categorías con colores por puntaje"""
-        if fecha:
-            df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
-        else:
-            ultima_fecha = df['Fecha'].max()
-            df_filtrado = df[(df['Fecha'] == ultima_fecha) & (df['Componente'] == componente)].copy()
-
-        if len(df_filtrado) == 0:
-            return None, f"No hay datos disponibles para el componente {componente}"
-
-        # Calcular promedio ponderado por categoría dentro del componente
-        def weighted_avg_category(group):
-            valores = group['Valor'].clip(0, 1)
-            pesos = group.get('Peso', pd.Series([1.0] * len(group)))
-            peso_total = pesos.sum()
-            
-            if peso_total > 0:
-                return (valores * pesos).sum() / peso_total
+        """Generar tabla de resumen de categorías con colores por puntaje usando valores más recientes"""
+        try:
+            if fecha:
+                df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
+                # Si no hay datos para esa fecha, usar valores más recientes del componente
+                if df_filtrado.empty:
+                    df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+                    df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
             else:
-                return valores.mean()
+                # Usar valores más recientes de cada indicador del componente
+                df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+                df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
 
-        # Calcular datos por categoría
-        datos_categorias = df_filtrado.groupby('Categoria').apply(weighted_avg_category).reset_index()
-        datos_categorias.columns = ['Categoria', 'Puntaje']
-        
-        # Función para asignar colores según el puntaje
-        def get_color_by_score(score):
-            if score >= 0.8:
-                return '#2E8B57'  # Verde - Excelente
-            elif score >= 0.6:
-                return '#DAA520'  # Dorado - Bueno
-            elif score >= 0.4:
-                return '#FF8C00'  # Naranja - Regular
-            else:
-                return '#DC143C'  # Rojo - Crítico
+            if len(df_filtrado) == 0:
+                return None, f"No hay datos disponibles para el componente {componente}"
 
-        # Crear tabla con colores
-        tabla_html = """
-        <div style="margin: 1rem 0;">
-            <h4 style="color: #2C3E50; margin-bottom: 0.5rem;">Puntajes por Categoría</h4>
-            <table style="width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <thead>
-                    <tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white;">
-                        <th style="padding: 12px; text-align: left; font-weight: 600;">Categoría</th>
-                        <th style="padding: 12px; text-align: center; font-weight: 600;">Puntaje</th>
-                        <th style="padding: 12px; text-align: center; font-weight: 600;">Porcentaje</th>
-                        <th style="padding: 12px; text-align: center; font-weight: 600;">Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        
-        for _, row in datos_categorias.iterrows():
-            color = get_color_by_score(row['Puntaje'])
-            porcentaje = row['Puntaje'] * 100
+            # Calcular promedio ponderado por categoría dentro del componente
+            def weighted_avg_category(group):
+                valores = group['Valor'].clip(0, 1)
+                pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+                peso_total = pesos.sum()
+                
+                if peso_total > 0:
+                    return (valores * pesos).sum() / peso_total
+                else:
+                    return valores.mean()
+
+            # Calcular datos por categoría
+            datos_categorias = df_filtrado.groupby('Categoria').apply(weighted_avg_category).reset_index()
+            datos_categorias.columns = ['Categoria', 'Puntaje']
             
-            # Determinar estado
-            if row['Puntaje'] >= 0.8:
-                estado = "Excelente"
-            elif row['Puntaje'] >= 0.6:
-                estado = "Bueno"
-            elif row['Puntaje'] >= 0.4:
-                estado = "Regular"
-            else:
-                estado = "Crítico"
-            
-            tabla_html += f"""
-                    <tr style="background-color: rgba(248, 249, 250, 0.9); border-bottom: 1px solid #BDC3C7;">
-                        <td style="padding: 12px; color: #2C3E50; font-weight: 500;">{row['Categoria']}</td>
-                        <td style="padding: 12px; text-align: center; color: {color}; font-weight: 700; font-size: 1.1rem;">{row['Puntaje']:.3f}</td>
-                        <td style="padding: 12px; text-align: center; color: {color}; font-weight: 600;">{porcentaje:.1f}%</td>
-                        <td style="padding: 12px; text-align: center;">
-                            <span style="background-color: {color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500;">
-                                {estado}
-                            </span>
-                        </td>
-                    </tr>
+            # Función para asignar colores según el puntaje
+            def get_color_by_score(score):
+                if score >= 0.8:
+                    return '#2E8B57'  # Verde - Excelente
+                elif score >= 0.6:
+                    return '#DAA520'  # Dorado - Bueno
+                elif score >= 0.4:
+                    return '#FF8C00'  # Naranja - Regular
+                else:
+                    return '#DC143C'  # Rojo - Crítico
+
+            # Crear tabla con colores
+            tabla_html = """
+            <div style="margin: 1rem 0;">
+                <h4 style="color: #2C3E50; margin-bottom: 0.5rem;">Puntajes por Categoría (Valores Más Recientes)</h4>
+                <table style="width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <th style="padding: 12px; text-align: left; font-weight: 600;">Categoría</th>
+                            <th style="padding: 12px; text-align: center; font-weight: 600;">Puntaje</th>
+                            <th style="padding: 12px; text-align: center; font-weight: 600;">Porcentaje</th>
+                            <th style="padding: 12px; text-align: center; font-weight: 600;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             """
-        
-        tabla_html += """
-                </tbody>
-            </table>
-        </div>
-        """
-        
-        return tabla_html, None
+            
+            for _, row in datos_categorias.iterrows():
+                color = get_color_by_score(row['Puntaje'])
+                porcentaje = row['Puntaje'] * 100
+                
+                # Determinar estado
+                if row['Puntaje'] >= 0.8:
+                    estado = "Excelente"
+                elif row['Puntaje'] >= 0.6:
+                    estado = "Bueno"
+                elif row['Puntaje'] >= 0.4:
+                    estado = "Regular"
+                else:
+                    estado = "Crítico"
+                
+                tabla_html += f"""
+                        <tr style="background-color: rgba(248, 249, 250, 0.9); border-bottom: 1px solid #BDC3C7;">
+                            <td style="padding: 12px; color: #2C3E50; font-weight: 500;">{row['Categoria']}</td>
+                            <td style="padding: 12px; text-align: center; color: {color}; font-weight: 700; font-size: 1.1rem;">{row['Puntaje']:.3f}</td>
+                            <td style="padding: 12px; text-align: center; color: {color}; font-weight: 600;">{porcentaje:.1f}%</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <span style="background-color: {color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500;">
+                                    {estado}
+                                </span>
+                            </td>
+                        </tr>
+                """
+            
+            tabla_html += """
+                    </tbody>
+                </table>
+            </div>
+            """
+            
+            return tabla_html, None
+            
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Error en tabla de categorías: {e}")
+            return None, f"Error al generar tabla para {componente}"
 
     @staticmethod
     def evolution_chart(df, indicador=None, componente=None, tipo_grafico="Línea", mostrar_meta=True):
@@ -170,135 +198,155 @@ class ChartGenerator:
 
     @staticmethod
     def radar_chart(df, fecha=None):
-        """Generar gráfico de radar por componente"""
-        if fecha:
-            df_filtrado = df[df['Fecha'] == fecha].copy()
-        else:
-            ultima_fecha = df['Fecha'].max()
-            df_filtrado = df[df['Fecha'] == ultima_fecha].copy()
-
-        if len(df_filtrado) == 0:
-            return ChartGenerator._empty_chart("No hay datos disponibles para la fecha seleccionada")
-
-        # Calcular promedio ponderado por componente (0-100 para visualización)
-        def weighted_avg_component(group):
-            valores = group['Valor'].clip(0, 1)
-            pesos = group.get('Peso', pd.Series([1.0] * len(group)))
-            peso_total = pesos.sum()
-            
-            if peso_total > 0:
-                return (valores * pesos).sum() / peso_total * 100
+        """Generar gráfico de radar por componente usando valores más recientes"""
+        try:
+            if fecha:
+                df_filtrado = df[df['Fecha'] == fecha].copy()
+                # Si no hay datos para esa fecha, usar valores más recientes
+                if df_filtrado.empty:
+                    df_filtrado = ChartGenerator._get_latest_values_by_indicator(df)
             else:
-                return valores.mean() * 100
+                # Usar valores más recientes de cada indicador
+                df_filtrado = ChartGenerator._get_latest_values_by_indicator(df)
 
-        # Calcular datos para el radar
-        datos_radar = df_filtrado.groupby('Componente').apply(weighted_avg_component).reset_index()
-        datos_radar.columns = ['Componente', 'Cumplimiento']
+            if len(df_filtrado) == 0:
+                return ChartGenerator._empty_chart("No hay datos disponibles")
 
-        if len(datos_radar) < 3:
-            return ChartGenerator._empty_chart("Se requieren al menos 3 componentes para el gráfico de radar")
+            # Calcular promedio ponderado por componente (0-100 para visualización)
+            def weighted_avg_component(group):
+                valores = group['Valor'].clip(0, 1)
+                pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+                peso_total = pesos.sum()
+                
+                if peso_total > 0:
+                    return (valores * pesos).sum() / peso_total * 100
+                else:
+                    return valores.mean() * 100
 
-        # Crear gráfico de radar
-        fig = go.Figure()
+            # Calcular datos para el radar
+            datos_radar = df_filtrado.groupby('Componente').apply(weighted_avg_component).reset_index()
+            datos_radar.columns = ['Componente', 'Cumplimiento']
 
-        fig.add_trace(go.Scatterpolar(
-            r=datos_radar['Cumplimiento'],
-            theta=datos_radar['Componente'],
-            fill='toself',
-            name='Cumplimiento',
-            line_color='#3498DB',
-            fillcolor='rgba(52, 152, 219, 0.3)'
-        ))
+            if len(datos_radar) < 3:
+                return ChartGenerator._empty_chart("Se requieren al menos 3 componentes para el gráfico de radar")
 
-        fig.update_layout(
-            polar=dict(
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 100],
-                    tickfont=dict(color='#2C3E50', size=10),
-                    gridcolor='#BDC3C7'
+            # Crear gráfico de radar
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatterpolar(
+                r=datos_radar['Cumplimiento'],
+                theta=datos_radar['Componente'],
+                fill='toself',
+                name='Cumplimiento',
+                line_color='#3498DB',
+                fillcolor='rgba(52, 152, 219, 0.3)'
+            ))
+
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 100],
+                        tickfont=dict(color='#2C3E50', size=10),
+                        gridcolor='#BDC3C7'
+                    ),
+                    angularaxis=dict(
+                        tickfont=dict(color='#2C3E50', size=11),
+                        gridcolor='#BDC3C7'
+                    ),
+                    bgcolor='rgba(248,249,250,0.8)'
                 ),
-                angularaxis=dict(
-                    tickfont=dict(color='#2C3E50', size=11),
-                    gridcolor='#BDC3C7'
-                ),
-                bgcolor='rgba(248,249,250,0.8)'
-            ),
-            paper_bgcolor='rgba(248,249,250,0.9)',
-            font_color='#2C3E50',
-            title="Radar: Promedio por Componente",
-            title_font_size=16,
-            title_font_color='#2C3E50',
-            height=350
-        )
+                paper_bgcolor='rgba(248,249,250,0.9)',
+                font_color='#2C3E50',
+                title="Radar: Promedio por Componente",
+                title_font_size=16,
+                title_font_color='#2C3E50',
+                height=350
+            )
 
-        return fig
+            return fig
+            
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Error en radar chart: {e}")
+            return ChartGenerator._empty_chart("Error al generar gráfico de radar")
 
     @staticmethod
     def radar_chart_categories(df, componente, fecha=None):
-        """Generar gráfico de radar por categorías de un componente específico"""
-        if fecha:
-            df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
-        else:
-            ultima_fecha = df['Fecha'].max()
-            df_filtrado = df[(df['Fecha'] == ultima_fecha) & (df['Componente'] == componente)].copy()
-
-        if len(df_filtrado) == 0:
-            return ChartGenerator._empty_chart(f"No hay datos disponibles para el componente {componente}")
-
-        # Calcular promedio ponderado por categoría dentro del componente
-        def weighted_avg_category(group):
-            valores = group['Valor'].clip(0, 1)
-            pesos = group.get('Peso', pd.Series([1.0] * len(group)))
-            peso_total = pesos.sum()
-            
-            if peso_total > 0:
-                return (valores * pesos).sum() / peso_total * 100
+        """Generar gráfico de radar por categorías de un componente específico usando valores más recientes"""
+        try:
+            if fecha:
+                df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
+                # Si no hay datos para esa fecha, usar valores más recientes del componente
+                if df_filtrado.empty:
+                    df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+                    df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
             else:
-                return valores.mean() * 100
+                # Usar valores más recientes de cada indicador del componente
+                df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+                df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
 
-        # Calcular datos para el radar por categoría
-        datos_radar = df_filtrado.groupby('Categoria').apply(weighted_avg_category).reset_index()
-        datos_radar.columns = ['Categoria', 'Cumplimiento']
+            if len(df_filtrado) == 0:
+                return ChartGenerator._empty_chart(f"No hay datos disponibles para el componente {componente}")
 
-        if len(datos_radar) < 3:
-            return ChartGenerator._empty_chart(f"Se requieren al menos 3 categorías para el radar de {componente}")
+            # Calcular promedio ponderado por categoría dentro del componente
+            def weighted_avg_category(group):
+                valores = group['Valor'].clip(0, 1)
+                pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+                peso_total = pesos.sum()
+                
+                if peso_total > 0:
+                    return (valores * pesos).sum() / peso_total * 100
+                else:
+                    return valores.mean() * 100
 
-        # Crear gráfico de radar
-        fig = go.Figure()
+            # Calcular datos para el radar por categoría
+            datos_radar = df_filtrado.groupby('Categoria').apply(weighted_avg_category).reset_index()
+            datos_radar.columns = ['Categoria', 'Cumplimiento']
 
-        fig.add_trace(go.Scatterpolar(
-            r=datos_radar['Cumplimiento'],
-            theta=datos_radar['Categoria'],
-            fill='toself',
-            name='Cumplimiento por Categoría',
-            line_color='#E67E22',
-            fillcolor='rgba(230, 126, 34, 0.3)'
-        ))
+            if len(datos_radar) < 3:
+                return ChartGenerator._empty_chart(f"Se requieren al menos 3 categorías para el radar de {componente}")
 
-        fig.update_layout(
-            polar=dict(
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 100],
-                    tickfont=dict(color='#2C3E50', size=10),
-                    gridcolor='#BDC3C7'
+            # Crear gráfico de radar
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatterpolar(
+                r=datos_radar['Cumplimiento'],
+                theta=datos_radar['Categoria'],
+                fill='toself',
+                name='Cumplimiento por Categoría',
+                line_color='#E67E22',
+                fillcolor='rgba(230, 126, 34, 0.3)'
+            ))
+
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 100],
+                        tickfont=dict(color='#2C3E50', size=10),
+                        gridcolor='#BDC3C7'
+                    ),
+                    angularaxis=dict(
+                        tickfont=dict(color='#2C3E50', size=11),
+                        gridcolor='#BDC3C7'
+                    ),
+                    bgcolor='rgba(248,249,250,0.8)'
                 ),
-                angularaxis=dict(
-                    tickfont=dict(color='#2C3E50', size=11),
-                    gridcolor='#BDC3C7'
-                ),
-                bgcolor='rgba(248,249,250,0.8)'
-            ),
-            paper_bgcolor='rgba(248,249,250,0.9)',
-            font_color='#2C3E50',
-            title=f"Radar: Categorías de {componente}",
-            title_font_size=16,
-            title_font_color='#2C3E50',
-            height=350
-        )
+                paper_bgcolor='rgba(248,249,250,0.9)',
+                font_color='#2C3E50',
+                title=f"Radar: Categorías de {componente}",
+                title_font_size=16,
+                title_font_color='#2C3E50',
+                height=350
+            )
 
-        return fig
+            return fig
+            
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Error en radar de categorías: {e}")
+            return ChartGenerator._empty_chart("Error al generar gráfico de radar por categorías")
 
     @staticmethod
     def component_bar_chart(puntajes_componente):
