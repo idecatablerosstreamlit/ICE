@@ -78,22 +78,102 @@ class DataLoader:
                 self.df = self.df.rename(columns={original: nuevo})
     
     def _process_dates(self):
-        """Procesar columna de fechas"""
-        try:
-            # Intentar conversión con formato específico
-            self.df['Fecha'] = pd.to_datetime(self.df['Fecha'], format='%d/%m/%Y', errors='coerce')
-        except:
-            try:
-                # Intentar conversión automática
-                self.df['Fecha'] = pd.to_datetime(self.df['Fecha'], errors='coerce')
-            except Exception as e:
-                st.warning(f"Error al convertir fechas: {e}")
+        """Procesar columna de fechas - CORREGIDO para múltiples formatos"""
+        import streamlit as st
         
-        # Filtrar filas con fechas NaT si existen
-        if self.df['Fecha'].isna().any():
-            filas_con_nat = self.df['Fecha'].isna().sum()
-            st.warning(f"Se encontraron {filas_con_nat} filas con fechas inválidas que serán excluidas del análisis.")
-            self.df = self.df.dropna(subset=['Fecha'])
+        try:
+            # Debug: Mostrar fechas originales
+            with st.expander("🔧 Debug: Procesamiento de fechas", expanded=False):
+                st.write("**Fechas originales (primeras 10):**")
+                st.write(self.df['Fecha'].head(10).tolist())
+                st.write(f"**Tipos de datos originales:** {self.df['Fecha'].dtype}")
+                
+                # Mostrar ejemplos de diferentes formatos encontrados
+                unique_samples = self.df['Fecha'].dropna().astype(str).unique()[:5]
+                st.write(f"**Ejemplos de formatos encontrados:** {list(unique_samples)}")
+            
+            # Lista de formatos de fecha a intentar
+            date_formats = [
+                '%d/%m/%Y',    # 01/01/2025
+                '%d-%m-%Y',    # 01-01-2025  
+                '%Y-%m-%d',    # 2025-01-01
+                '%Y/%m/%d',    # 2025/01/01
+                '%m/%d/%Y',    # 01/01/2025 (formato US)
+                '%d.%m.%Y',    # 01.01.2025
+            ]
+            
+            fechas_convertidas = None
+            formato_exitoso = None
+            
+            # Intentar cada formato
+            for formato in date_formats:
+                try:
+                    fechas_convertidas = pd.to_datetime(self.df['Fecha'], format=formato, errors='coerce')
+                    # Verificar si la conversión fue exitosa (menos de 50% de NaT)
+                    porcentaje_validas = (fechas_convertidas.notna().sum() / len(fechas_convertidas)) * 100
+                    
+                    if porcentaje_validas >= 50:  # Si al menos 50% se convirtieron bien
+                        formato_exitoso = formato
+                        st.success(f"✅ Formato exitoso: {formato} ({porcentaje_validas:.1f}% válidas)")
+                        break
+                    else:
+                        st.warning(f"⚠️ Formato {formato}: solo {porcentaje_validas:.1f}% válidas")
+                        
+                except ValueError as e:
+                    st.info(f"ℹ️ Formato {formato} no compatible: {e}")
+                    continue
+            
+            # Si ningún formato específico funcionó, usar conversión automática
+            if fechas_convertidas is None or formato_exitoso is None:
+                st.warning("⚠️ Ningún formato específico funcionó, intentando conversión automática...")
+                try:
+                    fechas_convertidas = pd.to_datetime(self.df['Fecha'], errors='coerce', dayfirst=True)
+                    formato_exitoso = "automático (dayfirst=True)"
+                except Exception as e:
+                    st.error(f"❌ Error en conversión automática: {e}")
+                    fechas_convertidas = pd.to_datetime(self.df['Fecha'], errors='coerce')
+                    formato_exitoso = "automático (estándar)"
+            
+            # Aplicar las fechas convertidas
+            self.df['Fecha'] = fechas_convertidas
+            
+            # Análisis de resultados
+            fechas_validas = self.df['Fecha'].notna().sum()
+            fechas_invalidas = self.df['Fecha'].isna().sum()
+            
+            # Debug: Mostrar resultados de conversión
+            with st.expander("🔧 Debug: Resultados de conversión", expanded=False):
+                st.write(f"**Formato usado:** {formato_exitoso}")
+                st.write(f"**Fechas válidas:** {fechas_validas}")
+                st.write(f"**Fechas inválidas:** {fechas_invalidas}")
+                
+                if fechas_validas > 0:
+                    st.write("**Fechas convertidas (muestra):**")
+                    st.write(self.df[self.df['Fecha'].notna()]['Fecha'].head().tolist())
+                
+                if fechas_invalidas > 0:
+                    st.write("**Fechas problemáticas:**")
+                    fechas_problematicas = self.df[self.df['Fecha'].isna()]['Fecha'].head()
+                    st.write(list(fechas_problematicas))
+            
+            # Filtrar filas con fechas inválidas solo si hay muchas
+            if fechas_invalidas > 0:
+                if fechas_invalidas <= 5:  # Si son pocas, solo avisar
+                    st.warning(f"⚠️ Se encontraron {fechas_invalidas} filas con fechas inválidas (se mantendrán para revisión)")
+                else:  # Si son muchas, excluir
+                    st.warning(f"⚠️ Se encontraron {fechas_invalidas} filas con fechas inválidas que serán excluidas del análisis")
+                    self.df = self.df.dropna(subset=['Fecha'])
+                    
+        except Exception as e:
+            st.error(f"❌ Error crítico al procesar fechas: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+            # En caso de error, intentar conversión básica
+            try:
+                self.df['Fecha'] = pd.to_datetime(self.df['Fecha'], errors='coerce')
+            except:
+                st.error("❌ No se pudieron procesar las fechas en absoluto")
+                pass
     
     def _process_values(self):
         """Procesar valores numéricos"""
@@ -339,10 +419,18 @@ class DataEditor:
     
     @staticmethod
     def add_new_record(df, codigo, fecha, valor, csv_path):
-        """Agregar un nuevo registro para un indicador - CORREGIDO"""
+        """Agregar un nuevo registro para un indicador - CORREGIDO formato de fecha"""
         try:
             # Leer el CSV actual para mantener el formato original
             df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+            
+            # Debug: Ver formato de fechas existentes
+            import streamlit as st
+            with st.expander("🔧 Debug: Formato de fechas en CSV", expanded=False):
+                st.write("**Fechas existentes en CSV:**")
+                st.write(df_actual['Fecha'].head().tolist())
+                st.write(f"**Fecha nueva a agregar:** {fecha}")
+                st.write(f"**Tipo de fecha nueva:** {type(fecha)}")
             
             # Obtener información base del indicador desde df_actual
             codigo_col = None
@@ -352,23 +440,43 @@ class DataEditor:
                     break
             
             if codigo_col is None:
-                import streamlit as st
                 st.error("❌ No se encontró columna de código en el CSV")
                 return False
             
             # Buscar información base del indicador
-            indicador_base = df_actual[df_actual[codigo_col] == codigo].iloc[0] if len(df_actual[df_actual[codigo_col] == codigo]) > 0 else None
-            
-            if indicador_base is None:
-                import streamlit as st
+            indicadores_existentes = df_actual[df_actual[codigo_col] == codigo]
+            if len(indicadores_existentes) == 0:
                 st.error(f"❌ No se encontró información base para el código {codigo}")
                 return False
+                
+            indicador_base = indicadores_existentes.iloc[0]
+            
+            # IMPORTANTE: Convertir fecha al formato correcto del CSV
+            # Detectar formato de fechas existentes en el CSV
+            sample_date = df_actual['Fecha'].dropna().iloc[0] if len(df_actual['Fecha'].dropna()) > 0 else None
+            
+            if sample_date:
+                # Si las fechas existentes están en formato d/m/Y, usar ese formato
+                if '/' in str(sample_date):
+                    fecha_formateada = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%d/%m/%Y')
+                else:
+                    # Si están en otro formato, usar ISO
+                    fecha_formateada = fecha.strftime('%Y-%m-%d') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%Y-%m-%d')
+            else:
+                # Por defecto usar formato d/m/Y que es el esperado por el sistema
+                fecha_formateada = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%d/%m/%Y')
+            
+            # Debug: Mostrar formato final
+            with st.expander("🔧 Debug: Fecha formateada", expanded=False):
+                st.write(f"**Fecha original:** {fecha}")
+                st.write(f"**Fecha formateada:** {fecha_formateada}")
+                st.write(f"**Formato detectado en CSV:** {sample_date}")
             
             # Crear nueva fila manteniendo la estructura original del CSV
             nueva_fila = {}
             for col in df_actual.columns:
                 if col == 'Fecha':
-                    nueva_fila[col] = fecha
+                    nueva_fila[col] = fecha_formateada  # Usar fecha formateada
                 elif col == 'Valor':
                     nueva_fila[col] = valor
                 else:
@@ -381,8 +489,15 @@ class DataEditor:
             # Guardar al CSV manteniendo el formato original
             df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
             
-            # Forzar recarga de datos en Streamlit
-            import streamlit as st
+            # Debug: Verificar que se guardó correctamente
+            with st.expander("🔧 Debug: Verificación de guardado", expanded=False):
+                df_verificacion = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+                st.write(f"**Registros totales después de guardar:** {len(df_verificacion)}")
+                st.write("**Últimas 3 filas guardadas:**")
+                st.dataframe(df_verificacion.tail(3))
+            
+            # FORZAR recarga completa del cache
+            st.cache_data.clear()
             if 'data_timestamp' not in st.session_state:
                 st.session_state.data_timestamp = 0
             st.session_state.data_timestamp += 1
