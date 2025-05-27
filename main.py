@@ -42,6 +42,27 @@ def main():
         df, csv_path = load_data_cached(st.session_state.data_timestamp)
         
         if df is not None and not df.empty:
+            # Verificación de salud de los datos
+            health_check_passed = True
+            
+            # Verificar columnas esenciales
+            required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                st.error(f"❌ **Error crítico:** Faltan columnas esenciales: {missing_columns}")
+                st.write("**Columnas disponibles:**", list(df.columns))
+                health_check_passed = False
+            
+            # Verificar datos válidos
+            datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
+            if len(datos_validos) == 0:
+                st.error("❌ **Error crítico:** No hay datos válidos (todos los registros tienen valores nulos)")
+                health_check_passed = False
+            
+            if not health_check_passed:
+                st.stop()
+            
             # Botón de recarga manual
             col_reload1, col_reload2, col_reload3 = st.columns([2, 1, 2])
             with col_reload2:
