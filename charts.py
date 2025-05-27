@@ -10,6 +10,82 @@ class ChartGenerator:
     """Clase para generar diferentes tipos de gráficos"""
     
     @staticmethod
+    def show_category_table_simple(df, componente):
+        """Mostrar tabla de categorías usando componentes nativos de Streamlit"""
+        import streamlit as st
+        
+        try:
+            # Obtener valores más recientes del componente
+            df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+            df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
+
+            if len(df_filtrado) == 0:
+                st.warning(f"No hay datos disponibles para el componente {componente}")
+                return
+
+            # Calcular promedio ponderado por categoría
+            def weighted_avg_category(group):
+                valores = group['Valor'].clip(0, 1)
+                pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+                peso_total = pesos.sum()
+                
+                if peso_total > 0:
+                    return (valores * pesos).sum() / peso_total
+                else:
+                    return valores.mean()
+
+            # Calcular datos por categoría
+            datos_categorias = df_filtrado.groupby('Categoria').apply(weighted_avg_category).reset_index()
+            datos_categorias.columns = ['Categoria', 'Puntaje']
+            
+            # Ordenar por puntaje descendente
+            datos_categorias = datos_categorias.sort_values('Puntaje', ascending=False)
+            
+            st.subheader("📊 Puntajes por Categoría")
+            
+            # Mostrar cada categoría con métricas coloridas
+            for _, row in datos_categorias.iterrows():
+                porcentaje = row['Puntaje'] * 100
+                
+                # Determinar color y emoji según puntaje
+                if row['Puntaje'] >= 0.8:
+                    emoji = "🟢"
+                    estado = "Excelente"
+                elif row['Puntaje'] >= 0.6:
+                    emoji = "🟡"
+                    estado = "Bueno"
+                elif row['Puntaje'] >= 0.4:
+                    emoji = "🟠"
+                    estado = "Regular"
+                else:
+                    emoji = "🔴"
+                    estado = "Crítico"
+                
+                # Crear columnas para cada categoría
+                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                
+                with col1:
+                    st.write(f"**{row['Categoria']}**")
+                
+                with col2:
+                    st.metric("Puntaje", f"{row['Puntaje']:.3f}")
+                
+                with col3:
+                    st.metric("Porcentaje", f"{porcentaje:.1f}%")
+                
+                with col4:
+                    st.write(f"{emoji} **{estado}**")
+                
+                # Agregar una barra de progreso visual
+                st.progress(row['Puntaje'])
+                st.write("---")  # Separador
+                
+        except Exception as e:
+            st.error(f"Error al mostrar tabla de categorías: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+
+    @staticmethod
     def _get_latest_values_by_indicator(df):
         """Obtener el valor más reciente de cada indicador"""
         try:
@@ -70,56 +146,30 @@ class ChartGenerator:
                 else:
                     return '#DC143C'  # Rojo - Crítico
 
-            # Crear tabla con colores
-            tabla_html = """
-            <div style="margin: 1rem 0;">
-                <h4 style="color: #2C3E50; margin-bottom: 0.5rem;">Puntajes por Categoría (Valores Más Recientes)</h4>
-                <table style="width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <thead>
-                        <tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white;">
-                            <th style="padding: 12px; text-align: left; font-weight: 600;">Categoría</th>
-                            <th style="padding: 12px; text-align: center; font-weight: 600;">Puntaje</th>
-                            <th style="padding: 12px; text-align: center; font-weight: 600;">Porcentaje</th>
-                            <th style="padding: 12px; text-align: center; font-weight: 600;">Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
-            
+            # Crear DataFrame para mostrar con Streamlit (más confiable que HTML)
+            tabla_data = []
             for _, row in datos_categorias.iterrows():
-                color = get_color_by_score(row['Puntaje'])
                 porcentaje = row['Puntaje'] * 100
                 
-                # Determinar estado
                 if row['Puntaje'] >= 0.8:
-                    estado = "Excelente"
+                    estado = "🟢 Excelente"
                 elif row['Puntaje'] >= 0.6:
-                    estado = "Bueno"
+                    estado = "🟡 Bueno"
                 elif row['Puntaje'] >= 0.4:
-                    estado = "Regular"
+                    estado = "🟠 Regular"
                 else:
-                    estado = "Crítico"
+                    estado = "🔴 Crítico"
                 
-                tabla_html += f"""
-                        <tr style="background-color: rgba(248, 249, 250, 0.9); border-bottom: 1px solid #BDC3C7;">
-                            <td style="padding: 12px; color: #2C3E50; font-weight: 500;">{row['Categoria']}</td>
-                            <td style="padding: 12px; text-align: center; color: {color}; font-weight: 700; font-size: 1.1rem;">{row['Puntaje']:.3f}</td>
-                            <td style="padding: 12px; text-align: center; color: {color}; font-weight: 600;">{porcentaje:.1f}%</td>
-                            <td style="padding: 12px; text-align: center;">
-                                <span style="background-color: {color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500;">
-                                    {estado}
-                                </span>
-                            </td>
-                        </tr>
-                """
+                tabla_data.append({
+                    'Categoría': row['Categoria'],
+                    'Puntaje': f"{row['Puntaje']:.3f}",
+                    'Porcentaje': f"{porcentaje:.1f}%",
+                    'Estado': estado
+                })
             
-            tabla_html += """
-                    </tbody>
-                </table>
-            </div>
-            """
+            tabla_df = pd.DataFrame(tabla_data)
             
-            return tabla_html, None
+            return tabla_df, None
             
         except Exception as e:
             import streamlit as st
