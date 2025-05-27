@@ -178,73 +178,112 @@ class ChartGenerator:
 
     @staticmethod
     def evolution_chart(df, indicador=None, componente=None, tipo_grafico="Línea", mostrar_meta=True):
-        """Generar gráfico de evolución temporal"""
-        # Filtrar datos
-        if indicador:
-            df_filtrado = df[df['Indicador'] == indicador]
-        elif componente:
-            df_filtrado = df[df['Componente'] == componente]
-        else:
-            df_filtrado = df
-
-        if len(df_filtrado) == 0:
-            return ChartGenerator._empty_chart("No hay datos disponibles para el filtro seleccionado")
-
-        # Agrupar por fecha y calcular promedio ponderado
-        if componente or not indicador:
-            # Para componente o vista general, usar promedio ponderado
-            def weighted_avg_by_date(group):
-                valores = group['Valor'].clip(0, 1)
-                pesos = group.get('Peso', pd.Series([1.0] * len(group)))
-                peso_total = pesos.sum()
-                
-                if peso_total > 0:
-                    return (valores * pesos).sum() / peso_total
-                else:
-                    return valores.mean()
+        """Generar gráfico de evolución temporal - CORREGIDO para mostrar datos históricos"""
+        try:
+            # Debug: Mostrar información de entrada
+            import streamlit as st
             
-            df_evolucion = df_filtrado.groupby('Fecha').apply(weighted_avg_by_date).reset_index()
-            df_evolucion.columns = ['Fecha', 'Valor']
-        else:
-            # Para indicador específico, usar valor directo
-            df_evolucion = df_filtrado.groupby('Fecha')['Valor'].mean().reset_index()
+            # Filtrar datos según los parámetros
+            if indicador:
+                df_filtrado = df[df['Indicador'] == indicador].copy()
+                titulo = f"Evolución de {indicador}"
+            elif componente:
+                df_filtrado = df[df['Componente'] == componente].copy()
+                titulo = f"Evolución del componente {componente}"
+            else:
+                df_filtrado = df.copy()
+                titulo = "Evolución General"
 
-        # Crear gráfico según tipo
-        title = f"Evolución de {indicador if indicador else componente if componente else 'Indicadores'}"
-        
-        if tipo_grafico == "Línea":
-            fig = px.line(df_evolucion, x='Fecha', y='Valor', title=title)
-            fig.update_traces(line_color='#3498DB', line_width=3)
-        else:  # Barras
-            fig = px.bar(df_evolucion, x='Fecha', y='Valor', title=title)
-            fig.update_traces(marker_color='#3498DB')
+            if len(df_filtrado) == 0:
+                return ChartGenerator._empty_chart("No hay datos disponibles para el filtro seleccionado")
 
-        # Añadir línea de meta si se seleccionó
-        if mostrar_meta:
-            fig.add_hline(
-                y=1.0,
-                line_dash="dash",
-                line_color="#E74C3C",
-                line_width=2,
-                annotation_text="Meta (100%)",
-                annotation_font_color="#E74C3C"
+            # Debug: Mostrar datos filtrados
+            with st.expander("🔍 Debug: Datos para evolución", expanded=False):
+                st.write(f"**Filtro aplicado:** {indicador or componente or 'General'}")
+                st.write(f"**Registros encontrados:** {len(df_filtrado)}")
+                st.dataframe(df_filtrado[['Fecha', 'Valor', 'Indicador', 'Componente']].sort_values('Fecha'))
+
+            # Preparar datos para gráfico
+            if indicador:
+                # Para indicador específico: mostrar todos sus valores históricos
+                df_evolucion = df_filtrado[['Fecha', 'Valor']].sort_values('Fecha')
+                df_evolucion = df_evolucion.dropna(subset=['Fecha', 'Valor'])
+            elif componente:
+                # Para componente: promedio ponderado por fecha
+                def weighted_avg_by_date(group):
+                    valores = group['Valor'].clip(0, 1)
+                    pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+                    peso_total = pesos.sum()
+                    
+                    if peso_total > 0:
+                        return (valores * pesos).sum() / peso_total
+                    else:
+                        return valores.mean()
+                
+                df_evolucion = df_filtrado.groupby('Fecha').apply(weighted_avg_by_date).reset_index()
+                df_evolucion.columns = ['Fecha', 'Valor']
+            else:
+                # Para vista general: promedio simple por fecha
+                df_evolucion = df_filtrado.groupby('Fecha')['Valor'].mean().reset_index()
+
+            # Verificar que tenemos datos para graficar
+            if len(df_evolucion) == 0:
+                return ChartGenerator._empty_chart("No hay datos válidos para graficar")
+
+            # Crear gráfico según tipo
+            if tipo_grafico == "Línea":
+                fig = px.line(
+                    df_evolucion, 
+                    x='Fecha', 
+                    y='Valor', 
+                    title=titulo,
+                    markers=True  # Agregar marcadores para ver puntos individuales
+                )
+                fig.update_traces(line_color='#3498DB', line_width=3, marker_size=8)
+            else:  # Barras
+                fig = px.bar(df_evolucion, x='Fecha', y='Valor', title=titulo)
+                fig.update_traces(marker_color='#3498DB')
+
+            # Añadir línea de meta si se seleccionó
+            if mostrar_meta:
+                fig.add_hline(
+                    y=1.0,
+                    line_dash="dash",
+                    line_color="#E74C3C",
+                    line_width=2,
+                    annotation_text="Meta (100%)",
+                    annotation_font_color="#E74C3C"
+                )
+
+            # Configurar layout
+            fig.update_layout(
+                plot_bgcolor='rgba(248,249,250,0.9)',
+                paper_bgcolor='rgba(248,249,250,0.9)',
+                font_color='#2C3E50',
+                xaxis_title="Fecha",
+                yaxis_title="Valor",
+                legend_title_text="",
+                height=400,
+                title_font_size=16,
+                title_font_color='#2C3E50',
+                xaxis=dict(gridcolor='#BDC3C7'),
+                yaxis=dict(gridcolor='#BDC3C7', range=[0, 1.1])  # Fijar rango Y
             )
 
-        fig.update_layout(
-            plot_bgcolor='rgba(248,249,250,0.9)',
-            paper_bgcolor='rgba(248,249,250,0.9)',
-            font_color='#2C3E50',
-            xaxis_title="Fecha",
-            yaxis_title="Valor",
-            legend_title_text="",
-            height=400,
-            title_font_size=16,
-            title_font_color='#2C3E50',
-            xaxis=dict(gridcolor='#BDC3C7'),
-            yaxis=dict(gridcolor='#BDC3C7')
-        )
+            # Mejorar formato de fechas en eje X
+            fig.update_xaxes(
+                tickformat="%d/%m/%Y",
+                tickangle=45
+            )
 
-        return fig
+            return fig
+            
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Error crítico en evolution_chart: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+            return ChartGenerator._empty_chart("Error al generar gráfico de evolución")
 
     @staticmethod
     def radar_chart(df, fecha=None):
