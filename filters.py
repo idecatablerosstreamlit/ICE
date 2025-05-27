@@ -152,34 +152,110 @@ class FilterManager:
         return active_filters
 
 class EvolutionFilters:
-    """Filtros específicos para la pestaña de evolución"""
+    """Filtros específicos para la pestaña de evolución - CORREGIDOS"""
     
     @staticmethod
     def create_evolution_filters(df):
         """Crear filtros para la pestaña de evolución"""
+        st.markdown("### 🎛️ Configuración de Visualización")
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            # Por código de indicador
-            codigos = sorted(df['Codigo'].unique())
-            codigo_seleccionado = st.selectbox("Código de Indicador", ["Todos"] + list(codigos))
+            st.markdown("**📊 Selección de Indicador**")
             
-            if codigo_seleccionado == "Todos":
-                codigo_seleccionado = None
-                indicador_seleccionado = None
-            else:
-                indicador_seleccionado = df[df['Codigo'] == codigo_seleccionado]['Indicador'].iloc[0]
+            try:
+                # Obtener códigos únicos disponibles
+                if 'Codigo' in df.columns:
+                    codigos_disponibles = sorted([c for c in df['Codigo'].dropna().unique() if str(c).strip()])
+                else:
+                    st.error("No se encontró la columna 'Codigo' en los datos")
+                    return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
+                
+                if not codigos_disponibles:
+                    st.warning("No hay códigos de indicadores disponibles")
+                    return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
+                
+                # Crear opciones con información adicional
+                opciones_display = ["🌍 Todos los indicadores (Vista General)"]
+                codigo_map = {opciones_display[0]: None}
+                
+                for codigo in codigos_disponibles:
+                    try:
+                        indicador_info = df[df['Codigo'] == codigo].iloc[0]
+                        nombre = indicador_info['Indicador'] if 'Indicador' in indicador_info else 'Sin nombre'
+                        componente = indicador_info['Componente'] if 'Componente' in indicador_info else 'Sin componente'
+                        
+                        # Limitar longitud para mejor visualización
+                        nombre_corto = nombre[:50] + "..." if len(nombre) > 50 else nombre
+                        display_text = f"📈 {codigo} - {nombre_corto}"
+                        
+                        opciones_display.append(display_text)
+                        codigo_map[display_text] = codigo
+                        
+                    except Exception as e:
+                        st.warning(f"Error procesando código {codigo}: {e}")
+                        continue
+                
+                # Selector principal
+                seleccion = st.selectbox(
+                    "Indicador a analizar:",
+                    opciones_display,
+                    help="Selecciona un indicador específico o la vista general"
+                )
+                
+                codigo_seleccionado = codigo_map.get(seleccion)
+                
+                # Obtener nombre del indicador si se seleccionó uno específico
+                if codigo_seleccionado:
+                    try:
+                        indicador_data = df[df['Codigo'] == codigo_seleccionado].iloc[0]
+                        indicador_seleccionado = indicador_data['Indicador']
+                        
+                        # Mostrar información adicional del indicador seleccionado
+                        st.info(f"""
+                        **Componente:** {indicador_data.get('Componente', 'N/A')}  
+                        **Categoría:** {indicador_data.get('Categoria', 'N/A')}
+                        """)
+                        
+                    except Exception as e:
+                        st.error(f"Error al obtener datos del indicador: {e}")
+                        indicador_seleccionado = None
+                else:
+                    indicador_seleccionado = None
+                    
+            except Exception as e:
+                st.error(f"Error crítico al crear filtros: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+                return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
         
         with col2:
+            st.markdown("**🎨 Opciones de Visualización**")
+            
             # Opción para mostrar línea de meta
-            mostrar_meta = st.checkbox("Mostrar línea de referencia (Meta = 1.0)", value=True)
+            mostrar_meta = st.checkbox(
+                "📏 Mostrar línea de referencia (Meta = 1.0)", 
+                value=True,
+                help="Muestra una línea horizontal en 100% como referencia"
+            )
             
             # Seleccionar tipo de gráfico
             tipo_grafico = st.radio(
-                "Tipo de gráfico",
+                "📊 Tipo de gráfico:",
                 options=["Línea", "Barras"],
-                horizontal=True
+                horizontal=True,
+                help="Línea: mejor para ver tendencias / Barras: mejor para comparar valores puntuales"
             )
+            
+            # Mostrar estadísticas si hay un indicador seleccionado
+            if codigo_seleccionado:
+                datos_indicador = df[df['Codigo'] == codigo_seleccionado]
+                if not datos_indicador.empty:
+                    st.markdown("**📊 Estadísticas:**")
+                    st.write(f"• **Registros:** {len(datos_indicador)}")
+                    st.write(f"• **Rango:** {datos_indicador['Valor'].min():.3f} - {datos_indicador['Valor'].max():.3f}")
+                    st.write(f"• **Promedio:** {datos_indicador['Valor'].mean():.3f}")
         
         return {
             'codigo': codigo_seleccionado,
