@@ -51,6 +51,10 @@ def main():
         except Exception as e:
             st.error(f"Error al procesar datos: {e}")
             st.info("Verifica que el archivo CSV contenga todas las columnas requeridas")
+            # Mostrar traceback para debug
+            import traceback
+            with st.expander("Detalles del error (para desarrolladores)"):
+                st.code(traceback.format_exc())
     
     else:
         show_error_message()
@@ -70,7 +74,7 @@ def create_simple_filters(df):
                     "", 
                     fechas, 
                     index=len(fechas) - 1,
-                    help="Selecciona la fecha para el análisis"
+                    help="Selecciona la fecha para el análisis (opcional - por defecto usa valores más recientes)"
                 )
                 return {'fecha': fecha_seleccionada}
             else:
