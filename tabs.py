@@ -4,9 +4,13 @@ Interfaces de usuario para las pestañas del Dashboard ICE
 
 import streamlit as st
 import pandas as pd
-from charts import ChartGenerator, MetricsDisplay
-from data_utils import DataProcessor, DataEditor
-from filters import EvolutionFilters, PivotTableFilters
+
+# Importaciones locales con manejo de errores
+try:
+    from charts import ChartGenerator, MetricsDisplay
+    from data_utils import DataProcessor, DataEditor
+except ImportError as e:
+    st.error(f"Error al importar módulos: {e}")
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
@@ -144,28 +148,50 @@ class EvolutionTab:
         st.subheader("Evolución de Indicadores")
         
         try:
-            # Crear filtros específicos de evolución
-            evolution_filters = EvolutionFilters.create_evolution_filters(df)
+            # Crear filtros específicos de evolución directamente aquí
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Por código de indicador
+                codigos = sorted(df['Codigo'].unique())
+                codigo_seleccionado = st.selectbox("Código de Indicador", ["Todos"] + list(codigos))
+                
+                if codigo_seleccionado == "Todos":
+                    codigo_seleccionado = None
+                    indicador_seleccionado = None
+                else:
+                    indicador_seleccionado = df[df['Codigo'] == codigo_seleccionado]['Indicador'].iloc[0]
+            
+            with col2:
+                # Opción para mostrar línea de meta
+                mostrar_meta = st.checkbox("Mostrar línea de referencia (Meta = 1.0)", value=True)
+                
+                # Seleccionar tipo de gráfico
+                tipo_grafico = st.radio(
+                    "Tipo de gráfico",
+                    options=["Línea", "Barras"],
+                    horizontal=True
+                )
             
             # Mostrar nombre del indicador seleccionado
-            if evolution_filters['indicador']:
-                st.write(f"**Indicador seleccionado:** {evolution_filters['indicador']}")
+            if indicador_seleccionado:
+                st.write(f"**Indicador seleccionado:** {indicador_seleccionado}")
             
             # Generar gráfico de evolución
             fig = ChartGenerator.evolution_chart(
                 df,
-                indicador=evolution_filters['indicador'],
+                indicador=indicador_seleccionado,
                 componente=filters.get('componente'),
-                tipo_grafico=evolution_filters['tipo_grafico'],
-                mostrar_meta=evolution_filters['mostrar_meta']
+                tipo_grafico=tipo_grafico,
+                mostrar_meta=mostrar_meta
             )
             
             st.plotly_chart(fig, use_container_width=True)
             
             # Mostrar tabla de datos del indicador seleccionado
-            if evolution_filters['codigo']:
-                st.subheader(f"Datos del indicador: {evolution_filters['indicador']}")
-                datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
+            if codigo_seleccionado:
+                st.subheader(f"Datos del indicador: {indicador_seleccionado}")
+                datos_indicador = df[df['Codigo'] == codigo_seleccionado].sort_values('Fecha')
                 st.dataframe(
                     datos_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
                     use_container_width=True
@@ -183,20 +209,41 @@ class PivotTableTab:
         st.subheader("Tabla Dinámica de Indicadores")
         
         try:
-            # Crear filtros para tabla dinámica
-            pivot_filters = PivotTableFilters.create_pivot_filters()
+            # Crear filtros para tabla dinámica directamente aquí
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                filas = st.selectbox(
+                    "Filas",
+                    options=["Categoria", "Componente", "Linea_Accion", "Codigo"],
+                    index=0
+                )
+            
+            with col2:
+                columnas = st.selectbox(
+                    "Columnas",
+                    options=["Componente", "Categoria", "Linea_Accion", "Codigo"],
+                    index=0
+                )
+            
+            with col3:
+                valores = st.selectbox(
+                    "Valores",
+                    options=["Valor", "Cumplimiento", "Puntaje_Ponderado"],
+                    index=0
+                )
             
             # Validar que filas y columnas sean diferentes
-            if pivot_filters['filas'] == pivot_filters['columnas']:
+            if filas == columnas:
                 st.warning("Las filas y columnas deben ser diferentes.")
             else:
                 # Crear tabla dinámica
                 tabla = DataProcessor.create_pivot_table(
                     df,
                     fecha=fecha_seleccionada,
-                    filas=pivot_filters['filas'],
-                    columnas=pivot_filters['columnas'],
-                    valores=pivot_filters['valores']
+                    filas=filas,
+                    columnas=columnas,
+                    valores=valores
                 )
                 
                 # Mostrar tabla con formato condicional
