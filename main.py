@@ -28,18 +28,37 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # Sistema de recarga automática de datos
+    # Sistema de recarga automática de datos - MEJORADO
     if 'data_timestamp' not in st.session_state:
         st.session_state.data_timestamp = 0
     
-    # Cargar datos con cache que se invalida cuando hay cambios
-    @st.cache_data(ttl=1)  # Cache por 1 segundo para permitir recargas rápidas
-    def load_data_cached(timestamp):
+    # Verificar si hay cambios en el archivo CSV
+    def get_file_timestamp(csv_path):
+        try:
+            return os.path.getmtime(csv_path)
+        except:
+            return 0
+    
+    # Cargar datos con cache más inteligente
+    @st.cache_data(ttl=5, show_spinner=True)  # Cache por 5 segundos para permitir recargas
+    def load_data_cached(timestamp, file_timestamp):
         data_loader = DataLoader()
-        return data_loader.load_data(), data_loader.csv_path
+        df_loaded = data_loader.load_data()
+        return df_loaded, data_loader.csv_path
     
     try:
-        df, csv_path = load_data_cached(st.session_state.data_timestamp)
+        # Obtener timestamp del archivo
+        data_loader_temp = DataLoader()
+        file_timestamp = get_file_timestamp(data_loader_temp.csv_path)
+        
+        # Cargar datos con ambos timestamps
+        df, csv_path = load_data_cached(st.session_state.data_timestamp, file_timestamp)
+        
+        # Debug: Mostrar información de cache
+        with st.expander("🔧 Debug: Sistema de cache", expanded=False):
+            st.write(f"**Session timestamp:** {st.session_state.data_timestamp}")
+            st.write(f"**File timestamp:** {file_timestamp}")
+            st.write(f"**Datos cargados:** {len(df) if df is not None else 0} registros")
         
         if df is not None and not df.empty:
             # Verificación de salud de los datos
