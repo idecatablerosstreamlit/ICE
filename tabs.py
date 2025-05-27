@@ -6,71 +6,7 @@ import streamlit as st
 import pandas as pd
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
-
-# Funciones de filtros integradas directamente
-def create_evolution_filters(df):
-    """Crear filtros para la pestaña de evolución"""
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Por código de indicador
-        codigos = sorted(df['Codigo'].unique())
-        codigo_seleccionado = st.selectbox("Código de Indicador", ["Todos"] + list(codigos))
-        
-        if codigo_seleccionado == "Todos":
-            codigo_seleccionado = None
-            indicador_seleccionado = None
-        else:
-            indicador_seleccionado = df[df['Codigo'] == codigo_seleccionado]['Indicador'].iloc[0]
-    
-    with col2:
-        # Opción para mostrar línea de meta
-        mostrar_meta = st.checkbox("Mostrar línea de referencia (Meta = 1.0)", value=True)
-        
-        # Seleccionar tipo de gráfico
-        tipo_grafico = st.radio(
-            "Tipo de gráfico",
-            options=["Línea", "Barras"],
-            horizontal=True
-        )
-    
-    return {
-        'codigo': codigo_seleccionado,
-        'indicador': indicador_seleccionado,
-        'mostrar_meta': mostrar_meta,
-        'tipo_grafico': tipo_grafico
-    }
-
-def create_pivot_filters():
-    """Crear filtros para la tabla dinámica"""
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        filas = st.selectbox(
-            "Filas",
-            options=["Categoria", "Componente", "Linea_Accion", "Codigo"],
-            index=0
-        )
-    
-    with col2:
-        columnas = st.selectbox(
-            "Columnas",
-            options=["Componente", "Categoria", "Linea_Accion", "Codigo"],
-            index=0
-        )
-    
-    with col3:
-        valores = st.selectbox(
-            "Valores",
-            options=["Valor", "Cumplimiento", "Puntaje_Ponderado"],
-            index=0
-        )
-    
-    return {
-        'filas': filas,
-        'columnas': columnas,
-        'valores': valores
-    }
+from filters import EvolutionFilters, PivotTableFilters
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
@@ -131,37 +67,20 @@ class ComponentSummaryTab:
         df_componente = df[df['Componente'] == componente_analisis]
         
         if not df_componente.empty:
-            # Métricas del componente con HTML personalizado para mejor visibilidad
+            # Métricas del componente
             col1, col2, col3 = st.columns(3)
             
             with col1:
                 valor_promedio = df_componente['Valor'].mean()
-                st.markdown(f"""
-                <div style="background-color: #404040; padding: 1rem; border-radius: 8px; text-align: center;">
-                    <h4 style="color: #E0E0E0; margin: 0 0 0.5rem 0;">Valor Promedio</h4>
-                    <h2 style="color: #FFFFFF; margin: 0; font-size: 2rem;">{valor_promedio:.2f}</h2>
-                    <p style="color: #B0B0B0; margin: 0.5rem 0 0 0;">{valor_promedio*100:.1f}%</p>
-                </div>
-                """, unsafe_allow_html=True)
+                st.metric("Valor Promedio", f"{valor_promedio:.2f}")
             
             with col2:
                 total_indicadores = df_componente['Indicador'].nunique()
-                st.markdown(f"""
-                <div style="background-color: #404040; padding: 1rem; border-radius: 8px; text-align: center;">
-                    <h4 style="color: #E0E0E0; margin: 0 0 0.5rem 0;">Total Indicadores</h4>
-                    <h2 style="color: #FFFFFF; margin: 0; font-size: 2rem;">{total_indicadores}</h2>
-                    <p style="color: #B0B0B0; margin: 0.5rem 0 0 0;">indicadores</p>
-                </div>
-                """, unsafe_allow_html=True)
+                st.metric("Total Indicadores", total_indicadores)
             
             with col3:
                 ultima_medicion = df_componente['Fecha'].max()
-                st.markdown(f"""
-                <div style="background-color: #404040; padding: 1rem; border-radius: 8px; text-align: center;">
-                    <h4 style="color: #E0E0E0; margin: 0 0 0.5rem 0;">Última Medición</h4>
-                    <h2 style="color: #FFFFFF; margin: 0; font-size: 1.5rem;">{ultima_medicion.strftime('%d/%m/%Y')}</h2>
-                </div>
-                """, unsafe_allow_html=True)
+                st.metric("Última Medición", ultima_medicion.strftime('%d/%m/%Y'))
             
             # Gráfico de evolución del componente
             fig_evol = ChartGenerator.evolution_chart(df_componente, componente=componente_analisis)
@@ -186,7 +105,7 @@ class EvolutionTab:
         
         try:
             # Crear filtros específicos de evolución
-            evolution_filters = create_evolution_filters(df)
+            evolution_filters = EvolutionFilters.create_evolution_filters(df)
             
             # Mostrar nombre del indicador seleccionado
             if evolution_filters['indicador']:
@@ -225,7 +144,7 @@ class PivotTableTab:
         
         try:
             # Crear filtros para tabla dinámica
-            pivot_filters = create_pivot_filters()
+            pivot_filters = PivotTableFilters.create_pivot_filters()
             
             # Validar que filas y columnas sean diferentes
             if pivot_filters['filas'] == pivot_filters['columnas']:
