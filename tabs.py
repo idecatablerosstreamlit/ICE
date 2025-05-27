@@ -4,6 +4,7 @@ Interfaces de usuario para las pestañas del Dashboard ICE
 
 import streamlit as st
 import pandas as pd
+import time
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
 from filters import EvolutionFilters
@@ -208,43 +209,114 @@ class ComponentSummaryTab:
             st.warning("No hay datos para el componente seleccionado")
 
 class EvolutionTab:
-    """Pestaña de evolución"""
+    """Pestaña de evolución - CORREGIDA"""
     
     @staticmethod
     def render(df, filters):
         """Renderizar la pestaña de evolución"""
-        st.subheader("Evolución de Indicadores")
+        st.subheader("📈 Evolución Temporal de Indicadores")
         
         try:
+            # Verificar que tenemos datos
+            if df.empty:
+                st.warning("No hay datos disponibles para mostrar evolución")
+                return
+            
+            # Información sobre los datos disponibles
+            st.info(f"""
+            📊 **Datos disponibles:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos
+            📅 **Rango de fechas:** {df['Fecha'].min().strftime('%d/%m/%Y')} - {df['Fecha'].max().strftime('%d/%m/%Y')}
+            """)
+            
             # Crear filtros específicos de evolución
             evolution_filters = EvolutionFilters.create_evolution_filters(df)
             
-            # Mostrar nombre del indicador seleccionado
+            # Mostrar información del filtro seleccionado
             if evolution_filters['indicador']:
-                st.write(f"**Indicador seleccionado:** {evolution_filters['indicador']}")
+                st.success(f"**📊 Indicador seleccionado:** {evolution_filters['indicador']}")
+                
+                # Mostrar datos específicos del indicador
+                datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
+                
+                if not datos_indicador.empty:
+                    st.write(f"**Registros históricos encontrados:** {len(datos_indicador)}")
+                    
+                    # Mostrar tabla de datos del indicador
+                    with st.expander("📋 Ver datos históricos del indicador"):
+                        st.dataframe(
+                            datos_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
+                            use_container_width=True
+                        )
+                else:
+                    st.warning("No se encontraron datos históricos para este indicador")
+                    return
+            else:
+                st.info("**📊 Vista general:** Mostrando evolución promedio de todos los indicadores")
             
             # Generar gráfico de evolución
-            fig = ChartGenerator.evolution_chart(
-                df,
-                indicador=evolution_filters['indicador'],
-                componente=filters.get('componente'),
-                tipo_grafico=evolution_filters['tipo_grafico'],
-                mostrar_meta=evolution_filters['mostrar_meta']
-            )
+            try:
+                fig = ChartGenerator.evolution_chart(
+                    df,
+                    indicador=evolution_filters['indicador'],
+                    componente=None,  # No filtrar por componente aquí
+                    tipo_grafico=evolution_filters['tipo_grafico'],
+                    mostrar_meta=evolution_filters['mostrar_meta']
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"Error al generar gráfico: {e}")
+                import traceback
+                with st.expander("Detalles del error"):
+                    st.code(traceback.format_exc())
             
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Mostrar tabla de datos del indicador seleccionado
-            if evolution_filters['codigo']:
-                st.subheader(f"Datos del indicador: {evolution_filters['indicador']}")
+            # Mostrar análisis adicional si hay un indicador seleccionado
+            if evolution_filters['codigo'] and evolution_filters['indicador']:
+                st.subheader(f"📊 Análisis Detallado: {evolution_filters['indicador']}")
+                
                 datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
+                
+                if len(datos_indicador) > 1:
+                    # Métricas de evolución
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        valor_inicial = datos_indicador.iloc[0]['Valor']
+                        st.metric("Valor Inicial", f"{valor_inicial:.3f}")
+                    
+                    with col2:
+                        valor_actual = datos_indicador.iloc[-1]['Valor']
+                        st.metric("Valor Actual", f"{valor_actual:.3f}")
+                    
+                    with col3:
+                        cambio = valor_actual - valor_inicial
+                        st.metric("Cambio Total", f"{cambio:+.3f}")
+                    
+                    with col4:
+                        if valor_inicial != 0:
+                            cambio_pct = (cambio / valor_inicial) * 100
+                            st.metric("Cambio %", f"{cambio_pct:+.1f}%")
+                        else:
+                            st.metric("Cambio %", "N/A")
+                
+                # Tabla de datos históricos
                 st.dataframe(
                     datos_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
                     use_container_width=True
                 )
         
         except Exception as e:
-            st.error(f"Error al generar gráfico de evolución: {e}")
+            st.error(f"Error crítico en pestaña de evolución: {e}")
+            import traceback
+            with st.expander("🔧 Debug: Detalles del error"):
+                st.code(traceback.format_exc())
+                st.write("**Datos de entrada:**")
+                st.write(f"- DataFrame shape: {df.shape if df is not None else 'None'}")
+                st.write(f"- Filtros: {filters}")
+                if df is not None and not df.empty:
+                    st.write(f"- Columnas: {list(df.columns)}")
+                    st.write(f"- Códigos únicos: {df['Codigo'].nunique() if 'Codigo' in df.columns else 'N/A'}")
 
 class EditTab:
     """Pestaña de edición mejorada"""
@@ -410,6 +482,10 @@ class EditTab:
                 if submitted:
                     if DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, csv_path):
                         st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente")
+                        st.balloons()
+                        # Forzar recarga inmediata
+                        st.cache_data.clear()
+                        time.sleep(0.5)
                         st.rerun()
                     else:
                         st.error("❌ Error al actualizar el registro")
@@ -455,6 +531,10 @@ class EditTab:
                     if st.button("🗑️ ELIMINAR REGISTRO", type="primary", use_container_width=True):
                         if DataEditor.delete_record(df, codigo_editar, fecha_real, csv_path):
                             st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente")
+                            st.balloons()
+                            # Forzar recarga inmediata
+                            st.cache_data.clear()
+                            time.sleep(0.5)
                             st.rerun()
                         else:
                             st.error("❌ Error al eliminar el registro")
