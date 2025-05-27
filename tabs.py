@@ -20,7 +20,26 @@ class GeneralSummaryTab:
         try:
             # IMPORTANTE: NO usar fecha_seleccionada para cálculos principales
             # Siempre calcular con valores más recientes para consistencia
+            
+            # Verificación previa de datos
+            if df.empty:
+                st.error("❌ No hay datos disponibles para el análisis")
+                return
+                
+            required_cols = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria']
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            if missing_cols:
+                st.error(f"❌ Faltan columnas esenciales: {missing_cols}")
+                st.write("**Columnas disponibles:**", list(df.columns))
+                return
+            
+            # Intentar cálculo de puntajes
             puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
+            
+            # Verificar que los cálculos fueron exitosos
+            if puntajes_componente.empty and puntajes_categoria.empty and puntaje_general == 0:
+                st.error("❌ No se pudieron calcular los puntajes. Revisar la estructura de los datos.")
+                return
             
             # Mostrar información sobre qué datos se están usando
             st.info("""
@@ -37,37 +56,58 @@ class GeneralSummaryTab:
             
             with col1:
                 # Gráfico de velocímetro (más pequeño)
-                st.plotly_chart(
-                    ChartGenerator.gauge_chart(puntaje_general), 
-                    use_container_width=True
-                )
+                try:
+                    st.plotly_chart(
+                        ChartGenerator.gauge_chart(puntaje_general), 
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Error en velocímetro: {e}")
             
             with col2:
                 # Gráfico de radar (más grande) - también usando valores más recientes
-                st.plotly_chart(
-                    ChartGenerator.radar_chart(df, None),  # None = usar valores más recientes
-                    use_container_width=True
-                )
+                try:
+                    st.plotly_chart(
+                        ChartGenerator.radar_chart(df, None),  # None = usar valores más recientes
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"Error en gráfico radar: {e}")
             
             # Puntajes por componente
             st.subheader("Puntajes por Componente")
             if not puntajes_componente.empty:
-                fig_comp = ChartGenerator.component_bar_chart(puntajes_componente)
-                st.plotly_chart(fig_comp, use_container_width=True)
+                try:
+                    fig_comp = ChartGenerator.component_bar_chart(puntajes_componente)
+                    st.plotly_chart(fig_comp, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error en gráfico de componentes: {e}")
+                    # Fallback: mostrar como tabla
+                    st.dataframe(puntajes_componente, use_container_width=True)
             else:
                 st.info("No hay datos suficientes para mostrar puntajes por componente")
             
         except Exception as e:
-            st.error(f"Error al calcular puntajes: {e}")
+            st.error(f"❌ Error crítico al calcular puntajes: {e}")
             import traceback
-            st.code(traceback.format_exc())
-            st.info("Comprueba que los datos contengan las columnas requeridas")
+            with st.expander("🔧 Detalles técnicos del error"):
+                st.code(traceback.format_exc())
+                st.write("**Información de debug:**")
+                st.write(f"- Shape del DataFrame: {df.shape if df is not None else 'None'}")
+                st.write(f"- Columnas: {list(df.columns) if df is not None else 'None'}")
+                if df is not None and not df.empty:
+                    st.write(f"- Códigos únicos: {df['Codigo'].nunique()}")
+                    st.write(f"- Fechas únicas: {df['Fecha'].nunique()}")
+            st.info("💡 Intenta recargar los datos usando el botón '🔄 Actualizar Datos'")
         
         # Mostrar tabla de datos más recientes
-        with st.expander("Ver datos más recientes por indicador"):
+        with st.expander("📋 Ver datos más recientes por indicador"):
             try:
                 df_latest = DataProcessor._get_latest_values_by_indicator(df)
-                st.dataframe(df_latest[['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Fecha']], use_container_width=True)
+                if not df_latest.empty:
+                    st.dataframe(df_latest[['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Fecha']], use_container_width=True)
+                else:
+                    st.warning("No se pudieron obtener datos más recientes")
             except Exception as e:
                 st.error(f"Error al mostrar datos: {e}")
 
