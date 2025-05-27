@@ -1,13 +1,14 @@
 """
-Dashboard ICE - Archivo Principal
+Dashboard ICE - Archivo Principal - Versión corregida
 Sistema de monitoreo y seguimiento de indicadores de la Infraestructura de Conocimiento Espacial
 """
 
 import streamlit as st
-import pandas as pd
 import os
+import pandas as pd
 from config import configure_page, apply_dark_theme, CSV_FILENAME
 from data_utils import DataLoader
+from filters import FilterManager
 from tabs import TabManager
 
 def main():
@@ -17,175 +18,171 @@ def main():
     configure_page()
     apply_dark_theme()
     
-    # Título principal con estilo corporativo
-    st.markdown("""
-    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
-                border-radius: 10px; margin-bottom: 2rem; color: white;">
-        <h1 style="color: white; margin: 0;">🏢 Dashboard ICE</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.1rem;">
-            Sistema de Monitoreo - Infraestructura de Conocimiento Espacial
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Título principal
+    st.title("📊 Dashboard de Indicadores ICE")
+    st.markdown("Sistema de monitoreo y seguimiento de indicadores")
     
-    # Sistema de recarga automática de datos - MEJORADO
-    if 'data_timestamp' not in st.session_state:
-        st.session_state.data_timestamp = 0
+    # Añadir opción de debug
+    debug_mode = st.sidebar.checkbox("Modo Debug", value=True)
     
-    # Verificar si hay cambios en el archivo CSV
-    def get_file_timestamp(csv_path):
+    # Cargar datos
+    data_loader = DataLoader()
+    
+    if debug_mode:
+        st.sidebar.header("🔧 Información de Debug")
+    
+    df = data_loader.load_data()
+    
+    if df is not None and len(df) > 0:
         try:
-            return os.path.getmtime(csv_path)
-        except:
-            return 0
+            # Mostrar información básica de los datos
+            if debug_mode:
+                with st.expander("📋 Información de los datos cargados"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total registros", len(df))
+                    with col2:
+                        st.metric("Indicadores únicos", df['Indicador'].nunique())
+                    with col3:
+                        st.metric("Fechas únicas", df['Fecha'].nunique())
+                    
+                    st.subheader("Primeros 5 registros:")
+                    st.dataframe(df.head())
+                    
+                    st.subheader("Información por columna:")
+                    st.write(df.dtypes)
+            
+            # Crear sistema de filtros
+            filter_manager = FilterManager(df)
+            filters = filter_manager.create_sidebar_filters()
+            
+            # Aplicar filtros
+            df_filtrado = filter_manager.apply_filters(df)
+            
+            if debug_mode:
+                st.sidebar.write(f"Registros después del filtro: {len(df_filtrado)}")
+            
+            # Mostrar información de filtros activos
+            active_filters = filter_manager.get_filter_info()
+            if active_filters:
+                st.sidebar.markdown("**🔍 Filtros activos:**")
+                for filter_info in active_filters:
+                    st.sidebar.markdown(f"- {filter_info}")
+            
+            # Verificar que hay datos después del filtro
+            if len(df_filtrado) == 0:
+                st.warning("⚠️ No hay datos que coincidan con los filtros seleccionados. Intenta cambiar los filtros.")
+                st.info("💡 Sugerencia: Selecciona 'Todos' en los filtros para ver todos los datos disponibles.")
+                
+                # Mostrar datos sin filtrar como referencia
+                with st.expander("Ver todos los datos disponibles"):
+                    st.dataframe(df)
+            else:
+                # Renderizar pestañas
+                tab_manager = TabManager(df, data_loader.csv_path)
+                tab_manager.render_tabs(df_filtrado, filters)
+            
+            # Información adicional en sidebar
+            render_sidebar_info(debug_mode)
+            
+        except Exception as e:
+            st.error(f"❌ Error al procesar datos: {e}")
+            st.info("🔧 Activa el modo debug para ver más información.")
+            
+            if debug_mode:
+                st.exception(e)
     
-    # Cargar datos con cache más inteligente
-    @st.cache_data(ttl=5, show_spinner=True)  # Cache por 5 segundos para permitir recargas
-    def load_data_cached(timestamp, file_timestamp):
-        data_loader = DataLoader()
-        df_loaded = data_loader.load_data()
-        return df_loaded, data_loader.csv_path
-    
-    try:
-        # Obtener timestamp del archivo
-        data_loader_temp = DataLoader()
-        file_timestamp = get_file_timestamp(data_loader_temp.csv_path)
-        
-        # Cargar datos con ambos timestamps
-        df, csv_path = load_data_cached(st.session_state.data_timestamp, file_timestamp)
-        
-        # Debug: Mostrar información de cache
-        with st.expander("🔧 Debug: Sistema de cache", expanded=False):
-            st.write(f"**Session timestamp:** {st.session_state.data_timestamp}")
-            st.write(f"**File timestamp:** {file_timestamp}")
-            st.write(f"**Datos cargados:** {len(df) if df is not None else 0} registros")
-        
-        if df is not None and not df.empty:
-            # Verificación de salud de los datos
-            health_check_passed = True
-            
-            # Verificar columnas esenciales
-            required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            
-            if missing_columns:
-                st.error(f"❌ **Error crítico:** Faltan columnas esenciales: {missing_columns}")
-                st.write("**Columnas disponibles:**", list(df.columns))
-                health_check_passed = False
-            
-            # Verificar datos válidos
-            datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
-            if len(datos_validos) == 0:
-                st.error("❌ **Error crítico:** No hay datos válidos (todos los registros tienen valores nulos)")
-                health_check_passed = False
-            
-            if not health_check_passed:
-                st.stop()
-            
-            # Botón de recarga manual
-            col_reload1, col_reload2, col_reload3 = st.columns([2, 1, 2])
-            with col_reload2:
-                if st.button("🔄 Actualizar Datos", help="Recarga los datos desde el archivo CSV"):
-                    st.cache_data.clear()
-                    st.session_state.data_timestamp += 1
-                    st.rerun()
-            
-            # Mostrar información de estado de los datos
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.info(f"📊 **{len(df)}** registros cargados")
-            with col2:
-                st.info(f"🔢 **{df['Codigo'].nunique()}** indicadores únicos")
-            with col3:
-                fechas_disponibles = df['Fecha'].nunique()
-                st.info(f"📅 **{fechas_disponibles}** fechas diferentes")
-            
-            # IMPORTANTE: No filtrar por fecha aquí - dejar que cada función maneje sus propios filtros
-            # El cálculo de componentes y general siempre usa valores más recientes
-            df_completo = df.copy()
-            
-            # Crear filtros simples (solo para referencia, no para filtrado directo)
-            filters = create_simple_filters(df)
-            
-            # Renderizar pestañas - pasar datos completos
-            tab_manager = TabManager(df_completo, csv_path)
-            tab_manager.render_tabs(df_completo, filters)
-            
-        else:
-            show_error_message()
-            
-    except Exception as e:
-        st.error(f"Error crítico al procesar datos: {e}")
-        st.info("Verifica que el archivo CSV contenga todas las columnas requeridas")
-        # Mostrar traceback para debug
-        import traceback
-        with st.expander("🔧 Detalles del error (para desarrolladores)"):
-            st.code(traceback.format_exc())
-            
-        # Botón para intentar recargar
-        if st.button("🔄 Intentar Recargar Datos"):
-            st.cache_data.clear()
-            st.rerun()
+    else:
+        show_error_message()
 
-def create_simple_filters(df):
-    """Crear selector de fecha para referencia (no afecta cálculos principales)"""
-    st.markdown("### 📅 Fecha de Referencia")
+def render_sidebar_info(debug_mode=False):
+    """Renderizar información adicional en la barra lateral"""
+    st.sidebar.markdown("---")
     
-    # Mostrar información explicativa
-    st.info("""
-    ℹ️ **Nota importante:** Los cálculos de componentes y puntaje general siempre usan 
-    el **valor más reciente** de cada indicador. Esta fecha es solo para visualizaciones específicas.
+    if debug_mode:
+        st.sidebar.header("🎯 Estado del Sistema")
+        try:
+            # Información del entorno
+            st.sidebar.write(f"Python: {os.sys.version.split()[0]}")
+            st.sidebar.write(f"Pandas: {pd.__version__}")
+            st.sidebar.write(f"Streamlit: {st.__version__}")
+            
+            # Información del directorio
+            current_dir = os.getcwd()
+            st.sidebar.write(f"Directorio actual: {os.path.basename(current_dir)}")
+            
+        except Exception as e:
+            st.sidebar.error(f"Error obteniendo info del sistema: {e}")
+    
+    st.sidebar.info("""
+    📊 **Dashboard ICE**
+    
+    Este dashboard permite monitorear y analizar los indicadores clave de desempeño de la Infraestructura de Conocimiento Espacial, con visualizaciones interactivas y cálculos automáticos de puntajes.
+    
+    **Navegación:**
+    - 📈 **Resumen General**: Vista global de indicadores
+    - 🏗️ **Por Componente**: Análisis detallado por área
+    - 📊 **Evolución**: Tendencias temporales
+    - 📋 **Tabla Dinámica**: Análisis cruzado
+    - ✏️ **Edición**: Actualizar valores
     """)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        try:
-            # Filtrar solo fechas válidas (no NaT)
-            fechas_validas = df['Fecha'].dropna().unique()
-            if len(fechas_validas) > 0:
-                fechas = sorted(fechas_validas)
-                fecha_seleccionada = st.selectbox(
-                    "Seleccionar fecha (solo para visualizaciones específicas)", 
-                    fechas, 
-                    index=len(fechas) - 1,
-                    help="Esta fecha se usa solo en algunas visualizaciones. Los cálculos principales usan valores más recientes."
-                )
-                return {'fecha': fecha_seleccionada}
-            else:
-                st.warning("No se encontraron fechas válidas en los datos")
-                return {'fecha': None}
-        except Exception as e:
-            st.warning(f"Error al procesar fechas: {e}")
-            return {'fecha': None}
+    # Créditos
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**© 2025 Dashboard ICE**")
+    st.sidebar.markdown("**IDECA - Bogotá D.C.**")
 
 def show_error_message():
     """Mostrar mensaje de error cuando no se puede cargar el archivo"""
     st.error(f"""
     ### ❌ Error al cargar el archivo de indicadores
 
-    No se pudo encontrar o abrir el archivo "{CSV_FILENAME}". 
+    No se pudo encontrar o abrir el archivo `{CSV_FILENAME}`. 
 
-    **Solución:**
-    1. Asegúrate de que el archivo "{CSV_FILENAME}" existe en el mismo directorio donde estás ejecutando esta aplicación.
-    2. Verifica que el nombre del archivo sea exactamente "{CSV_FILENAME}" (respetando mayúsculas y minúsculas).
-    3. Comprueba que el archivo utiliza punto y coma (;) como separador de columnas.
-    4. Asegúrate de que tienes permisos de lectura para el archivo.
-
-    Si sigues teniendo problemas, intenta crear una copia del archivo CSV y guárdala con el nombre "{CSV_FILENAME}" en el mismo directorio que este script.
+    **🛠️ Posibles soluciones:**
+    
+    1. **Verificar archivo**: Asegúrate de que el archivo `{CSV_FILENAME}` existe
+    2. **Ubicación**: El archivo debe estar en el mismo directorio que este script
+    3. **Formato**: Verifica que usa punto y coma (;) como separador
+    4. **Encoding**: Asegúrate de que está guardado en UTF-8
+    5. **Permisos**: Comprueba que tienes permisos de lectura
     """)
 
     # Mostrar información de diagnóstico
     try:
         current_dir = os.getcwd()
-        files_in_dir = os.listdir(current_dir)
+        files_in_dir = [f for f in os.listdir(current_dir) if f.endswith('.csv')]
+        
         st.info(f"""
-        **Información de diagnóstico:**
-        - Directorio de trabajo actual: {current_dir}
-        - Archivos en el directorio actual: {', '.join(files_in_dir)}
+        **🔍 Información de diagnóstico:**
+        - **Directorio actual**: `{current_dir}`
+        - **Archivos CSV encontrados**: {', '.join(files_in_dir) if files_in_dir else 'Ninguno'}
+        - **Archivo buscado**: `{CSV_FILENAME}`
         """)
+        
+        if files_in_dir:
+            st.success("💡 Se encontraron archivos CSV. Verifica que el nombre coincida exactamente.")
+        
     except Exception as e:
-        st.warning(f"No se pudo obtener información del directorio: {e}")
+        st.warning(f"⚠️ No se pudo obtener información del directorio: {e}")
+
+def check_streamlit_issues():
+    """Verificar problemas comunes de Streamlit"""
+    try:
+        # Verificar versión de Streamlit
+        import streamlit as st
+        version = st.__version__
+        
+        # Sugerir actualización si es necesario
+        if version < "1.28.0":
+            st.sidebar.warning(f"⚠️ Streamlit {version} detectado. Considera actualizar a la versión más reciente.")
+            
+    except Exception as e:
+        st.sidebar.error(f"Error verificando Streamlit: {e}")
 
 if __name__ == "__main__":
+    # Verificar problemas de Streamlit
+    check_streamlit_issues()
+    
+    # Ejecutar aplicación principal
     main()
