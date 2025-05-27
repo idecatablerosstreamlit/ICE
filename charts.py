@@ -10,6 +10,95 @@ class ChartGenerator:
     """Clase para generar diferentes tipos de gráficos"""
     
     @staticmethod
+    def category_summary_table(df, componente, fecha=None):
+        """Generar tabla de resumen de categorías con colores por puntaje"""
+        if fecha:
+            df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
+        else:
+            ultima_fecha = df['Fecha'].max()
+            df_filtrado = df[(df['Fecha'] == ultima_fecha) & (df['Componente'] == componente)].copy()
+
+        if len(df_filtrado) == 0:
+            return None, f"No hay datos disponibles para el componente {componente}"
+
+        # Calcular promedio ponderado por categoría dentro del componente
+        def weighted_avg_category(group):
+            valores = group['Valor'].clip(0, 1)
+            pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+            peso_total = pesos.sum()
+            
+            if peso_total > 0:
+                return (valores * pesos).sum() / peso_total
+            else:
+                return valores.mean()
+
+        # Calcular datos por categoría
+        datos_categorias = df_filtrado.groupby('Categoria').apply(weighted_avg_category).reset_index()
+        datos_categorias.columns = ['Categoria', 'Puntaje']
+        
+        # Función para asignar colores según el puntaje
+        def get_color_by_score(score):
+            if score >= 0.8:
+                return '#2E8B57'  # Verde - Excelente
+            elif score >= 0.6:
+                return '#DAA520'  # Dorado - Bueno
+            elif score >= 0.4:
+                return '#FF8C00'  # Naranja - Regular
+            else:
+                return '#DC143C'  # Rojo - Crítico
+
+        # Crear tabla con colores
+        tabla_html = """
+        <div style="margin: 1rem 0;">
+            <h4 style="color: #2C3E50; margin-bottom: 0.5rem;">Puntajes por Categoría</h4>
+            <table style="width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <th style="padding: 12px; text-align: left; font-weight: 600;">Categoría</th>
+                        <th style="padding: 12px; text-align: center; font-weight: 600;">Puntaje</th>
+                        <th style="padding: 12px; text-align: center; font-weight: 600;">Porcentaje</th>
+                        <th style="padding: 12px; text-align: center; font-weight: 600;">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        for _, row in datos_categorias.iterrows():
+            color = get_color_by_score(row['Puntaje'])
+            porcentaje = row['Puntaje'] * 100
+            
+            # Determinar estado
+            if row['Puntaje'] >= 0.8:
+                estado = "Excelente"
+            elif row['Puntaje'] >= 0.6:
+                estado = "Bueno"
+            elif row['Puntaje'] >= 0.4:
+                estado = "Regular"
+            else:
+                estado = "Crítico"
+            
+            tabla_html += f"""
+                    <tr style="background-color: rgba(248, 249, 250, 0.9); border-bottom: 1px solid #BDC3C7;">
+                        <td style="padding: 12px; color: #2C3E50; font-weight: 500;">{row['Categoria']}</td>
+                        <td style="padding: 12px; text-align: center; color: {color}; font-weight: 700; font-size: 1.1rem;">{row['Puntaje']:.3f}</td>
+                        <td style="padding: 12px; text-align: center; color: {color}; font-weight: 600;">{porcentaje:.1f}%</td>
+                        <td style="padding: 12px; text-align: center;">
+                            <span style="background-color: {color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 500;">
+                                {estado}
+                            </span>
+                        </td>
+                    </tr>
+            """
+        
+        tabla_html += """
+                </tbody>
+            </table>
+        </div>
+        """
+        
+        return tabla_html, None
+
+    @staticmethod
     def evolution_chart(df, indicador=None, componente=None, tipo_grafico="Línea", mostrar_meta=True):
         """Generar gráfico de evolución temporal"""
         # Filtrar datos
