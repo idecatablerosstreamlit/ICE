@@ -80,17 +80,26 @@ class DataProcessor:
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """Calcular puntajes por componente y categoría usando promedio ponderado"""
+        """Calcular puntajes usando el valor más reciente de cada indicador"""
+        if df.empty:
+            return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
+                   pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
+
+        # Si se especifica una fecha, usar solo esa fecha
         if fecha_filtro:
             df_filtrado = df[df['Fecha'] == fecha_filtro].copy()
+            # Si no hay datos para esa fecha, tomar los más recientes por indicador
+            if df_filtrado.empty:
+                df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
         else:
-            df_filtrado = df.copy()
+            # Obtener el valor más reciente de cada indicador
+            df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
 
         if len(df_filtrado) == 0:
             return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
-        # Normalizar valores (0-1 o convertir a 0-100 si es necesario para visualización)
+        # Normalizar valores (0-1)
         df_filtrado['Valor_Normalizado'] = df_filtrado['Valor'].clip(0, 1)
         
         # Calcular puntajes por componente (promedio ponderado)
@@ -113,6 +122,23 @@ class DataProcessor:
         return puntajes_componente, puntajes_categoria, puntaje_general
     
     @staticmethod
+    def _get_latest_values_by_indicator(df):
+        """Obtener el valor más reciente de cada indicador"""
+        try:
+            # Agrupar por código de indicador y tomar el registro con fecha más reciente
+            def get_latest_record(group):
+                return group.loc[group['Fecha'].idxmax()]
+            
+            df_latest = df.groupby('Codigo').apply(get_latest_record).reset_index(drop=True)
+            return df_latest
+            
+        except Exception as e:
+            import streamlit as st
+            st.warning(f"Error al obtener valores más recientes: {e}")
+            # Fallback: retornar el DataFrame original
+            return df
+    
+    @staticmethod
     def _calculate_weighted_average_by_group(df, group_column):
         """Calcular promedio ponderado por grupo"""
         def weighted_avg(group):
@@ -133,33 +159,8 @@ class DataProcessor:
     
     @staticmethod
     def create_pivot_table(df, fecha=None, filas='Categoria', columnas='Componente', valores='Valor'):
-        """Crear tabla dinámica"""
-        if fecha:
-            df_filtrado = df[df['Fecha'] == fecha].copy()
-        else:
-            ultima_fecha = df['Fecha'].max()
-            df_filtrado = df[df['Fecha'] == ultima_fecha].copy()
-
-        # Calcular columnas adicionales si es necesario
-        if valores in ["Cumplimiento", "Puntaje_Ponderado"]:
-            df_filtrado['Valor_Normalizado'] = df_filtrado['Valor'].clip(0, 1)
-            
-            if valores == "Cumplimiento":
-                df_filtrado['Cumplimiento'] = df_filtrado['Valor_Normalizado'] * 100
-            elif valores == "Puntaje_Ponderado":
-                # Para la tabla pivote, usamos el valor ponderado individual
-                df_filtrado['Puntaje_Ponderado'] = df_filtrado['Valor_Normalizado'] * df_filtrado.get('Peso', 1.0)
-
-        tabla = pd.pivot_table(
-            df_filtrado,
-            values=valores,
-            index=[filas],
-            columns=[columnas],
-            aggfunc='mean',
-            fill_value=0
-        )
-
-        return tabla
+        """Crear tabla dinámica (función legacy - ya no se usa)"""
+        return pd.DataFrame()  # Función deshabilitada
 
 class DataEditor:
     """Clase para editar datos con operaciones CRUD completas"""
