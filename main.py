@@ -111,7 +111,7 @@ def main():
             df_completo = df.copy()
             
             # Crear filtros simples (solo para referencia, no para filtrado directo)
-            filters = create_simple_filters(df)
+            filters = {'fecha': None}  # Filtro simplificado por ahora
             
             # Renderizar pestañas - pasar datos completos
             tab_manager = TabManager(df_completo, csv_path, excel_data)
