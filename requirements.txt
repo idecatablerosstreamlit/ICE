@@ -26,3 +26,8 @@ flake8>=6.0.0
 # Para futuras extensiones
 # sqlite3  # Incluido en Python estándar
 # sqlalchemy>=2.0.0  # Para bases de datos avanzadas
+
+gspread>=5.12.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
