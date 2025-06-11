@@ -38,23 +38,27 @@ def main():
             return os.path.getmtime(csv_path)
         except:
             return 0
+
     
-    # Cargar datos con cache más inteligente
+    
     @st.cache_data(ttl=5, show_spinner=True)  # Cache por 5 segundos para permitir recargas
     def load_data_cached(timestamp, file_timestamp):
         data_loader = DataLoader()
         df_loaded = data_loader.load_data()
-        return df_loaded, data_loader.csv_path
+    
         # Cargar datos del Excel para hojas metodológicas
         excel_loader = ExcelDataLoader()
         excel_data = excel_loader.load_excel_data()
+    
+        return df_loaded, data_loader.csv_path, excel_data
+    
     try:
         # Obtener timestamp del archivo
         data_loader_temp = DataLoader()
         file_timestamp = get_file_timestamp(data_loader_temp.csv_path)
         
         # Cargar datos con ambos timestamps
-        df, csv_path = load_data_cached(st.session_state.data_timestamp, file_timestamp)
+        df, csv_path, excel_data = load_data_cached(st.session_state.data_timestamp, file_timestamp)
         
         # Debug: Mostrar información de cache
         with st.expander("🔧 Debug: Sistema de cache", expanded=False):
