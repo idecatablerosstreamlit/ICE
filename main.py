@@ -22,8 +22,8 @@ def main():
     
     # Título principal
     st.markdown(f"""
-    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #0F9D58 0%, #34A853 100%); 
-                border-radius: 10px; margin-bottom: 2rem; color: white;">
+    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%);
+                  border-radius: 10px; margin-bottom: 2rem; color: white;">
         <h1 style="color: white; margin: 0;">🏢 Dashboard ICE</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.1rem;">
             Sistema de Monitoreo - Infraestructura de Conocimiento Espacial
