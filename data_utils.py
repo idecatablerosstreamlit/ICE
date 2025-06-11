@@ -6,7 +6,7 @@ import pandas as pd
 import os
 import streamlit as st
 from config import COLUMN_MAPPING, DEFAULT_META, CSV_SEPARATOR, CSV_FILENAME, EXCEL_FILENAME
-
+import openpyxl  # Para leer archivos Excel
 class DataLoader:
     """Clase para cargar y procesar datos del CSV"""
     
@@ -615,17 +615,22 @@ class DataEditor:
             import traceback
             st.code(traceback.format_exc())
             return False
-class ExcelDataLoader:
+    class ExcelDataLoader:
     """Clase para cargar datos del archivo Excel con hojas metodológicas"""
     
     def __init__(self):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.excel_path = os.path.join(self.script_dir, EXCEL_FILENAME)
+        self.excel_path = os.path.join(self.script_dir, "Batería de indicadores 120325 1.xlsx")
         self.metodologicas_data = None
     
     def load_excel_data(self):
         """Cargar datos del Excel"""
         try:
+            # Verificar que el archivo existe
+            if not os.path.exists(self.excel_path):
+                st.warning(f"Archivo Excel no encontrado: {self.excel_path}")
+                return None
+            
             # Leer la hoja metodológica
             df_metodologicas = pd.read_excel(
                 self.excel_path, 
@@ -675,6 +680,7 @@ class ExcelDataLoader:
             df_metodologicas = df_metodologicas.dropna(subset=['Codigo'])
             
             self.metodologicas_data = df_metodologicas
+            st.success(f"✅ Datos del Excel cargados: {len(df_metodologicas)} indicadores metodológicos")
             return df_metodologicas
             
         except Exception as e:
@@ -684,89 +690,8 @@ class ExcelDataLoader:
     def get_indicator_data(self, codigo):
         """Obtener datos de un indicador específico por código"""
         if self.metodologicas_data is None:
-            return None
+            self.load_excel_data()
         
-        try:
-            # Buscar el indicador por código
-            indicator_data = self.metodologicas_data[
-                self.metodologicas_data['Codigo'] == codigo
-            ]
-            
-            if len(indicator_data) > 0:
-                return indicator_data.iloc[0].to_dict()
-            else:
-                return None
-                
-        except Exception as e:
-            st.error(f"Error al obtener datos del indicador {codigo}: {e}")
-            return Noneclass ExcelDataLoader:
-    """Clase para cargar datos del archivo Excel con hojas metodológicas"""
-    
-    def __init__(self):
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.excel_path = os.path.join(self.script_dir, EXCEL_FILENAME)
-        self.metodologicas_data = None
-    
-    def load_excel_data(self):
-        """Cargar datos del Excel"""
-        try:
-            # Leer la hoja metodológica
-            df_metodologicas = pd.read_excel(
-                self.excel_path, 
-                sheet_name="Hoja metodológica indicadores",
-                header=1  # La segunda fila contiene los headers
-            )
-            
-            # Renombrar columnas para facilitar el acceso
-            column_mapping = {
-                'C1_ID': 'Codigo',
-                'C2_Nombre indicador': 'Nombre_Indicador',
-                'C3_Definición': 'Definicion',
-                'C4_Objetivo': 'Objetivo',
-                'C5_Área temática': 'Area_Tematica',
-                'C6_Tema': 'Tema',
-                'C7_Soporte Legal': 'Soporte_Legal',
-                'C8_Fórmula de cálculo': 'Formula_Calculo',
-                'C9_Variables': 'Variables',
-                'C10_Unidad de medida': 'Unidad_Medida',
-                'C11_Fuente de Información': 'Fuente_Informacion',
-                'C12_Tipo de indicador': 'Tipo_Indicador',
-                'C13_Periodicidad ': 'Periodicidad',
-                'C14_Desagregación Geográfica': 'Desagregacion_Geografica',
-                'Metodología de cálculo': 'Metodologia_Calculo',
-                'C15_Desagregación poblacional-diferencial': 'Desagregacion_Poblacional',
-                'C16_Observaciones / Notas Técnicas': 'Observaciones',
-                'Clasificación según calidad': 'Clasificacion_Calidad',
-                'Clasificación según nivel de intervención': 'Clasificacion_Intervencion',
-                'Tipo de acumulación': 'Tipo_Acumulacion',
-                'C17_Enlaces web relacionados': 'Enlaces_Web',
-                'Interpretación': 'Interpretacion',
-                'Limitaciones': 'Limitaciones',
-                'C18_Sector': 'Sector',
-                'C19_Entidad': 'Entidad',
-                'C20_Dependencia': 'Dependencia',
-                'C21_Directivo/a Responsable': 'Directivo_Responsable',
-                'C22_Correo electrónico del directivo': 'Correo_Directivo',
-                'C23_Teléfono de contacto': 'Telefono_Contacto'
-            }
-            
-            # Renombrar columnas existentes
-            for old_name, new_name in column_mapping.items():
-                if old_name in df_metodologicas.columns:
-                    df_metodologicas = df_metodologicas.rename(columns={old_name: new_name})
-            
-            # Limpiar datos vacíos
-            df_metodologicas = df_metodologicas.dropna(subset=['Codigo'])
-            
-            self.metodologicas_data = df_metodologicas
-            return df_metodologicas
-            
-        except Exception as e:
-            st.error(f"Error al cargar datos del Excel: {e}")
-            return None
-    
-    def get_indicator_data(self, codigo):
-        """Obtener datos de un indicador específico por código"""
         if self.metodologicas_data is None:
             return None
         
