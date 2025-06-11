@@ -401,7 +401,30 @@ class EditTab:
             **Componente:** {componente_indicador}  
             **Categoría:** {categoria_indicador}
             """)
-            
+
+            # Botón para descargar hoja metodológica
+            col1, col2 = st.columns([3, 1])
+            with col2:
+                if st.button("📄 Descargar Hoja Metodológica", key="download_pdf"):
+                    if excel_data is not None:
+                        try:
+                            pdf_generator = PDFGenerator()
+                            file_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
+                            
+                            if file_bytes:
+                                st.download_button(
+                                    label="📊 Descargar CSV",
+                                    data=file_bytes,
+                                    file_name=f"Hoja_Metodologica_{codigo_editar}.csv",
+                                    mime="text/csv",
+                                    key="download_file_button"
+                                )
+                            else:
+                                st.error("No se pudo generar el archivo metodológico")
+                        except Exception as e:
+                            st.error(f"Error al generar archivo: {e}")
+                    else:
+                        st.error("No se pudieron cargar los datos del Excel")
             # Obtener registros existentes del indicador
             registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
             
