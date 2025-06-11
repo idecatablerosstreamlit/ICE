@@ -1,4 +1,4 @@
-"""
+a"""
 Configuración y estilos para el Dashboard ICE - SOLO GOOGLE SHEETS
 """
 
@@ -7,7 +7,7 @@ import streamlit as st
 def configure_page():
     """Configurar la página de Streamlit"""
     st.set_page_config(
-        page_title="Dashboard ICE - Google Sheets",
+        page_title="Dashboard ICE - Ideca",
         page_icon="🏢",
         layout="wide",
         initial_sidebar_state="collapsed"
