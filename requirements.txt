@@ -8,12 +8,12 @@ streamlit>=1.28.0
 # Manipulación de datos
 pandas>=1.5.0
 numpy>=1.24.0
+plotly>=5.15.0
+openpyxl>=3.1.0
+reportlab>=4.0.0
 
 dash
 matplotlib
-
-# Visualizaciones
-plotly>=5.0.0
 
 # Manejo de fechas
 python-dateutil>=2.8.0
@@ -25,5 +25,4 @@ flake8>=6.0.0
 
 # Para futuras extensiones
 # sqlite3  # Incluido en Python estándar
-# openpyxl>=3.1.0  # Para manejo de Excel
 # sqlalchemy>=2.0.0  # Para bases de datos avanzadas
