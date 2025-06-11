@@ -1,5 +1,5 @@
 """
-Gestor de Google Sheets para el Dashboard ICE
+Gestor de Google Sheets para el Dashboard ICE - CORREGIDO
 """
 
 import pandas as pd
@@ -15,7 +15,7 @@ except ImportError:
     GSPREAD_AVAILABLE = False
 
 class GoogleSheetsManager:
-    """Clase para gestionar la conexión y operaciones con Google Sheets"""
+    """Clase para gestionar la conexión y operaciones con Google Sheets - CORREGIDA"""
     
     def __init__(self):
         self.gc = None
@@ -88,7 +88,7 @@ class GoogleSheetsManager:
             # Obtener o crear worksheet
             try:
                 self.worksheet = self.sheet.worksheet(self.worksheet_name)
-                st.success(f"✅ Conectado a '{self.worksheet_name}'")
+                # st.success(f"✅ Conectado a '{self.worksheet_name}'")
             except gspread.WorksheetNotFound:
                 # Crear worksheet si no existe
                 self.worksheet = self.sheet.add_worksheet(
@@ -121,7 +121,11 @@ class GoogleSheetsManager:
             
             if not data:
                 st.warning("⚠️ Hoja de Google Sheets vacía")
-                return pd.DataFrame()
+                # Crear DataFrame vacío con columnas correctas
+                return pd.DataFrame(columns=[
+                    "LINEA DE ACCIÓN", "COMPONENTE PROPUESTO", "CATEGORÍA", 
+                    "COD", "Nombre de indicador", "Valor", "Fecha"
+                ])
             
             df = pd.DataFrame(data)
             
@@ -138,108 +142,200 @@ class GoogleSheetsManager:
             
         except Exception as e:
             st.error(f"❌ Error al cargar desde Google Sheets: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return None
     
     def add_record(self, data_dict):
-        """Agregar un registro a Google Sheets"""
+        """Agregar un registro a Google Sheets - CORREGIDO"""
         try:
             if not self.connected and not self.connect_to_sheet():
+                st.error("❌ No se pudo conectar a Google Sheets")
                 return False
             
-            # Obtener headers para mantener orden
-            headers = self.worksheet.row_values(1)
+            # Verificar que tenemos datos
+            if not data_dict:
+                st.error("❌ No hay datos para agregar")
+                return False
             
-            # Crear fila con el orden correcto
+            # Obtener headers de la hoja para mantener orden correcto
+            try:
+                headers = self.worksheet.row_values(1)
+                if not headers:
+                    # Si no hay headers, agregarlos
+                    headers = [
+                        "LINEA DE ACCIÓN", "COMPONENTE PROPUESTO", "CATEGORÍA", 
+                        "COD", "Nombre de indicador", "Valor", "Fecha"
+                    ]
+                    self.worksheet.append_row(headers)
+            except Exception as e:
+                st.error(f"❌ Error al obtener headers: {e}")
+                return False
+            
+            # Mapeo de nombres internos a nombres de Google Sheets
+            header_map = {
+                'Linea_Accion': 'LINEA DE ACCIÓN',
+                'Componente': 'COMPONENTE PROPUESTO', 
+                'Categoria': 'CATEGORÍA',
+                'Codigo': 'COD',
+                'Indicador': 'Nombre de indicador',
+                'Valor': 'Valor',
+                'Fecha': 'Fecha'
+            }
+            
+            # Crear fila con el orden correcto de los headers
             nueva_fila = []
             for header in headers:
-                # Mapear nombres de columnas
-                header_map = {
-                    'LINEA DE ACCIÓN': 'Linea_Accion',
-                    'COMPONENTE PROPUESTO': 'Componente', 
-                    'CATEGORÍA': 'Categoria',
-                    'COD': 'Codigo',
-                    'Nombre de indicador': 'Indicador',
-                    'Valor': 'Valor',
-                    'Fecha': 'Fecha'
-                }
+                # Buscar el valor correspondiente
+                valor_encontrado = ""
                 
-                mapped_key = header_map.get(header, header)
-                nueva_fila.append(data_dict.get(mapped_key, ''))
+                # Buscar por mapeo directo
+                for key_interno, header_sheets in header_map.items():
+                    if header == header_sheets and key_interno in data_dict:
+                        valor_encontrado = str(data_dict[key_interno])
+                        break
+                
+                # Si no se encontró por mapeo, buscar directamente
+                if not valor_encontrado and header in data_dict:
+                    valor_encontrado = str(data_dict[header])
+                
+                nueva_fila.append(valor_encontrado)
             
-            # Agregar fila
+            # Debug: mostrar lo que se va a agregar
+            with st.expander("🔧 Debug: Datos a agregar", expanded=False):
+                st.write("**Headers de Google Sheets:**", headers)
+                st.write("**Datos recibidos:**", data_dict)
+                st.write("**Fila a agregar:**", nueva_fila)
+            
+            # Agregar fila a Google Sheets
             self.worksheet.append_row(nueva_fila)
             st.success("✅ Registro agregado a Google Sheets")
+            
+            # Pequeña pausa para asegurar que se guarde
+            import time
+            time.sleep(0.5)
+            
             return True
             
         except Exception as e:
             st.error(f"❌ Error al agregar: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
     
     def update_record(self, codigo, fecha, nuevo_valor):
-        """Actualizar un registro en Google Sheets"""
+        """Actualizar un registro en Google Sheets - CORREGIDO"""
         try:
             if not self.connected and not self.connect_to_sheet():
                 return False
             
-            # Obtener todos los datos
-            data = self.worksheet.get_all_records()
+            # Obtener todos los datos para buscar el registro
+            try:
+                data = self.worksheet.get_all_records()
+            except Exception as e:
+                st.error(f"❌ Error al obtener datos: {e}")
+                return False
             
             # Buscar registro a actualizar
+            row_to_update = None
             for i, row in enumerate(data, start=2):  # start=2 (headers en fila 1)
-                if (str(row.get('COD', '')).strip() == str(codigo).strip() and 
-                    self._compare_dates(row.get('Fecha', ''), fecha)):
-                    
-                    # Encontrar columna de Valor
-                    headers = self.worksheet.row_values(1)
-                    valor_col = None
-                    for j, header in enumerate(headers, start=1):
-                        if header == 'Valor':
-                            valor_col = j
-                            break
-                    
-                    if valor_col:
-                        self.worksheet.update_cell(i, valor_col, nuevo_valor)
-                        st.success("✅ Registro actualizado en Google Sheets")
-                        return True
+                row_codigo = str(row.get('COD', '')).strip()
+                
+                if row_codigo == str(codigo).strip():
+                    # Comparar fechas
+                    if self._compare_dates(row.get('Fecha', ''), fecha):
+                        row_to_update = i
+                        break
             
-            st.error("❌ Registro no encontrado")
-            return False
+            if row_to_update is None:
+                st.error("❌ Registro no encontrado para actualizar")
+                return False
+            
+            # Encontrar columna de Valor
+            try:
+                headers = self.worksheet.row_values(1)
+                valor_col = None
+                for j, header in enumerate(headers, start=1):
+                    if header in ['Valor', 'valor']:
+                        valor_col = j
+                        break
+                
+                if valor_col is None:
+                    st.error("❌ No se encontró columna 'Valor'")
+                    return False
+                
+                # Actualizar celda
+                self.worksheet.update_cell(row_to_update, valor_col, nuevo_valor)
+                st.success("✅ Registro actualizado en Google Sheets")
+                
+                # Pausa para asegurar guardado
+                import time
+                time.sleep(0.5)
+                
+                return True
+                
+            except Exception as e:
+                st.error(f"❌ Error al actualizar celda: {e}")
+                return False
             
         except Exception as e:
             st.error(f"❌ Error al actualizar: {e}")
             return False
     
     def delete_record(self, codigo, fecha):
-        """Eliminar un registro de Google Sheets"""
+        """Eliminar un registro de Google Sheets - CORREGIDO"""
         try:
             if not self.connected and not self.connect_to_sheet():
                 return False
             
             # Obtener todos los datos
-            data = self.worksheet.get_all_records()
+            try:
+                data = self.worksheet.get_all_records()
+            except Exception as e:
+                st.error(f"❌ Error al obtener datos: {e}")
+                return False
             
             # Buscar registro a eliminar
+            row_to_delete = None
             for i, row in enumerate(data, start=2):  # start=2 (headers en fila 1)
-                if (str(row.get('COD', '')).strip() == str(codigo).strip() and 
-                    self._compare_dates(row.get('Fecha', ''), fecha)):
-                    
-                    # Eliminar fila
-                    self.worksheet.delete_rows(i)
-                    st.success("✅ Registro eliminado de Google Sheets")
-                    return True
+                row_codigo = str(row.get('COD', '')).strip()
+                
+                if row_codigo == str(codigo).strip():
+                    if self._compare_dates(row.get('Fecha', ''), fecha):
+                        row_to_delete = i
+                        break
             
-            st.error("❌ Registro no encontrado")
-            return False
+            if row_to_delete is None:
+                st.error("❌ Registro no encontrado para eliminar")
+                return False
+            
+            try:
+                # Eliminar fila
+                self.worksheet.delete_rows(row_to_delete)
+                st.success("✅ Registro eliminado de Google Sheets")
+                
+                # Pausa para asegurar guardado
+                import time
+                time.sleep(0.5)
+                
+                return True
+                
+            except Exception as e:
+                st.error(f"❌ Error al eliminar fila: {e}")
+                return False
             
         except Exception as e:
             st.error(f"❌ Error al eliminar: {e}")
             return False
     
     def _compare_dates(self, sheet_date_str, target_date):
-        """Comparar fechas de forma segura"""
+        """Comparar fechas de forma segura - MEJORADO"""
         try:
             if not sheet_date_str:
                 return False
+            
+            # Limpiar string de fecha
+            sheet_date_str = str(sheet_date_str).strip()
             
             # Convertir fecha de sheets a datetime
             sheet_date = pd.to_datetime(sheet_date_str, dayfirst=True, errors='coerce')
@@ -247,6 +343,9 @@ class GoogleSheetsManager:
             # Convertir fecha objetivo a datetime si es necesario
             if isinstance(target_date, str):
                 target_date = pd.to_datetime(target_date, dayfirst=True, errors='coerce')
+            elif hasattr(target_date, 'date'):
+                # Si es datetime, extraer solo la fecha
+                target_date = pd.to_datetime(target_date.date())
             
             # Comparar solo las fechas (sin tiempo)
             if pd.notna(sheet_date) and pd.notna(target_date):
@@ -254,7 +353,8 @@ class GoogleSheetsManager:
             
             return False
             
-        except Exception:
+        except Exception as e:
+            st.warning(f"Error al comparar fechas: {e}")
             return False
     
     def get_connection_info(self):
