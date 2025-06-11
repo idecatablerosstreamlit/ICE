@@ -1,5 +1,5 @@
 """
-Utilidades para el manejo de datos del Dashboard ICE - Compatible con Google Sheets
+Utilidades para el manejo de datos del Dashboard ICE - CORREGIDO PARA GOOGLE SHEETS
 """
 
 import pandas as pd
@@ -10,7 +10,7 @@ import openpyxl  # Para leer archivos Excel
 from google_sheets_manager import GoogleSheetsManager
 
 class DataLoader:
-    """Clase para cargar y procesar datos - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+    """Clase para cargar y procesar datos - CORREGIDO GOOGLE SHEETS"""
     
     def __init__(self, use_google_sheets=True):
         self.df = None
@@ -24,7 +24,7 @@ class DataLoader:
         try:
             # Intentar cargar desde Google Sheets primero
             if self.use_google_sheets and self.sheets_manager:
-                st.info("🔄 Intentando cargar desde Google Sheets...")
+                st.info("🔄 Cargando desde Google Sheets...")
                 df_sheets = self._load_from_google_sheets()
                 
                 if df_sheets is not None:
@@ -55,8 +55,18 @@ class DataLoader:
         try:
             df = self.sheets_manager.load_data()
             
-            if df is None or df.empty:
+            if df is None:
                 return None
+            
+            if df.empty:
+                # Crear DataFrame vacío con estructura correcta
+                empty_df = pd.DataFrame(columns=[
+                    "LINEA DE ACCIÓN", "COMPONENTE PROPUESTO", "CATEGORÍA", 
+                    "COD", "Nombre de indicador", "Valor", "Fecha"
+                ])
+                self._process_dataframe(empty_df)
+                st.warning("📋 Google Sheets conectado pero vacío")
+                return empty_df
             
             # Procesar datos igual que CSV
             self._process_dataframe(df)
@@ -70,13 +80,21 @@ class DataLoader:
                 
         except Exception as e:
             st.warning(f"⚠️ Error al cargar desde Google Sheets: {e}")
+            import traceback
+            with st.expander("🔧 Debug: Error Google Sheets", expanded=False):
+                st.code(traceback.format_exc())
             return None
     
     def _load_from_csv(self):
         """Cargar datos desde CSV (método original mantenido)"""
         try:
+            # Verificar que el archivo existe
+            if not os.path.exists(self.csv_path):
+                st.error(f"❌ Archivo CSV no encontrado: {self.csv_path}")
+                return None
+            
             # Código original del CSV
-            self.df = pd.read_csv(self.csv_path, sep=CSV_SEPARATOR)
+            self.df = pd.read_csv(self.csv_path, sep=CSV_SEPARATOR, encoding='utf-8')
             
             # Debug info
             with st.expander("🔧 Debug: CSV cargado", expanded=False):
@@ -103,6 +121,9 @@ class DataLoader:
     def _process_dataframe(self, df):
         """Procesar DataFrame (común para Google Sheets y CSV)"""
         try:
+            if df.empty:
+                return
+            
             # Renombrar columnas
             for original, nuevo in COLUMN_MAPPING.items():
                 if original in df.columns:
@@ -123,6 +144,13 @@ class DataLoader:
     def _verify_and_clean_dataframe(self, df):
         """Verificar y limpiar DataFrame"""
         try:
+            if df.empty:
+                # Si está vacío pero tiene la estructura correcta, está bien
+                required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
+                if all(col in df.columns for col in required_columns):
+                    return True
+                return False
+            
             # Verificar columnas esenciales
             required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
             missing_columns = [col for col in required_columns if col not in df.columns]
@@ -133,11 +161,16 @@ class DataLoader:
                 return False
             
             # Limpiar datos problemáticos
+            initial_count = len(df)
             df.dropna(subset=['Codigo', 'Fecha', 'Valor'], inplace=True)
+            final_count = len(df)
+            
+            if initial_count != final_count:
+                st.info(f"🧹 Limpiados {initial_count - final_count} registros con datos faltantes")
             
             if df.empty:
-                st.error("❌ No hay datos válidos después de la limpieza")
-                return False
+                st.warning("⚠️ No hay datos válidos después de la limpieza")
+                return True  # Permitir DataFrames vacíos pero con estructura correcta
             
             return True
             
@@ -146,8 +179,11 @@ class DataLoader:
             return False
     
     def _process_dates(self, df):
-        """Procesar fechas (método original mantenido)"""
+        """Procesar fechas (método mejorado)"""
         try:
+            if df.empty or 'Fecha' not in df.columns:
+                return
+            
             date_formats = [
                 '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', 
                 '%Y/%m/%d', '%m/%d/%Y', '%d.%m.%Y'
@@ -170,11 +206,10 @@ class DataLoader:
             
             df['Fecha'] = fechas_convertidas
             
-            # Filtrar fechas inválidas si son muchas
+            # Contar fechas inválidas
             fechas_invalidas = df['Fecha'].isna().sum()
-            if fechas_invalidas > 5:
-                df.dropna(subset=['Fecha'], inplace=True)
-                st.warning(f"⚠️ Excluidas {fechas_invalidas} filas con fechas inválidas")
+            if fechas_invalidas > 0:
+                st.warning(f"⚠️ {fechas_invalidas} fechas no se pudieron convertir")
                 
         except Exception as e:
             st.warning(f"Error al procesar fechas: {e}")
@@ -182,11 +217,14 @@ class DataLoader:
     def _process_values(self, df):
         """Procesar valores numéricos"""
         try:
+            if df.empty or 'Valor' not in df.columns:
+                return
+            
             if df['Valor'].dtype == 'object':
-                df['Valor'] = pd.to_numeric(
-                    df['Valor'].astype(str).str.replace(',', '.'), 
-                    errors='coerce'
-                )
+                # Limpiar y convertir valores
+                df['Valor'] = df['Valor'].astype(str).str.replace(',', '.').str.strip()
+                df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce')
+                
         except Exception as e:
             st.warning(f"Error al procesar valores: {e}")
     
@@ -216,14 +254,10 @@ class DataProcessor:
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """
-        Calcular puntajes usando SIEMPRE el valor más reciente de cada indicador.
-        CORREGIDO: Manejo robusto de errores y validaciones.
-        """
+        """Calcular puntajes usando SIEMPRE el valor más reciente de cada indicador."""
         try:
             if df.empty:
-                import streamlit as st
-                st.warning("DataFrame vacío para cálculo de puntajes")
+                st.info("📋 No hay datos disponibles para calcular puntajes")
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
@@ -231,21 +265,9 @@ class DataProcessor:
             df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
 
             if len(df_filtrado) == 0:
-                import streamlit as st
-                st.error("No se pudieron obtener valores más recientes de los indicadores")
+                st.info("📋 No hay datos para calcular puntajes")
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
-
-            # Debug: Verificar estructura del DataFrame
-            import streamlit as st
-            with st.expander("🔧 Debug: Estructura de datos para cálculos", expanded=False):
-                st.write(f"**Shape del DataFrame filtrado:** {df_filtrado.shape}")
-                st.write(f"**Columnas disponibles:** {list(df_filtrado.columns)}")
-                st.write(f"**Tipos de datos:**")
-                st.write(df_filtrado.dtypes)
-                if len(df_filtrado) > 0:
-                    st.write("**Muestra de datos:**")
-                    st.dataframe(df_filtrado.head())
 
             # Verificar columnas esenciales
             required_columns = ['Valor', 'Peso', 'Componente', 'Categoria']
@@ -301,7 +323,6 @@ class DataProcessor:
             return puntajes_componente, puntajes_categoria, puntaje_general
             
         except Exception as e:
-            import streamlit as st
             st.error(f"Error crítico en calculate_scores: {e}")
             import traceback
             st.code(traceback.format_exc())
@@ -310,10 +331,7 @@ class DataProcessor:
     
     @staticmethod
     def _get_latest_values_by_indicator(df):
-        """
-        Obtener el valor más reciente de cada indicador.
-        CORREGIDO: Evita problemas de estructura multidimensional.
-        """
+        """Obtener el valor más reciente de cada indicador."""
         try:
             if df.empty:
                 return df
@@ -321,7 +339,6 @@ class DataProcessor:
             # Verificar que tenemos las columnas necesarias
             required_columns = ['Codigo', 'Fecha', 'Valor']
             if not all(col in df.columns for col in required_columns):
-                import streamlit as st
                 st.error(f"Faltan columnas requeridas: {required_columns}")
                 return df
             
@@ -329,48 +346,29 @@ class DataProcessor:
             df_clean = df.dropna(subset=['Codigo', 'Fecha', 'Valor']).copy()
             
             if df_clean.empty:
-                import streamlit as st
-                st.warning("No hay datos válidos después de limpiar valores NaN")
                 return df
             
-            # MÉTODO CORREGIDO: Usar sort_values y drop_duplicates
-            # Esto evita problemas con groupby().apply()
+            # Usar sort_values y groupby para obtener valores más recientes
             df_latest = (df_clean
-                        .sort_values(['Codigo', 'Fecha'])  # Ordenar por código y fecha
-                        .groupby('Codigo', as_index=False)  # Agrupar por código
-                        .last()  # Tomar el último registro de cada grupo
-                        .reset_index(drop=True))  # Resetear índice
-            
-            import streamlit as st
-            # Mostrar información de debug solo si hay problemas
-            debug_info = len(df_clean['Codigo'].unique()) != len(df_latest)
-            if debug_info:
-                with st.expander("🔍 Debug: Valores más recientes por indicador", expanded=False):
-                    st.write(f"**Total indicadores únicos en datos originales:** {df_clean['Codigo'].nunique()}")
-                    st.write(f"**Registros después de filtrar:** {len(df_latest)}")
-                    st.write(f"**Estructura del DataFrame resultante:** {df_latest.shape}")
-                    st.dataframe(df_latest[['Codigo', 'Indicador', 'Valor', 'Fecha', 'Componente']].sort_values('Fecha'))
+                        .sort_values(['Codigo', 'Fecha'])
+                        .groupby('Codigo', as_index=False)
+                        .last()
+                        .reset_index(drop=True))
             
             return df_latest
             
         except Exception as e:
-            import streamlit as st
-            st.error(f"Error crítico al obtener valores más recientes: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-            # En caso de error, retornar DataFrame original como fallback
+            st.error(f"Error al obtener valores más recientes: {e}")
             return df
     
     @staticmethod
     def _calculate_weighted_average_by_group(df, group_column):
-        """Calcular promedio ponderado por grupo - CORREGIDO para evitar errores dimensionales"""
+        """Calcular promedio ponderado por grupo"""
         try:
-            # Verificar que el DataFrame y la columna de agrupación son válidos
             if df.empty:
                 return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
             
             if group_column not in df.columns:
-                import streamlit as st
                 st.error(f"La columna '{group_column}' no existe en los datos")
                 return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
             
@@ -378,14 +376,11 @@ class DataProcessor:
             required_cols = ['Valor_Normalizado', 'Peso']
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
-                import streamlit as st
                 st.error(f"Faltan columnas necesarias: {missing_cols}")
                 return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
             
             # Función para calcular promedio ponderado
             def weighted_avg(valores, pesos):
-                """Calcular promedio ponderado de forma segura"""
-                # Filtrar valores no nulos
                 mask = pd.notna(valores) & pd.notna(pesos)
                 if not mask.any():
                     return 0.0
@@ -399,13 +394,12 @@ class DataProcessor:
                 else:
                     return valores_clean.mean() if len(valores_clean) > 0 else 0.0
             
-            # Calcular promedio ponderado por grupo usando agg()
+            # Calcular promedio ponderado por grupo
             result = df.groupby(group_column).agg({
                 'Valor_Normalizado': list,
                 'Peso': list
             }).reset_index()
             
-            # Aplicar la función de promedio ponderado
             result['Puntaje_Ponderado'] = result.apply(
                 lambda row: weighted_avg(
                     pd.Series(row['Valor_Normalizado']), 
@@ -413,39 +407,23 @@ class DataProcessor:
                 ), axis=1
             )
             
-            # Mantener solo las columnas necesarias
-            result = result[[group_column, 'Puntaje_Ponderado']]
-            
-            return result
+            return result[[group_column, 'Puntaje_Ponderado']]
             
         except Exception as e:
-            import streamlit as st
             st.error(f"Error en cálculo ponderado por {group_column}: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-            # Retornar DataFrame vacío pero con estructura correcta
             return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
     
     @staticmethod
     def create_pivot_table(df, fecha=None, filas='Categoria', columnas='Componente', valores='Valor'):
-        """Crear tabla dinámica (función legacy - ya no se usa)"""
-        return pd.DataFrame()  # Función deshabilitada
+        """Crear tabla dinámica (función legacy)"""
+        return pd.DataFrame()
 
 class DataEditor:
-    """Clase para editar datos - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
-    
-    def __init__(self, use_google_sheets=True):
-        self.use_google_sheets = use_google_sheets
-        self.sheets_manager = GoogleSheetsManager() if use_google_sheets else None
+    """Clase para editar datos - CORREGIDO PARA GOOGLE SHEETS"""
     
     @staticmethod
-    def save_edit(df, codigo, fecha, nuevo_valor, csv_path):
-        """Guardar edición de un indicador (función heredada para compatibilidad)"""
-        return DataEditor.update_record(df, codigo, fecha, nuevo_valor, csv_path)
-    
-    @staticmethod
-    def add_new_record(df, codigo, fecha, valor, csv_path):
-        """Agregar un nuevo registro - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+    def add_new_record(df, codigo, fecha, valor, csv_path=None):
+        """Agregar un nuevo registro - CORREGIDO"""
         try:
             # Determinar si usar Google Sheets o CSV
             use_sheets = DataEditor._should_use_google_sheets()
@@ -457,13 +435,14 @@ class DataEditor:
                 
         except Exception as e:
             st.error(f"❌ Error al agregar registro: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
     
     @staticmethod
-    def update_record(df, codigo, fecha, nuevo_valor, csv_path):
-        """Actualizar un registro existente - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+    def update_record(df, codigo, fecha, nuevo_valor, csv_path=None):
+        """Actualizar un registro existente - CORREGIDO"""
         try:
-            # Determinar si usar Google Sheets o CSV
             use_sheets = DataEditor._should_use_google_sheets()
             
             if use_sheets:
@@ -476,10 +455,9 @@ class DataEditor:
             return False
     
     @staticmethod
-    def delete_record(df, codigo, fecha, csv_path):
-        """Eliminar un registro existente - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+    def delete_record(df, codigo, fecha, csv_path=None):
+        """Eliminar un registro existente - CORREGIDO"""
         try:
-            # Determinar si usar Google Sheets o CSV
             use_sheets = DataEditor._should_use_google_sheets()
             
             if use_sheets:
@@ -493,9 +471,8 @@ class DataEditor:
     
     @staticmethod
     def _should_use_google_sheets():
-        """Determinar si debe usar Google Sheets basado en la configuración"""
+        """Determinar si debe usar Google Sheets"""
         try:
-            # Verificar si Google Sheets está configurado
             return ("google_sheets" in st.secrets and 
                     "spreadsheet_url" in st.secrets["google_sheets"])
         except:
@@ -508,23 +485,31 @@ class DataEditor:
             sheets_manager = GoogleSheetsManager()
             
             # Buscar información base del indicador
+            if df.empty:
+                st.error(f"❌ No hay datos base disponibles para crear el registro")
+                return False
+            
             indicador_existente = df[df['Codigo'] == codigo]
             if indicador_existente.empty:
                 st.error(f"❌ No se encontró información base para el código {codigo}")
+                st.info("💡 Asegúrate de que el código existe en los datos actuales")
                 return False
             
             indicador_base = indicador_existente.iloc[0]
             
             # Formatear fecha
-            fecha_formateada = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%d/%m/%Y')
+            if hasattr(fecha, 'strftime'):
+                fecha_formateada = fecha.strftime('%d/%m/%Y')
+            else:
+                fecha_formateada = pd.to_datetime(fecha).strftime('%d/%m/%Y')
             
-            # Crear diccionario de datos
+            # Crear diccionario de datos con los nombres correctos para Google Sheets
             data_dict = {
-                'Linea_Accion': indicador_base.get('Linea_Accion', ''),
-                'Componente': indicador_base.get('Componente', ''),
-                'Categoria': indicador_base.get('Categoria', ''),
-                'Codigo': codigo,
-                'Indicador': indicador_base.get('Indicador', ''),
+                'LINEA DE ACCIÓN': indicador_base.get('Linea_Accion', ''),
+                'COMPONENTE PROPUESTO': indicador_base.get('Componente', ''),
+                'CATEGORÍA': indicador_base.get('Categoria', ''),
+                'COD': codigo,
+                'Nombre de indicador': indicador_base.get('Indicador', ''),
                 'Valor': valor,
                 'Fecha': fecha_formateada
             }
@@ -533,16 +518,16 @@ class DataEditor:
             success = sheets_manager.add_record(data_dict)
             
             if success:
-                # Forzar recarga de cache
+                # Forzar recarga de cache SIN cambiar pestaña
                 st.cache_data.clear()
-                if 'data_timestamp' not in st.session_state:
-                    st.session_state.data_timestamp = 0
-                st.session_state.data_timestamp += 1
+                st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
             
             return success
             
         except Exception as e:
             st.error(f"❌ Error en Google Sheets: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return False
     
     @staticmethod
@@ -553,11 +538,9 @@ class DataEditor:
             success = sheets_manager.update_record(codigo, fecha, nuevo_valor)
             
             if success:
-                # Forzar recarga de cache
+                # Forzar recarga de cache SIN cambiar pestaña
                 st.cache_data.clear()
-                if 'data_timestamp' not in st.session_state:
-                    st.session_state.data_timestamp = 0
-                st.session_state.data_timestamp += 1
+                st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
             
             return success
             
@@ -573,11 +556,9 @@ class DataEditor:
             success = sheets_manager.delete_record(codigo, fecha)
             
             if success:
-                # Forzar recarga de cache
+                # Forzar recarga de cache SIN cambiar pestaña
                 st.cache_data.clear()
-                if 'data_timestamp' not in st.session_state:
-                    st.session_state.data_timestamp = 0
-                st.session_state.data_timestamp += 1
+                st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
             
             return success
             
@@ -585,206 +566,115 @@ class DataEditor:
             st.error(f"❌ Error en Google Sheets: {e}")
             return False
     
+    # Métodos CSV originales mantenidos...
     @staticmethod
     def _add_record_csv(df, codigo, fecha, valor, csv_path):
-        """Agregar registro a CSV (método original mantenido)"""
+        """Agregar registro a CSV (método original)"""
         try:
-            # Leer el CSV actual para mantener el formato original
-            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
-            
-            # Debug: Ver formato de fechas existentes
-            import streamlit as st
-            with st.expander("🔧 Debug: Formato de fechas en CSV", expanded=False):
-                st.write("**Fechas existentes en CSV:**")
-                st.write(df_actual['Fecha'].head().tolist())
-                st.write(f"**Fecha nueva a agregar:** {fecha}")
-                st.write(f"**Tipo de fecha nueva:** {type(fecha)}")
-            
-            # Obtener información base del indicador desde df_actual
-            codigo_col = None
-            for col_name in ['COD', 'Codigo']:
-                if col_name in df_actual.columns:
-                    codigo_col = col_name
-                    break
-            
-            if codigo_col is None:
-                st.error("❌ No se encontró columna de código en el CSV")
+            if not csv_path:
+                st.error("❌ No se especificó ruta del archivo CSV")
                 return False
             
-            # Buscar información base del indicador
+            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+            
+            codigo_col = 'COD' if 'COD' in df_actual.columns else 'Codigo'
+            if codigo_col not in df_actual.columns:
+                st.error("❌ No se encontró columna de código")
+                return False
+            
             indicadores_existentes = df_actual[df_actual[codigo_col] == codigo]
             if len(indicadores_existentes) == 0:
-                st.error(f"❌ No se encontró información base para el código {codigo}")
+                st.error(f"❌ No se encontró información base para {codigo}")
                 return False
                 
             indicador_base = indicadores_existentes.iloc[0]
             
-            # IMPORTANTE: Convertir fecha al formato correcto del CSV
-            # Detectar formato de fechas existentes en el CSV
-            sample_date = df_actual['Fecha'].dropna().iloc[0] if len(df_actual['Fecha'].dropna()) > 0 else None
+            fecha_formateada = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%d/%m/%Y')
             
-            if sample_date:
-                # Si las fechas existentes están en formato d/m/Y, usar ese formato
-                if '/' in str(sample_date):
-                    fecha_formateada = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%d/%m/%Y')
-                else:
-                    # Si están en otro formato, usar ISO
-                    fecha_formateada = fecha.strftime('%Y-%m-%d') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%Y-%m-%d')
-            else:
-                # Por defecto usar formato d/m/Y que es el esperado por el sistema
-                fecha_formateada = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%d/%m/%Y')
-            
-            # Debug: Mostrar formato final
-            with st.expander("🔧 Debug: Fecha formateada", expanded=False):
-                st.write(f"**Fecha original:** {fecha}")
-                st.write(f"**Fecha formateada:** {fecha_formateada}")
-                st.write(f"**Formato detectado en CSV:** {sample_date}")
-            
-            # Crear nueva fila manteniendo la estructura original del CSV
             nueva_fila = {}
             for col in df_actual.columns:
                 if col == 'Fecha':
-                    nueva_fila[col] = fecha_formateada  # Usar fecha formateada
+                    nueva_fila[col] = fecha_formateada
                 elif col == 'Valor':
                     nueva_fila[col] = valor
                 else:
-                    # Mantener el valor original de la primera fila del indicador
                     nueva_fila[col] = indicador_base[col]
             
-            # Agregar nueva fila al DataFrame
             df_nuevo = pd.concat([df_actual, pd.DataFrame([nueva_fila])], ignore_index=True)
-            
-            # Guardar al CSV manteniendo el formato original
             df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
             
-            # Debug: Verificar que se guardó correctamente
-            with st.expander("🔧 Debug: Verificación de guardado", expanded=False):
-                df_verificacion = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
-                st.write(f"**Registros totales después de guardar:** {len(df_verificacion)}")
-                st.write("**Últimas 3 filas guardadas:**")
-                st.dataframe(df_verificacion.tail(3))
-            
-            # FORZAR recarga completa del cache
             st.cache_data.clear()
-            if 'data_timestamp' not in st.session_state:
-                st.session_state.data_timestamp = 0
-            st.session_state.data_timestamp += 1
+            st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
             
             return True
             
         except Exception as e:
-            import streamlit as st
-            st.error(f"❌ Error al agregar nuevo registro: {e}")
-            import traceback
-            st.code(traceback.format_exc())
+            st.error(f"❌ Error al agregar a CSV: {e}")
             return False
     
     @staticmethod
     def _update_record_csv(df, codigo, fecha, nuevo_valor, csv_path):
-        """Actualizar un registro existente en CSV (método original mantenido)"""
+        """Actualizar registro en CSV (método original)"""
         try:
-            # Leer el CSV actual con el mismo separador
-            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
-            
-            # Procesar fechas si es necesario
-            df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
-            
-            # Determinar la columna de código correcta
-            codigo_col = None
-            for col_name in ['COD', 'Codigo']:
-                if col_name in df_actual.columns:
-                    codigo_col = col_name
-                    break
-            
-            if codigo_col is None:
-                import streamlit as st
-                st.error("❌ No se encontró columna de código en el CSV (COD o Codigo)")
+            if not csv_path:
                 return False
             
-            # Encontrar el índice del registro a actualizar
+            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+            df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
+            
+            codigo_col = 'COD' if 'COD' in df_actual.columns else 'Codigo'
             idx = df_actual[(df_actual[codigo_col] == codigo) & (df_actual['Fecha'] == fecha)].index
             
             if len(idx) > 0:
-                # Actualizar el valor
                 df_actual.loc[idx, 'Valor'] = nuevo_valor
-                # Guardar al CSV manteniendo el formato original
                 df_actual.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
                 
-                # Forzar recarga de datos en Streamlit
-                import streamlit as st
-                if 'data_timestamp' not in st.session_state:
-                    st.session_state.data_timestamp = 0
-                st.session_state.data_timestamp += 1
-                
+                st.cache_data.clear()
+                st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                 return True
             else:
-                import streamlit as st
-                st.error(f"❌ No se encontró registro para código {codigo} en fecha {fecha.strftime('%d/%m/%Y')}")
-                # Debug: mostrar registros disponibles para este código
-                registros_codigo = df_actual[df_actual[codigo_col] == codigo]
-                if not registros_codigo.empty:
-                    st.write("**Registros disponibles para este código:**")
-                    st.dataframe(registros_codigo[['Fecha', 'Valor']])
+                st.error(f"❌ No se encontró registro para actualizar")
                 return False
                 
         except Exception as e:
-            import streamlit as st
-            st.error(f"❌ Error al actualizar el registro: {e}")
-            import traceback
-            st.code(traceback.format_exc())
+            st.error(f"❌ Error al actualizar CSV: {e}")
             return False
     
     @staticmethod
     def _delete_record_csv(df, codigo, fecha, csv_path):
-        """Eliminar un registro existente de CSV (método original mantenido)"""
+        """Eliminar registro de CSV (método original)"""
         try:
-            # Leer el CSV actual
-            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
-            
-            # Procesar fechas si es necesario
-            df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
-            
-            # Determinar la columna de código correcta
-            codigo_col = None
-            for col_name in ['COD', 'Codigo']:
-                if col_name in df_actual.columns:
-                    codigo_col = col_name
-                    break
-            
-            if codigo_col is None:
-                import streamlit as st
-                st.error("❌ No se encontró columna de código en el CSV")
+            if not csv_path:
                 return False
             
-            # Encontrar el índice del registro a eliminar
+            df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
+            df_actual['Fecha'] = pd.to_datetime(df_actual['Fecha'], errors='coerce')
+            
+            codigo_col = 'COD' if 'COD' in df_actual.columns else 'Codigo'
             idx = df_actual[(df_actual[codigo_col] == codigo) & (df_actual['Fecha'] == fecha)].index
             
             if len(idx) > 0:
-                # Eliminar la fila
                 df_nuevo = df_actual.drop(idx).reset_index(drop=True)
-                # Guardar al CSV
                 df_nuevo.to_csv(csv_path, sep=CSV_SEPARATOR, index=False)
                 
-                # Forzar recarga de datos en Streamlit
-                import streamlit as st
-                if 'data_timestamp' not in st.session_state:
-                    st.session_state.data_timestamp = 0
-                st.session_state.data_timestamp += 1
-                
+                st.cache_data.clear()
+                st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                 return True
             else:
-                import streamlit as st
                 st.error(f"❌ No se encontró registro para eliminar")
                 return False
                 
         except Exception as e:
-            import streamlit as st
-            st.error(f"❌ Error al eliminar el registro: {e}")
-            import traceback
-            st.code(traceback.format_exc())
+            st.error(f"❌ Error al eliminar de CSV: {e}")
             return False
 
-# MANTENER CLASE ORIGINAL SIN CAMBIOS
+    # Función de compatibilidad
+    @staticmethod
+    def save_edit(df, codigo, fecha, nuevo_valor, csv_path):
+        """Función de compatibilidad"""
+        return DataEditor.update_record(df, codigo, fecha, nuevo_valor, csv_path)
+
+# MANTENER CLASE EXCEL ORIGINAL
 class ExcelDataLoader:
     """Clase para cargar datos del archivo Excel con hojas metodológicas"""
     
@@ -796,19 +686,15 @@ class ExcelDataLoader:
     def load_excel_data(self):
         """Cargar datos del Excel"""
         try:
-            # Verificar que el archivo existe
             if not os.path.exists(self.excel_path):
-                st.warning(f"Archivo Excel no encontrado: {self.excel_path}")
                 return None
             
-            # Leer la hoja metodológica
             df_metodologicas = pd.read_excel(
                 self.excel_path, 
                 sheet_name="Hoja metodológica indicadores",
-                header=1  # La segunda fila contiene los headers
+                header=1
             )
             
-            # Renombrar columnas para facilitar el acceso
             column_mapping = {
                 'C1_ID': 'Codigo',
                 'C2_Nombre indicador': 'Nombre_Indicador',
@@ -875,6 +761,10 @@ class ExcelDataLoader:
                 return indicator_data.iloc[0].to_dict()
             else:
                 return None
+                
+        except Exception as e:
+            st.error(f"Error al obtener datos del indicador {codigo}: {e}")
+            return None
                 
         except Exception as e:
             st.error(f"Error al obtener datos del indicador {codigo}: {e}")
