@@ -177,7 +177,7 @@ def main():
                            padding: 1rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
                     <p style="color: white; margin: 0; font-weight: 500;">
                         📊 Datos sincronizados con Google Sheets
-                        <a href="{spreadsheet_url}" target="_blank" style="color: #E8F5E8; text-decoration: underline; margin-left: 10px;">
+                        <a href="{spreadsheet_url}" target="_blank" style="color: #4472C4; text-decoration: underline; margin-left: 10px;">
                             🔗 Abrir hoja de cálculo
                         </a>
                     </p>
