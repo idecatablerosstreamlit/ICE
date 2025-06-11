@@ -136,8 +136,15 @@ def main():
             col_reload1, col_reload2, col_reload3 = st.columns([2, 1, 2])
             with col_reload2:
                 if st.button("🔄 Actualizar desde Google Sheets", help="Recarga los datos desde Google Sheets"):
+                    # Guardar pestaña activa antes de recargar
+                    current_tab = st.session_state.get('active_tab', 0)
+                    
                     st.cache_data.clear()
                     st.session_state.data_timestamp += 1
+                    
+                    # Restaurar pestaña activa
+                    st.session_state.active_tab = current_tab
+                    
                     st.rerun()
             
             # Mostrar información de estado
@@ -198,7 +205,14 @@ def main():
             
         # Botón para intentar recargar
         if st.button("🔄 Intentar Recargar"):
+            # Guardar pestaña activa antes de recargar
+            current_tab = st.session_state.get('active_tab', 0)
+            
             st.cache_data.clear()
+            
+            # Restaurar pestaña activa
+            st.session_state.active_tab = current_tab
+            
             st.rerun()
 
 def create_simple_filters(df):
