@@ -1,5 +1,5 @@
 """
-Configuración y estilos para el Dashboard ICE - CON SOPORTE GOOGLE SHEETS
+Configuración y estilos para el Dashboard ICE - SOLO GOOGLE SHEETS
 """
 
 import streamlit as st
@@ -7,18 +7,18 @@ import streamlit as st
 def configure_page():
     """Configurar la página de Streamlit"""
     st.set_page_config(
-        page_title="Dashboard ICE",
+        page_title="Dashboard ICE - Google Sheets",
         page_icon="🏢",
         layout="wide",
         initial_sidebar_state="collapsed"
     )
 
 def apply_dark_theme():
-    """Aplicar tema corporativo moderno"""
+    """Aplicar tema corporativo moderno con colores de Google Sheets"""
     st.markdown("""
     <style>
         .stApp {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #f1f8e9 0%, #c8e6c9 100%);
             color: #2C3E50;
         }
         
@@ -31,7 +31,7 @@ def apply_dark_theme():
         }
         
         .stTabs [data-baseweb="tab-list"] {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(90deg, #0F9D58 0%, #34A853 100%);
             border-radius: 10px 10px 0 0;
             padding: 10px;
         }
@@ -63,7 +63,7 @@ def apply_dark_theme():
         }
         
         div.stButton > button {
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(45deg, #0F9D58 0%, #34A853 100%);
             color: white;
             border: none;
             border-radius: 6px;
@@ -78,7 +78,7 @@ def apply_dark_theme():
         }
         
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(180deg, #0F9D58 0%, #34A853 100%);
             border-right: 3px solid #BDC3C7;
         }
         
@@ -90,7 +90,7 @@ def apply_dark_theme():
         }
         
         .metric-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0F9D58 0%, #34A853 100%);
             padding: 1rem;
             border-radius: 10px;
             color: white;
@@ -102,7 +102,7 @@ def apply_dark_theme():
             background: rgba(255, 255, 255, 0.1);
             padding: 1rem;
             border-radius: 8px;
-            border-left: 4px solid #3498DB;
+            border-left: 4px solid #0F9D58;
         }
         
         .stMetric label {
@@ -129,7 +129,7 @@ def apply_dark_theme():
         
         .stAlert {
             border-radius: 8px;
-            border-left: 4px solid #3498DB;
+            border-left: 4px solid #0F9D58;
         }
         
         .stSelectbox > div > div {
@@ -138,7 +138,7 @@ def apply_dark_theme():
             border: 1px solid #BDC3C7;
         }
         
-        /* Estilos específicos para indicadores de Google Sheets */
+        /* Indicadores específicos de Google Sheets */
         .sheets-indicator {
             background: linear-gradient(45deg, #0F9D58 0%, #34A853 100%);
             color: white;
@@ -150,39 +150,27 @@ def apply_dark_theme():
             margin-left: 0.5rem;
         }
         
-        .csv-indicator {
-            background: linear-gradient(45deg, #FF6B35 0%, #F7931E 100%);
+        .sheets-connected {
+            background: linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%);
             color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            display: inline-block;
-            margin-left: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .sheets-error {
+            background: linear-gradient(45deg, #F44336 0%, #E57373 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
         }
     </style>
     """, unsafe_allow_html=True)
 
-def get_data_source_preference():
-    """Obtener preferencia de fuente de datos desde configuración"""
-    try:
-        # Verificar si Google Sheets está configurado
-        if ("google_sheets" in st.secrets and 
-            "spreadsheet_url" in st.secrets["google_sheets"]):
-            return "google_sheets"
-        else:
-            return "csv"
-    except:
-        return "csv"
-
-def show_data_source_indicator(source_type):
-    """Mostrar indicador visual del tipo de fuente de datos"""
-    if source_type == "google_sheets":
-        return '<span class="sheets-indicator">📊 Google Sheets</span>'
-    else:
-        return '<span class="csv-indicator">📁 CSV Local</span>'
-
-# Configuración de columnas CSV/Google Sheets
+# Configuración de columnas para Google Sheets
 COLUMN_MAPPING = {
     'LINEA DE ACCIÓN': 'Linea_Accion',
     'COMPONENTE PROPUESTO': 'Componente',
@@ -195,8 +183,6 @@ COLUMN_MAPPING = {
 
 # Configuración por defecto
 DEFAULT_META = 1.0
-CSV_SEPARATOR = ";"
-CSV_FILENAME = "IndicadoresICE.csv"
 EXCEL_FILENAME = "Batería de indicadores.xlsx"
 
 # Configuración Google Sheets
@@ -206,57 +192,69 @@ GOOGLE_SHEETS_CONFIG = {
         'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA', 
         'COD', 'Nombre de indicador', 'Valor', 'Fecha'
     ],
-    'cache_ttl_seconds': 30,  # Cache más frecuente para Google Sheets
+    'cache_ttl_seconds': 30,
     'max_retries': 3
 }
 
 # Mensajes de ayuda para configuración
 GOOGLE_SHEETS_SETUP_GUIDE = """
-## 🔧 Configuración de Google Sheets
+## 🔧 Configuración de Google Sheets para Dashboard ICE
 
-Para usar Google Sheets como base de datos:
+Para usar Google Sheets como base de datos del Dashboard ICE:
 
 ### 1. Crear Service Account:
 1. Ve a [Google Cloud Console](https://console.cloud.google.com/)
 2. Crea un nuevo proyecto o selecciona uno existente
-3. Habilita la API de Google Sheets y Google Drive
-4. Crea un Service Account
-5. Descarga las credenciales como JSON
+3. Habilita la **API de Google Sheets** y **Google Drive API**
+4. Ve a **"Credenciales"** → **"Crear credenciales"** → **"Cuenta de servicio"**
+5. Crea una cuenta de servicio con un nombre descriptivo
+6. Descarga las credenciales como archivo JSON
 
 ### 2. Configurar Streamlit Secrets:
-Crea `.streamlit/secrets.toml`:
+Crea el archivo `.streamlit/secrets.toml` con el contenido del JSON:
 
 ```toml
 [google_sheets]
 type = "service_account"
 project_id = "tu-proyecto-id"
 private_key_id = "tu-private-key-id"  
-private_key = "-----BEGIN PRIVATE KEY-----\\ntu-private-key\\n-----END PRIVATE KEY-----\\n"
+private_key = "-----BEGIN PRIVATE KEY-----\\ntu-private-key-completa\\n-----END PRIVATE KEY-----\\n"
 client_email = "tu-service-account@proyecto.iam.gserviceaccount.com"
 client_id = "tu-client-id"
 auth_uri = "https://accounts.google.com/o/oauth2/auth"
 token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/tu-service-account%40proyecto.iam.gserviceaccount.com"
 spreadsheet_url = "https://docs.google.com/spreadsheets/d/TU_SPREADSHEET_ID/edit"
 ```
 
 ### 3. Compartir Google Sheets:
-- Comparte tu hoja de Google Sheets con el email del Service Account
-- Dale permisos de Editor
+1. Abre tu hoja de Google Sheets
+2. Haz clic en **"Compartir"**
+3. Comparte con el email del Service Account (`tu-service-account@proyecto.iam.gserviceaccount.com`)
+4. Dale permisos de **"Editor"**
 
 ### 4. Estructura de la hoja:
-La hoja debe tener estas columnas en la primera fila:
-- LINEA DE ACCIÓN
-- COMPONENTE PROPUESTO  
-- CATEGORÍA
-- COD
-- Nombre de indicador
-- Valor
-- Fecha
-"""
+La hoja debe tener estas columnas en la **primera fila**:
+- `LINEA DE ACCIÓN`
+- `COMPONENTE PROPUESTO`  
+- `CATEGORÍA`
+- `COD`
+- `Nombre de indicador`
+- `Valor`
+- `Fecha`
 
-def show_setup_instructions():
-    """Mostrar instrucciones de configuración"""
-    st.markdown(GOOGLE_SHEETS_SETUP_GUIDE)
+### 5. Installar dependencias:
+```bash
+pip install gspread google-auth
+```
+
+### ⚠️ Notas importantes:
+- El `private_key` debe incluir los `\\n` para los saltos de línea
+- El Service Account debe tener permisos de Editor en la hoja
+- La URL debe ser la completa de Google Sheets (incluye `/edit` al final)
+- Los nombres de las columnas deben coincidir exactamente
+"""
 
 def validate_google_sheets_config():
     """Validar configuración de Google Sheets"""
@@ -277,7 +275,49 @@ def validate_google_sheets_config():
         if missing_keys:
             return False, f"Faltan claves en configuración: {missing_keys}"
         
+        # Verificar que la URL sea válida
+        spreadsheet_url = st.secrets["google_sheets"]["spreadsheet_url"]
+        if not spreadsheet_url.startswith("https://docs.google.com/spreadsheets/"):
+            return False, "URL de Google Sheets inválida"
+        
         return True, "Configuración válida"
         
     except Exception as e:
         return False, f"Error al validar configuración: {e}"
+
+def show_setup_instructions():
+    """Mostrar instrucciones de configuración"""
+    st.markdown(GOOGLE_SHEETS_SETUP_GUIDE)
+    
+    # Mostrar ejemplo de estructura
+    st.subheader("📊 Ejemplo de estructura de Google Sheets:")
+    
+    example_data = {
+        'LINEA DE ACCIÓN': ['LA.2.3.', 'N.A.', 'L.A.4.3'],
+        'COMPONENTE PROPUESTO': ['Datos', 'Seguridad e interoperabilidad', 'Gobernanza y estratégia'],
+        'CATEGORÍA': ['01. Disponibilidad', '01. Interoperabilidad', '02. Financiación'],
+        'COD': ['D01-1', 'S01-1', 'G02-3'],
+        'Nombre de indicador': [
+            'Porcentaje de datos de licencia abierta',
+            'Porcentaje de datos que se consumen como servicios',
+            'Porcentaje de incremento ingresos propios anuales'
+        ],
+        'Valor': [0.5, 0.75, 0.3],
+        'Fecha': ['1/01/2025', '1/01/2025', '1/01/2025']
+    }
+    
+    example_df = pd.DataFrame(example_data)
+    st.dataframe(example_df, use_container_width=True)
+    
+    st.info("💡 **Tip:** Puedes copiar esta estructura a tu Google Sheets como punto de partida.")
+
+def get_connection_status():
+    """Obtener estado de conexión de Google Sheets"""
+    try:
+        config_valid, _ = validate_google_sheets_config()
+        if config_valid:
+            return "connected"
+        else:
+            return "config_error"
+    except:
+        return "error"
