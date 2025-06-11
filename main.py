@@ -1,15 +1,13 @@
 """
-Dashboard ICE - Archivo Principal
+Dashboard ICE - Archivo Principal - SOLO GOOGLE SHEETS
 Sistema de monitoreo y seguimiento de indicadores de la Infraestructura de Conocimiento Espacial
-VERSION CON SOPORTE GOOGLE SHEETS
 """
 
 import streamlit as st
 import pandas as pd
 import os
 from config import (
-    configure_page, apply_dark_theme, get_data_source_preference, 
-    show_data_source_indicator, validate_google_sheets_config,
+    configure_page, apply_dark_theme, validate_google_sheets_config,
     show_setup_instructions
 )
 from data_utils import DataLoader, ExcelDataLoader
@@ -22,105 +20,122 @@ def main():
     configure_page()
     apply_dark_theme()
     
-    # Determinar fuente de datos
-    data_source = get_data_source_preference()
-    
-    # Título principal con indicador de fuente de datos
-    source_indicator = show_data_source_indicator(data_source)
-    
+    # Título principal
     st.markdown(f"""
-    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); 
+    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #0F9D58 0%, #34A853 100%); 
                 border-radius: 10px; margin-bottom: 2rem; color: white;">
         <h1 style="color: white; margin: 0;">🏢 Dashboard ICE</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.1rem;">
             Sistema de Monitoreo - Infraestructura de Conocimiento Espacial
         </p>
         <p style="margin: 0.5rem 0 0 0;">
-            {source_indicator}
+            <span style="background: rgba(255,255,255,0.2); padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.8rem; font-weight: 500;">
+                📊 Powered by Google Sheets
+            </span>
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Mostrar configuración si es necesario
-    if data_source == "google_sheets":
-        config_valid, config_message = validate_google_sheets_config()
-        if not config_valid:
-            st.error(f"❌ **Error en configuración de Google Sheets:** {config_message}")
-            
-            with st.expander("📋 Ver instrucciones de configuración", expanded=True):
-                show_setup_instructions()
-            
-            st.info("💡 El sistema usará CSV como fallback hasta que Google Sheets esté configurado")
-            data_source = "csv"  # Fallback a CSV
+    # Verificar configuración de Google Sheets
+    config_valid, config_message = validate_google_sheets_config()
+    
+    if not config_valid:
+        st.error(f"❌ **Error en configuración de Google Sheets:** {config_message}")
+        
+        with st.expander("📋 Ver instrucciones de configuración", expanded=True):
+            show_setup_instructions()
+        
+        st.stop()
     
     # Sistema de recarga automática de datos
     if 'data_timestamp' not in st.session_state:
         st.session_state.data_timestamp = 0
     
-    # Función de carga adaptable
-    @st.cache_data(ttl=30 if data_source == "google_sheets" else 5, show_spinner=True)
-    def load_data_cached(timestamp, source_type):
-        """Cargar datos según el tipo de fuente"""
-        # Configurar DataLoader según la fuente
-        use_google_sheets = (source_type == "google_sheets")
-        data_loader = DataLoader(use_google_sheets=use_google_sheets)
-        
-        df_loaded = data_loader.load_data()
-        
-        # Cargar datos del Excel para hojas metodológicas
-        excel_loader = ExcelDataLoader()
-        excel_data = excel_loader.load_excel_data()
-        
-        # Obtener información de la fuente de datos
-        source_info = data_loader.get_data_source_info()
-        
-        return df_loaded, source_info, excel_data
+    # Función de carga desde Google Sheets
+    @st.cache_data(ttl=30, show_spinner=True)
+    def load_data_cached(timestamp):
+        """Cargar datos únicamente desde Google Sheets"""
+        try:
+            # Cargar desde Google Sheets
+            data_loader = DataLoader()
+            df_loaded = data_loader.load_data()
+            
+            # Cargar datos del Excel para hojas metodológicas
+            excel_loader = ExcelDataLoader()
+            excel_data = excel_loader.load_excel_data()
+            
+            # Obtener información de la fuente
+            source_info = data_loader.get_data_source_info()
+            
+            return df_loaded, source_info, excel_data
+            
+        except Exception as e:
+            st.error(f"Error al cargar datos desde Google Sheets: {e}")
+            # Retornar datos vacíos pero válidos
+            empty_df = pd.DataFrame(columns=[
+                'Linea_Accion', 'Componente', 'Categoria', 
+                'Codigo', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso'
+            ])
+            return empty_df, {'source': 'Google Sheets (Error)', 'connection_info': {'connected': False}}, None
     
     try:
         # Cargar datos
-        df, source_info, excel_data = load_data_cached(st.session_state.data_timestamp, data_source)
+        df, source_info, excel_data = load_data_cached(st.session_state.data_timestamp)
         
         # Debug: Mostrar información de la fuente
-        with st.expander("🔧 Debug: Información de la fuente de datos", expanded=False):
+        with st.expander("🔧 Debug: Información de Google Sheets", expanded=False):
             st.write(f"**Tipo de fuente:** {source_info['source']}")
             st.write(f"**Session timestamp:** {st.session_state.data_timestamp}")
             st.write(f"**Datos cargados:** {len(df) if df is not None else 0} registros")
+            st.write(f"**Columnas disponibles:** {list(df.columns) if df is not None else 'N/A'}")
             
-            if source_info['source'] == 'Google Sheets':
-                connection_info = source_info.get('connection_info', {})
-                st.write(f"**Conectado:** {connection_info.get('connected', False)}")
-                if connection_info.get('spreadsheet_url'):
-                    st.write(f"**URL:** {connection_info['spreadsheet_url']}")
-            elif source_info['source'] == 'CSV':
-                st.write(f"**Archivo CSV:** {source_info.get('csv_path', 'N/A')}")
+            connection_info = source_info.get('connection_info', {})
+            st.write(f"**Conectado:** {connection_info.get('connected', False)}")
+            if connection_info.get('spreadsheet_url'):
+                st.write(f"**URL:** {connection_info['spreadsheet_url']}")
         
-        if df is not None and not df.empty:
-            # Verificación de salud de los datos
-            health_check_passed = True
+        if df is not None:
+            # Verificación básica de datos
+            if df.empty:
+                st.info("📋 Google Sheets está vacío. Puedes agregar datos en la pestaña 'Gestión de Datos'")
+                
+                # Mostrar instrucciones para empezar
+                with st.expander("📚 Cómo empezar con Google Sheets", expanded=True):
+                    st.markdown("""
+                    ### 🚀 Primeros pasos para usar el Dashboard ICE con Google Sheets:
+                    
+                    1. **Ve a la pestaña "Gestión de Datos"**
+                    2. **Selecciona "➕ Crear nuevo código"** para crear tu primer indicador
+                    3. **Llena la información básica** del indicador
+                    4. **Agrega algunos registros** con fechas y valores
+                    5. **Los datos se guardarán automáticamente** en Google Sheets
+                    6. **Regresa a las otras pestañas** para ver los análisis
+                    
+                    ### 📊 Estructura de Google Sheets:
+                    Tu hoja debe tener estas columnas en la primera fila:
+                    - `LINEA DE ACCIÓN`
+                    - `COMPONENTE PROPUESTO`
+                    - `CATEGORÍA`
+                    - `COD`
+                    - `Nombre de indicador`
+                    - `Valor`
+                    - `Fecha`
+                    """)
+            else:
+                # Verificación de columnas esenciales
+                required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
+                missing_columns = [col for col in required_columns if col not in df.columns]
+                
+                if missing_columns:
+                    st.error(f"❌ **Error:** Faltan columnas esenciales en Google Sheets: {missing_columns}")
+                    st.error("**Verifica que tu Google Sheets tenga las columnas correctas**")
+                    st.write("**Columnas disponibles:**", list(df.columns))
+                    st.stop()
             
-            # Verificar columnas esenciales
-            required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            
-            if missing_columns:
-                st.error(f"❌ **Error crítico:** Faltan columnas esenciales: {missing_columns}")
-                st.write("**Columnas disponibles:**", list(df.columns))
-                health_check_passed = False
-            
-            # Verificar datos válidos
-            datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
-            if len(datos_validos) == 0:
-                st.error("❌ **Error crítico:** No hay datos válidos")
-                health_check_passed = False
-            
-            if not health_check_passed:
-                st.stop()
-            
-            # Botón de recarga manual adaptado
+            # Botón de recarga manual
             col_reload1, col_reload2, col_reload3 = st.columns([2, 1, 2])
             with col_reload2:
-                button_text = "🔄 Actualizar desde Google Sheets" if data_source == "google_sheets" else "🔄 Actualizar Datos"
-                if st.button(button_text, help=f"Recarga los datos desde {source_info['source']}"):
+                if st.button("🔄 Actualizar desde Google Sheets", help="Recarga los datos desde Google Sheets"):
                     st.cache_data.clear()
                     st.session_state.data_timestamp += 1
                     st.rerun()
@@ -130,22 +145,26 @@ def main():
             with col1:
                 st.info(f"📊 **{len(df)}** registros")
             with col2:
-                st.info(f"🔢 **{df['Codigo'].nunique()}** indicadores")
+                indicadores_unicos = df['Codigo'].nunique() if not df.empty else 0
+                st.info(f"🔢 **{indicadores_unicos}** indicadores")
             with col3:
-                fechas_disponibles = df['Fecha'].nunique()
-                st.info(f"📅 **{fechas_disponibles}** fechas")
-            with col4:
-                # Mostrar fuente de datos
-                if source_info['source'] == 'Google Sheets':
-                    st.success("🌐 **Google Sheets**")
+                if not df.empty and 'Fecha' in df.columns:
+                    fechas_disponibles = df['Fecha'].nunique()
+                    st.info(f"📅 **{fechas_disponibles}** fechas")
                 else:
-                    st.warning("📁 **CSV Local**")
+                    st.info("📅 **0** fechas")
+            with col4:
+                # Mostrar estado de conexión
+                connection_info = source_info.get('connection_info', {})
+                if connection_info.get('connected', False):
+                    st.success("🌐 **Conectado**")
+                else:
+                    st.error("❌ **Desconectado**")
             
-            # Mostrar enlace a Google Sheets si aplica
-            if (source_info['source'] == 'Google Sheets' and 
-                source_info.get('connection_info', {}).get('spreadsheet_url')):
-                
-                spreadsheet_url = source_info['connection_info']['spreadsheet_url']
+            # Mostrar enlace a Google Sheets
+            connection_info = source_info.get('connection_info', {})
+            if connection_info.get('spreadsheet_url'):
+                spreadsheet_url = connection_info['spreadsheet_url']
                 st.markdown(f"""
                 <div style="background: linear-gradient(45deg, #0F9D58 0%, #34A853 100%); 
                            padding: 1rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
@@ -158,23 +177,19 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Datos completos para pestañas
-            df_completo = df.copy()
-            
             # Crear filtros simples
             filters = create_simple_filters(df)
             
-            # Renderizar pestañas con información de fuente
-            csv_path = source_info.get('csv_path', '') if source_info['source'] == 'CSV' else None
-            tab_manager = TabManager(df_completo, csv_path, excel_data)
-            tab_manager.render_tabs(df_completo, filters)
+            # Renderizar pestañas (sin CSV path ya que solo usamos Google Sheets)
+            tab_manager = TabManager(df, None, excel_data)
+            tab_manager.render_tabs(df, filters)
             
         else:
-            show_error_message(data_source)
+            st.error("❌ No se pudieron cargar los datos desde Google Sheets")
+            show_error_message()
             
     except Exception as e:
-        st.error(f"Error crítico al procesar datos: {e}")
-        st.info("Verifica la configuración de tu fuente de datos")
+        st.error(f"Error crítico: {e}")
         
         # Mostrar traceback para debug
         import traceback
@@ -199,6 +214,10 @@ def create_simple_filters(df):
     
     with col2:
         try:
+            if df.empty or 'Fecha' not in df.columns:
+                st.warning("No hay fechas disponibles en Google Sheets")
+                return {'fecha': None}
+                
             fechas_validas = df['Fecha'].dropna().unique()
             if len(fechas_validas) > 0:
                 fechas = sorted(fechas_validas)
@@ -210,72 +229,46 @@ def create_simple_filters(df):
                 )
                 return {'fecha': fecha_seleccionada}
             else:
-                st.warning("No se encontraron fechas válidas")
+                st.warning("No se encontraron fechas válidas en Google Sheets")
                 return {'fecha': None}
         except Exception as e:
             st.warning(f"Error al procesar fechas: {e}")
             return {'fecha': None}
 
-def show_error_message(data_source):
-    """Mostrar mensaje de error adaptado a la fuente de datos"""
-    if data_source == "google_sheets":
-        st.error("""
-        ### ❌ Error al cargar datos desde Google Sheets
+def show_error_message():
+    """Mostrar mensaje de error específico para Google Sheets"""
+    st.error(f"""
+    ### ❌ Error al cargar datos desde Google Sheets
 
-        **Posibles causas:**
-        1. **Configuración incorrecta:** Verifica `secrets.toml`
-        2. **Permisos:** El Service Account debe tener acceso a la hoja
-        3. **Estructura de datos:** La hoja debe tener las columnas correctas
-        4. **Conectividad:** Verifica tu conexión a internet
+    **Posibles causas:**
+    1. **Configuración incorrecta:** Verifica `secrets.toml`
+    2. **Permisos:** El Service Account debe tener acceso a la hoja
+    3. **Estructura de datos:** La hoja debe tener las columnas correctas
+    4. **Conectividad:** Verifica tu conexión a internet
+    
+    **Solución:**
+    - Revisa la configuración en el expander de arriba
+    - Asegúrate de que la hoja esté compartida con el Service Account
+    - Verifica que las columnas coincidan con el formato esperado
+    """)
+    
+    with st.expander("🔧 Diagnóstico de Google Sheets", expanded=True):
+        config_valid, config_message = validate_google_sheets_config()
+        if config_valid:
+            st.success("✅ Configuración de secrets.toml válida")
+        else:
+            st.error(f"❌ {config_message}")
         
-        **Solución:**
-        - Revisa la configuración en el expander de arriba
-        - Asegúrate de que la hoja esté compartida con el Service Account
-        - Verifica que las columnas coincidan con el formato esperado
-        """)
-        
-        with st.expander("🔧 Diagnóstico de Google Sheets"):
-            config_valid, config_message = validate_google_sheets_config()
-            if config_valid:
-                st.success("✅ Configuración de secrets.toml válida")
-            else:
-                st.error(f"❌ {config_message}")
-            
-            # Mostrar configuración actual (sin datos sensibles)
-            if "google_sheets" in st.secrets:
-                st.write("**Configuración encontrada:**")
-                config_keys = list(st.secrets["google_sheets"].keys())
-                # Ocultar private_key por seguridad
-                safe_keys = [k for k in config_keys if k != 'private_key']
-                st.write(f"- Claves configuradas: {safe_keys}")
-                if 'spreadsheet_url' in st.secrets["google_sheets"]:
-                    url = st.secrets["google_sheets"]["spreadsheet_url"]
-                    st.write(f"- URL de hoja: {url}")
-    else:
-        # Mensaje original para CSV
-        from config import CSV_FILENAME
-        st.error(f"""
-        ### ❌ Error al cargar archivo CSV
-
-        No se pudo encontrar o abrir el archivo "{CSV_FILENAME}".
-
-        **Solución:**
-        1. Asegúrate de que el archivo "{CSV_FILENAME}" existe
-        2. Verifica el formato (punto y coma como separador)
-        3. Comprueba los permisos de lectura
-        """)
-        
-        # Mostrar información de diagnóstico
-        try:
-            current_dir = os.getcwd()
-            files_in_dir = os.listdir(current_dir)
-            st.info(f"""
-            **Diagnóstico:**
-            - Directorio actual: {current_dir}
-            - Archivos encontrados: {', '.join(files_in_dir)}
-            """)
-        except Exception as e:
-            st.warning(f"Error al obtener información del directorio: {e}")
+        # Mostrar configuración actual (sin datos sensibles)
+        if "google_sheets" in st.secrets:
+            st.write("**Configuración encontrada:**")
+            config_keys = list(st.secrets["google_sheets"].keys())
+            # Ocultar private_key por seguridad
+            safe_keys = [k for k in config_keys if k != 'private_key']
+            st.write(f"- Claves configuradas: {safe_keys}")
+            if 'spreadsheet_url' in st.secrets["google_sheets"]:
+                url = st.secrets["google_sheets"]["spreadsheet_url"]
+                st.write(f"- URL de hoja: {url}")
 
 if __name__ == "__main__":
     main()
