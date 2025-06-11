@@ -18,8 +18,8 @@ def apply_dark_theme():
     st.markdown("""
     <style>
         .stApp {
-            background: #FFFFFF;
-            color: #4472C4;
+            background: white;
+            color: #2C3E50;
         }
         
         .main > div {
