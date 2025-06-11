@@ -1,5 +1,5 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE - SIN RESETEO
+Interfaces de usuario para las pestañas del Dashboard ICE - SOLO GOOGLE SHEETS
 """
 
 import streamlit as st
@@ -20,27 +20,28 @@ class GeneralSummaryTab:
         try:
             # Verificación previa de datos
             if df.empty:
-                st.info("📋 No hay datos disponibles. Puedes agregar datos en la pestaña 'Gestión de Datos'")
+                st.info("📋 Google Sheets está vacío. Puedes agregar datos en la pestaña 'Gestión de Datos'")
                 st.markdown("""
                 ### 🚀 Primeros pasos:
                 1. Ve a la pestaña **"Gestión de Datos"**
                 2. Selecciona un código de indicador (o crea uno nuevo)
                 3. Agrega algunos registros con valores y fechas
-                4. Regresa aquí para ver los análisis
+                4. Los datos se guardarán automáticamente en Google Sheets
+                5. Regresa aquí para ver los análisis
                 """)
                 return
                 
             required_cols = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria']
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
-                st.error(f"❌ Faltan columnas esenciales: {missing_cols}")
+                st.error(f"❌ Faltan columnas esenciales en Google Sheets: {missing_cols}")
                 st.write("**Columnas disponibles:**", list(df.columns))
                 return
             
             # Verificar que hay datos válidos
             datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
             if datos_validos.empty:
-                st.info("📋 Los datos están vacíos o incompletos")
+                st.info("📋 Los datos en Google Sheets están vacíos o incompletos")
                 return
             
             # Intentar cálculo de puntajes
@@ -53,7 +54,7 @@ class GeneralSummaryTab:
             
             # Mostrar información sobre qué datos se están usando
             st.info("""
-            📊 **Cálculos basados en valores más recientes:** Los puntajes se calculan 
+            📊 **Cálculos basados en valores más recientes desde Google Sheets:** Los puntajes se calculan 
             usando el valor más reciente de cada indicador, asegurando consistencia.
             """)
             
@@ -93,16 +94,16 @@ class GeneralSummaryTab:
                     st.error(f"Error en gráfico de componentes: {e}")
                     st.dataframe(puntajes_componente, use_container_width=True)
             else:
-                st.info("Agrega más datos para ver puntajes por componente")
+                st.info("Agrega más datos a Google Sheets para ver puntajes por componente")
             
         except Exception as e:
-            st.error(f"❌ Error al calcular puntajes: {e}")
+            st.error(f"❌ Error al calcular puntajes desde Google Sheets: {e}")
             import traceback
             with st.expander("🔧 Detalles del error"):
                 st.code(traceback.format_exc())
         
         # Mostrar tabla de datos más recientes
-        with st.expander("📋 Ver datos más recientes por indicador"):
+        with st.expander("📋 Ver datos más recientes por indicador (desde Google Sheets)"):
             try:
                 df_latest = DataProcessor._get_latest_values_by_indicator(df)
                 if not df_latest.empty:
@@ -121,13 +122,13 @@ class ComponentSummaryTab:
         st.header("Resumen por Componente")
         
         if df.empty:
-            st.info("📋 No hay datos disponibles para análisis por componente")
+            st.info("📋 No hay datos disponibles en Google Sheets para análisis por componente")
             return
         
         # Selector de componente específico para esta vista
         componentes = sorted(df['Componente'].unique())
         if not componentes:
-            st.info("📋 No hay componentes disponibles")
+            st.info("📋 No hay componentes disponibles en Google Sheets")
             return
             
         componente_analisis = st.selectbox(
@@ -144,7 +145,7 @@ class ComponentSummaryTab:
             # Información sobre los datos que se están usando
             st.info(f"""
             📊 **Análisis de {componente_analisis}:** Basado en los valores más recientes 
-            de cada indicador de este componente.
+            de cada indicador de este componente desde Google Sheets.
             """)
             
             # Métricas del componente
@@ -198,7 +199,7 @@ class ComponentSummaryTab:
                 use_container_width=True
             )
         else:
-            st.warning("No hay datos para el componente seleccionado")
+            st.warning("No hay datos para el componente seleccionado en Google Sheets")
 
 class EvolutionTab:
     """Pestaña de evolución"""
@@ -210,12 +211,12 @@ class EvolutionTab:
         
         try:
             if df.empty:
-                st.info("📋 No hay datos disponibles para mostrar evolución")
+                st.info("📋 No hay datos disponibles en Google Sheets para mostrar evolución")
                 return
             
             # Información sobre los datos disponibles
             st.info(f"""
-            📊 **Datos disponibles:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos
+            📊 **Datos desde Google Sheets:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos
             📅 **Rango de fechas:** {df['Fecha'].min().strftime('%d/%m/%Y')} - {df['Fecha'].max().strftime('%d/%m/%Y')}
             """)
             
@@ -239,7 +240,7 @@ class EvolutionTab:
                             use_container_width=True
                         )
                 else:
-                    st.warning("No se encontraron datos históricos para este indicador")
+                    st.warning("No se encontraron datos históricos para este indicador en Google Sheets")
                     return
             else:
                 st.info("**📊 Vista general:** Mostrando evolución promedio de todos los indicadores")
@@ -304,14 +305,20 @@ class EvolutionTab:
                 st.code(traceback.format_exc())
 
 class EditTab:
-    """Pestaña de edición mejorada - SIN RESETEO"""
+    """Pestaña de edición - SOLO GOOGLE SHEETS"""
     
     @staticmethod
     def render(df, csv_path, excel_data=None):
-        """Renderizar la pestaña de edición con capacidades completas"""
-        st.subheader("Gestión de Indicadores")
+        """Renderizar la pestaña de edición con Google Sheets"""
+        st.subheader("Gestión de Indicadores (Google Sheets)")
         
         try:
+            # Verificar que Google Sheets esté disponible
+            from data_utils import GOOGLE_SHEETS_AVAILABLE
+            if not GOOGLE_SHEETS_AVAILABLE:
+                st.error("❌ **Google Sheets no disponible.** Instala las dependencias: `pip install gspread google-auth`")
+                return
+            
             # Inicializar session state para preservar selecciones
             if 'selected_codigo' not in st.session_state:
                 st.session_state.selected_codigo = None
@@ -320,7 +327,7 @@ class EditTab:
             
             # Obtener códigos disponibles
             if df.empty:
-                st.info("📋 No hay datos disponibles. Puedes crear un nuevo indicador.")
+                st.info("📋 Google Sheets está vacío. Puedes crear un nuevo indicador.")
                 codigos_disponibles = []
             else:
                 codigos_disponibles = sorted(df['Codigo'].dropna().unique())
@@ -340,7 +347,8 @@ class EditTab:
                 "Seleccionar Código de Indicador", 
                 opciones_codigo,
                 index=index_actual,
-                key="codigo_editar"
+                key="codigo_editar",
+                help="Los datos se guardan automáticamente en Google Sheets"
             )
             
             # Actualizar session state
@@ -349,14 +357,14 @@ class EditTab:
             
             # Manejar creación de nuevo código
             if codigo_editar == "➕ Crear nuevo código":
-                EditTab._render_new_indicator_form(df, csv_path)
+                EditTab._render_new_indicator_form(df)
                 return
             
             # Validar que el código seleccionado existe en los datos
             datos_indicador = df[df['Codigo'] == codigo_editar] if not df.empty else pd.DataFrame()
             
             if datos_indicador.empty and not df.empty:
-                st.error(f"No se encontraron datos para el código {codigo_editar}")
+                st.error(f"No se encontraron datos para el código {codigo_editar} en Google Sheets")
                 return
             elif not df.empty:
                 # Mostrar información del indicador
@@ -368,7 +376,8 @@ class EditTab:
                     st.markdown(f"""
                     **Indicador seleccionado:** {nombre_indicador}  
                     **Componente:** {componente_indicador}  
-                    **Categoría:** {categoria_indicador}
+                    **Categoría:** {categoria_indicador}  
+                    📊 **Fuente:** Google Sheets
                     """)
                     
                 except IndexError:
@@ -417,23 +426,23 @@ class EditTab:
             ])
             
             with tab_ver:
-                st.subheader("Registros Existentes")
+                st.subheader("Registros Existentes en Google Sheets")
                 if not registros_indicador.empty:
                     st.dataframe(
                         registros_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
                         use_container_width=True
                     )
                 else:
-                    st.info("No hay registros para este indicador")
+                    st.info("No hay registros para este indicador en Google Sheets")
             
             with tab_agregar:
-                EditTab._render_add_form(df, codigo_editar, csv_path)
+                EditTab._render_add_form(df, codigo_editar)
             
             with tab_editar:
-                EditTab._render_edit_form(df, codigo_editar, registros_indicador, csv_path)
+                EditTab._render_edit_form(df, codigo_editar, registros_indicador)
             
             with tab_eliminar:
-                EditTab._render_delete_form(df, codigo_editar, registros_indicador, csv_path)
+                EditTab._render_delete_form(df, codigo_editar, registros_indicador)
         
         except Exception as e:
             st.error(f"Error en la gestión de indicadores: {e}")
@@ -441,9 +450,9 @@ class EditTab:
             st.code(traceback.format_exc())
     
     @staticmethod
-    def _render_new_indicator_form(df, csv_path):
-        """Formulario para crear nuevo indicador"""
-        st.subheader("Crear Nuevo Indicador")
+    def _render_new_indicator_form(df):
+        """Formulario para crear nuevo indicador en Google Sheets"""
+        st.subheader("Crear Nuevo Indicador en Google Sheets")
         
         with st.form("form_nuevo_indicador"):
             col1, col2 = st.columns(2)
@@ -495,7 +504,7 @@ class EditTab:
                     help="Fecha del primer registro"
                 )
             
-            submitted = st.form_submit_button("➕ Crear Indicador", use_container_width=True)
+            submitted = st.form_submit_button("➕ Crear Indicador en Google Sheets", use_container_width=True)
             
             if submitted:
                 # Validaciones
@@ -513,77 +522,45 @@ class EditTab:
                 
                 # Verificar que el código no exista
                 if not df.empty and nuevo_codigo in df['Codigo'].values:
-                    st.error(f"❌ El código '{nuevo_codigo}' ya existe")
+                    st.error(f"❌ El código '{nuevo_codigo}' ya existe en Google Sheets")
                     return
                 
-                # Crear el nuevo registro
+                # Crear el nuevo registro en Google Sheets
                 try:
-                    # Preparar datos para Google Sheets o CSV
-                    if DataEditor._should_use_google_sheets():
-                        # Para Google Sheets
-                        data_dict = {
-                            'LINEA DE ACCIÓN': nueva_linea.strip(),
-                            'COMPONENTE PROPUESTO': nuevo_componente,
-                            'CATEGORÍA': nueva_categoria.strip(),
-                            'COD': nuevo_codigo.strip(),
-                            'Nombre de indicador': nuevo_indicador.strip(),
-                            'Valor': primer_valor,
-                            'Fecha': primera_fecha.strftime('%d/%m/%Y')
-                        }
-                        
-                        from google_sheets_manager import GoogleSheetsManager
-                        sheets_manager = GoogleSheetsManager()
-                        success = sheets_manager.add_record(data_dict)
-                        
-                    else:
-                        # Para CSV - crear entrada directamente
-                        if not csv_path:
-                            st.error("❌ No se puede crear en CSV sin ruta específica")
-                            return
-                        
-                        # Leer CSV actual o crear nuevo
-                        try:
-                            df_actual = pd.read_csv(csv_path, sep=';')
-                        except FileNotFoundError:
-                            # Crear nuevo CSV
-                            df_actual = pd.DataFrame(columns=[
-                                'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA', 
-                                'COD', 'Nombre de indicador', 'Valor', 'Fecha'
-                            ])
-                        
-                        nueva_fila = {
-                            'LINEA DE ACCIÓN': nueva_linea.strip(),
-                            'COMPONENTE PROPUESTO': nuevo_componente,
-                            'CATEGORÍA': nueva_categoria.strip(),
-                            'COD': nuevo_codigo.strip(),
-                            'Nombre de indicador': nuevo_indicador.strip(),
-                            'Valor': primer_valor,
-                            'Fecha': primera_fecha.strftime('%d/%m/%Y')
-                        }
-                        
-                        df_nuevo = pd.concat([df_actual, pd.DataFrame([nueva_fila])], ignore_index=True)
-                        df_nuevo.to_csv(csv_path, sep=';', index=False)
-                        success = True
+                    from google_sheets_manager import GoogleSheetsManager
+                    sheets_manager = GoogleSheetsManager()
+                    
+                    # Preparar datos para Google Sheets
+                    data_dict = {
+                        'LINEA DE ACCIÓN': nueva_linea.strip(),
+                        'COMPONENTE PROPUESTO': nuevo_componente,
+                        'CATEGORÍA': nueva_categoria.strip(),
+                        'COD': nuevo_codigo.strip(),
+                        'Nombre de indicador': nuevo_indicador.strip(),
+                        'Valor': primer_valor,
+                        'Fecha': primera_fecha.strftime('%d/%m/%Y')
+                    }
+                    
+                    success = sheets_manager.add_record(data_dict)
                     
                     if success:
-                        st.success(f"✅ Indicador '{nuevo_codigo}' creado correctamente")
+                        st.success(f"✅ Indicador '{nuevo_codigo}' creado correctamente en Google Sheets")
                         # Actualizar session state para seleccionar el nuevo código
                         st.session_state.selected_codigo = nuevo_codigo
                         # Forzar recarga
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
-                        # No usar st.rerun() para evitar reseteo de pestaña
-                        st.info("🔄 Recarga la página para ver el nuevo indicador en las listas")
+                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets")
                     else:
-                        st.error("❌ Error al crear el indicador")
+                        st.error("❌ Error al crear el indicador en Google Sheets")
                         
                 except Exception as e:
-                    st.error(f"❌ Error al crear indicador: {e}")
+                    st.error(f"❌ Error al crear indicador en Google Sheets: {e}")
     
     @staticmethod
-    def _render_add_form(df, codigo_editar, csv_path):
-        """Formulario para agregar nuevo registro"""
-        st.subheader("Agregar Nuevo Registro")
+    def _render_add_form(df, codigo_editar):
+        """Formulario para agregar nuevo registro a Google Sheets"""
+        st.subheader("Agregar Nuevo Registro a Google Sheets")
         
         with st.form("form_agregar"):
             col1, col2 = st.columns(2)
@@ -604,7 +581,7 @@ class EditTab:
                     help="Valor entre 0 y 1, donde 1 = 100% de cumplimiento"
                 )
             
-            submitted = st.form_submit_button("➕ Agregar Registro", use_container_width=True)
+            submitted = st.form_submit_button("➕ Agregar Registro a Google Sheets", use_container_width=True)
             
             if submitted:
                 # Verificar si ya existe un registro para esa fecha
@@ -614,26 +591,25 @@ class EditTab:
                     registro_existente = df[(df['Codigo'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
                     
                     if not registro_existente.empty:
-                        st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')}. Usa la pestaña 'Editar' para modificarlo.")
+                        st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')} en Google Sheets. Usa la pestaña 'Editar' para modificarlo.")
                         return
                 
-                # Agregar registro
-                success = DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, csv_path)
+                # Agregar registro a Google Sheets
+                success = DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, None)
                 
                 if success:
-                    st.success("✅ Nuevo registro agregado correctamente")
-                    # NO usar st.rerun() para evitar reseteo de pestaña
+                    st.success("✅ Nuevo registro agregado correctamente a Google Sheets")
                     st.info("🔄 Los datos se actualizarán automáticamente")
                 else:
-                    st.error("❌ Error al agregar el nuevo registro")
+                    st.error("❌ Error al agregar el nuevo registro a Google Sheets")
     
     @staticmethod
-    def _render_edit_form(df, codigo_editar, registros_indicador, csv_path):
-        """Formulario para editar registro existente"""
-        st.subheader("Editar Registro Existente")
+    def _render_edit_form(df, codigo_editar, registros_indicador):
+        """Formulario para editar registro existente en Google Sheets"""
+        st.subheader("Editar Registro Existente en Google Sheets")
         
         if registros_indicador.empty:
-            st.info("No hay registros existentes para editar")
+            st.info("No hay registros existentes para editar en Google Sheets")
             return
         
         # Seleccionar registro a editar
@@ -641,7 +617,7 @@ class EditTab:
         fecha_seleccionada_str = st.selectbox(
             "Seleccionar fecha a editar",
             fechas_disponibles,
-            help="Selecciona el registro que deseas modificar"
+            help="Selecciona el registro que deseas modificar en Google Sheets"
         )
         
         if fecha_seleccionada_str:
@@ -664,29 +640,28 @@ class EditTab:
                         min_value=0.0,
                         max_value=1.0,
                         step=0.01,
-                        help="Nuevo valor para este registro"
+                        help="Nuevo valor para este registro en Google Sheets"
                     )
                 
-                submitted = st.form_submit_button("✏️ Actualizar Registro", use_container_width=True)
+                submitted = st.form_submit_button("✏️ Actualizar Registro en Google Sheets", use_container_width=True)
                 
                 if submitted:
-                    success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, csv_path)
+                    success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, None)
                     
                     if success:
-                        st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente")
+                        st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente en Google Sheets")
                         st.balloons()
-                        # NO usar st.rerun() para evitar reseteo
-                        st.info("🔄 Los datos se actualizarán automáticamente")
+                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets")
                     else:
-                        st.error("❌ Error al actualizar el registro")
+                        st.error("❌ Error al actualizar el registro en Google Sheets")
     
     @staticmethod
-    def _render_delete_form(df, codigo_editar, registros_indicador, csv_path):
-        """Formulario para eliminar registro"""
-        st.subheader("Eliminar Registro")
+    def _render_delete_form(df, codigo_editar, registros_indicador):
+        """Formulario para eliminar registro de Google Sheets"""
+        st.subheader("Eliminar Registro de Google Sheets")
         
         if registros_indicador.empty:
-            st.info("No hay registros existentes para eliminar")
+            st.info("No hay registros existentes para eliminar en Google Sheets")
             return
         
         # Seleccionar registro a eliminar
@@ -694,7 +669,7 @@ class EditTab:
         fecha_seleccionada_str = st.selectbox(
             "Seleccionar fecha a eliminar",
             fechas_disponibles,
-            help="⚠️ CUIDADO: Esta acción no se puede deshacer"
+            help="⚠️ CUIDADO: Esta acción eliminará el registro de Google Sheets y no se puede deshacer"
         )
         
         if fecha_seleccionada_str:
@@ -704,37 +679,36 @@ class EditTab:
             valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
             
             st.warning(f"""
-            ⚠️ **ATENCIÓN**: Estás a punto de eliminar el registro:
+            ⚠️ **ATENCIÓN**: Estás a punto de eliminar el registro de Google Sheets:
             - **Fecha**: {fecha_real.strftime('%d/%m/%Y')}
             - **Valor**: {valor_actual:.3f}
             
-            Esta acción **NO SE PUEDE DESHACER**.
+            Esta acción **NO SE PUEDE DESHACER** y eliminará el registro permanentemente de Google Sheets.
             """)
             
             col1, col2 = st.columns(2)
             
             with col1:
-                confirmar = st.checkbox("Confirmo que quiero eliminar este registro", key="confirm_delete")
+                confirmar = st.checkbox("Confirmo que quiero eliminar este registro de Google Sheets", key="confirm_delete")
             
             with col2:
                 if confirmar:
-                    if st.button("🗑️ ELIMINAR REGISTRO", type="primary", use_container_width=True):
-                        success = DataEditor.delete_record(df, codigo_editar, fecha_real, csv_path)
+                    if st.button("🗑️ ELIMINAR REGISTRO DE GOOGLE SHEETS", type="primary", use_container_width=True):
+                        success = DataEditor.delete_record(df, codigo_editar, fecha_real, None)
                         
                         if success:
-                            st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente")
+                            st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente de Google Sheets")
                             st.balloons()
-                            # NO usar st.rerun() para evitar reseteo
-                            st.info("🔄 Los datos se actualizarán automáticamente")
+                            st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets")
                         else:
-                            st.error("❌ Error al eliminar el registro")
+                            st.error("❌ Error al eliminar el registro de Google Sheets")
 
 class TabManager:
-    """Gestor de pestañas del dashboard - SIN RESETEO"""
+    """Gestor de pestañas del dashboard - SOLO GOOGLE SHEETS"""
     
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
-        self.csv_path = csv_path
+        self.csv_path = None  # No usamos CSV
         self.excel_data = excel_data
     
     def render_tabs(self, df_filtrado, filters):
@@ -742,10 +716,10 @@ class TabManager:
         
         # Crear pestañas
         tab1, tab2, tab3, tab4 = st.tabs([
-            "Resumen General", 
-            "Resumen por Componente", 
-            "Evolución", 
-            "Gestión de Datos"
+            "📊 Resumen General", 
+            "🏗️ Resumen por Componente", 
+            "📈 Evolución", 
+            "⚙️ Gestión de Datos"
         ])
         
         # Renderizar contenido de cada pestaña
@@ -759,4 +733,4 @@ class TabManager:
             EvolutionTab.render(self.df, filters)
         
         with tab4:
-            EditTab.render(self.df, self.csv_path, self.excel_data)
+            EditTab.render(self.df, None, self.excel_data)  # Sin CSV path
