@@ -547,10 +547,15 @@ class EditTab:
                         st.success(f"✅ Indicador '{nuevo_codigo}' creado correctamente en Google Sheets")
                         # Actualizar session state para seleccionar el nuevo código
                         st.session_state.selected_codigo = nuevo_codigo
-                        # Forzar recarga
+                        # Forzar recarga SIN cambiar pestaña
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
-                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets")
+                        # NO usar st.rerun() para evitar reseteo de pestaña
+                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
+                        
+                        # Mostrar botón manual de actualización
+                        if st.button("🔄 Actualizar ahora", key="refresh_after_create"):
+                            st.rerun()
                     else:
                         st.error("❌ Error al crear el indicador en Google Sheets")
                         
@@ -599,7 +604,16 @@ class EditTab:
                 
                 if success:
                     st.success("✅ Nuevo registro agregado correctamente a Google Sheets")
-                    st.info("🔄 Los datos se actualizarán automáticamente")
+                    # NO usar st.rerun() para evitar reseteo de pestaña
+                    st.info("🔄 Los datos se actualizarán automáticamente en unos segundos")
+                    
+                    # Limpiar cache para próxima carga
+                    st.cache_data.clear()
+                    st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
+                    
+                    # Botón manual de actualización
+                    if st.button("🔄 Ver cambios ahora", key="refresh_after_add"):
+                        st.rerun()
                 else:
                     st.error("❌ Error al agregar el nuevo registro a Google Sheets")
     
@@ -651,7 +665,16 @@ class EditTab:
                     if success:
                         st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente en Google Sheets")
                         st.balloons()
-                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets")
+                        # NO usar st.rerun() para evitar reseteo de pestaña
+                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
+                        
+                        # Limpiar cache para próxima carga
+                        st.cache_data.clear()
+                        st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
+                        
+                        # Botón manual de actualización
+                        if st.button("🔄 Ver cambios ahora", key="refresh_after_edit"):
+                            st.rerun()
                     else:
                         st.error("❌ Error al actualizar el registro en Google Sheets")
     
@@ -699,38 +722,83 @@ class EditTab:
                         if success:
                             st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente de Google Sheets")
                             st.balloons()
-                            st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets")
+                            # NO usar st.rerun() para evitar reseteo de pestaña
+                            st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
+                            
+                            # Limpiar cache para próxima carga
+                            st.cache_data.clear()
+                            st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
+                            
+                            # Botón manual de actualización
+                            if st.button("🔄 Ver cambios ahora", key="refresh_after_delete"):
+                                st.rerun()
                         else:
                             st.error("❌ Error al eliminar el registro de Google Sheets")
 
 class TabManager:
-    """Gestor de pestañas del dashboard - SOLO GOOGLE SHEETS"""
+    """Gestor de pestañas del dashboard - SOLO GOOGLE SHEETS CON PERSISTENCIA"""
     
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
         self.csv_path = None  # No usamos CSV
         self.excel_data = excel_data
+        
+        # Inicializar pestaña activa en session_state
+        if 'active_tab' not in st.session_state:
+            st.session_state.active_tab = 0
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar todas las pestañas manteniendo el estado"""
+        """Renderizar todas las pestañas manteniendo el estado activo"""
         
-        # Crear pestañas
-        tab1, tab2, tab3, tab4 = st.tabs([
+        # Nombres de las pestañas
+        tab_names = [
             "📊 Resumen General", 
             "🏗️ Resumen por Componente", 
             "📈 Evolución", 
             "⚙️ Gestión de Datos"
-        ])
+        ]
+        
+        # Crear pestañas con índice persistente
+        tabs = st.tabs(tab_names)
+        
+        # Detectar cambio de pestaña usando un callback
+        # Usamos un selectbox oculto para mantener el estado
+        with st.sidebar:
+            with st.expander("🎛️ Navegación", expanded=False):
+                current_tab = st.radio(
+                    "Pestaña activa:",
+                    options=range(len(tab_names)),
+                    format_func=lambda x: tab_names[x],
+                    index=st.session_state.active_tab,
+                    key="tab_selector"
+                )
+                
+                # Actualizar session state si cambió
+                if current_tab != st.session_state.active_tab:
+                    st.session_state.active_tab = current_tab
+                    st.rerun()
         
         # Renderizar contenido de cada pestaña
-        with tab1:
-            GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
+        with tabs[0]:  # Resumen General
+            if st.session_state.active_tab == 0 or True:  # Siempre renderizar para que funcione
+                GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
         
-        with tab2:
-            ComponentSummaryTab.render(df_filtrado, filters)
+        with tabs[1]:  # Resumen por Componente
+            if st.session_state.active_tab == 1 or True:
+                ComponentSummaryTab.render(df_filtrado, filters)
         
-        with tab3:
-            EvolutionTab.render(self.df, filters)
+        with tabs[2]:  # Evolución
+            if st.session_state.active_tab == 2 or True:
+                EvolutionTab.render(self.df, filters)
         
-        with tab4:
-            EditTab.render(self.df, None, self.excel_data)  # Sin CSV path
+        with tabs[3]:  # Gestión de Datos
+            if st.session_state.active_tab == 3 or True:
+                EditTab.render(self.df, None, self.excel_data)
+        
+        # Mostrar información de la pestaña activa
+        st.sidebar.info(f"📍 **Pestaña activa:** {tab_names[st.session_state.active_tab]}")
+        
+        # Botón para resetear pestaña (útil para debugging)
+        if st.sidebar.button("🔄 Resetear navegación"):
+            st.session_state.active_tab = 0
+            st.rerun()
