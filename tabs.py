@@ -1,5 +1,5 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE
+Interfaces de usuario para las pestañas del Dashboard ICE - SIN RESETEO
 """
 
 import streamlit as st
@@ -18,12 +18,16 @@ class GeneralSummaryTab:
         st.header("Resumen General")
         
         try:
-            # IMPORTANTE: NO usar fecha_seleccionada para cálculos principales
-            # Siempre calcular con valores más recientes para consistencia
-            
             # Verificación previa de datos
             if df.empty:
-                st.error("❌ No hay datos disponibles para el análisis")
+                st.info("📋 No hay datos disponibles. Puedes agregar datos en la pestaña 'Gestión de Datos'")
+                st.markdown("""
+                ### 🚀 Primeros pasos:
+                1. Ve a la pestaña **"Gestión de Datos"**
+                2. Selecciona un código de indicador (o crea uno nuevo)
+                3. Agrega algunos registros con valores y fechas
+                4. Regresa aquí para ver los análisis
+                """)
                 return
                 
             required_cols = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria']
@@ -33,19 +37,24 @@ class GeneralSummaryTab:
                 st.write("**Columnas disponibles:**", list(df.columns))
                 return
             
+            # Verificar que hay datos válidos
+            datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
+            if datos_validos.empty:
+                st.info("📋 Los datos están vacíos o incompletos")
+                return
+            
             # Intentar cálculo de puntajes
             puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
             
             # Verificar que los cálculos fueron exitosos
             if puntajes_componente.empty and puntajes_categoria.empty and puntaje_general == 0:
-                st.error("❌ No se pudieron calcular los puntajes. Revisar la estructura de los datos.")
+                st.info("📊 Agregando más datos podrás ver los puntajes y análisis")
                 return
             
             # Mostrar información sobre qué datos se están usando
             st.info("""
             📊 **Cálculos basados en valores más recientes:** Los puntajes se calculan 
-            usando el valor más reciente de cada indicador, asegurando consistencia 
-            independientemente de cuándo se agregaron los datos.
+            usando el valor más reciente de cada indicador, asegurando consistencia.
             """)
             
             # Mostrar métricas generales
@@ -65,10 +74,10 @@ class GeneralSummaryTab:
                     st.error(f"Error en velocímetro: {e}")
             
             with col2:
-                # Gráfico de radar (más grande) - también usando valores más recientes
+                # Gráfico de radar (más grande)
                 try:
                     st.plotly_chart(
-                        ChartGenerator.radar_chart(df, None),  # None = usar valores más recientes
+                        ChartGenerator.radar_chart(df, None),
                         use_container_width=True
                     )
                 except Exception as e:
@@ -82,23 +91,15 @@ class GeneralSummaryTab:
                     st.plotly_chart(fig_comp, use_container_width=True)
                 except Exception as e:
                     st.error(f"Error en gráfico de componentes: {e}")
-                    # Fallback: mostrar como tabla
                     st.dataframe(puntajes_componente, use_container_width=True)
             else:
-                st.info("No hay datos suficientes para mostrar puntajes por componente")
+                st.info("Agrega más datos para ver puntajes por componente")
             
         except Exception as e:
-            st.error(f"❌ Error crítico al calcular puntajes: {e}")
+            st.error(f"❌ Error al calcular puntajes: {e}")
             import traceback
-            with st.expander("🔧 Detalles técnicos del error"):
+            with st.expander("🔧 Detalles del error"):
                 st.code(traceback.format_exc())
-                st.write("**Información de debug:**")
-                st.write(f"- Shape del DataFrame: {df.shape if df is not None else 'None'}")
-                st.write(f"- Columnas: {list(df.columns) if df is not None else 'None'}")
-                if df is not None and not df.empty:
-                    st.write(f"- Códigos únicos: {df['Codigo'].nunique()}")
-                    st.write(f"- Fechas únicas: {df['Fecha'].nunique()}")
-            st.info("💡 Intenta recargar los datos usando el botón '🔄 Actualizar Datos'")
         
         # Mostrar tabla de datos más recientes
         with st.expander("📋 Ver datos más recientes por indicador"):
@@ -107,7 +108,7 @@ class GeneralSummaryTab:
                 if not df_latest.empty:
                     st.dataframe(df_latest[['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Fecha']], use_container_width=True)
                 else:
-                    st.warning("No se pudieron obtener datos más recientes")
+                    st.info("No hay datos para mostrar")
             except Exception as e:
                 st.error(f"Error al mostrar datos: {e}")
 
@@ -119,8 +120,16 @@ class ComponentSummaryTab:
         """Renderizar la pestaña de resumen por componente"""
         st.header("Resumen por Componente")
         
+        if df.empty:
+            st.info("📋 No hay datos disponibles para análisis por componente")
+            return
+        
         # Selector de componente específico para esta vista
         componentes = sorted(df['Componente'].unique())
+        if not componentes:
+            st.info("📋 No hay componentes disponibles")
+            return
+            
         componente_analisis = st.selectbox(
             "Seleccionar componente para análisis detallado", 
             componentes,
@@ -138,108 +147,51 @@ class ComponentSummaryTab:
             de cada indicador de este componente.
             """)
             
-            # Métricas del componente con estilo personalizado (gris más claro)
-            st.markdown("""
-            <style>
-            .metric-gray {
-                background-color: rgba(248, 249, 250, 0.9);
-                padding: 1rem;
-                border-radius: 8px;
-                border-left: 4px solid #95A5A6;
-                margin-bottom: 1rem;
-            }
-            .metric-gray .metric-label {
-                color: #7F8C8D !important;
-                font-size: 0.875rem;
-                font-weight: 500;
-                margin-bottom: 0.25rem;
-            }
-            .metric-gray .metric-value {
-                color: #5D6D7E !important;
-                font-size: 1.5rem;
-                font-weight: 600;
-                margin: 0;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
+            # Métricas del componente
             col1, col2, col3 = st.columns(3)
             
             with col1:
                 valor_promedio = df_componente['Valor'].mean()
-                st.markdown(f"""
-                <div class="metric-gray">
-                    <div class="metric-label">Valor Promedio</div>
-                    <div class="metric-value">{valor_promedio:.3f}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.metric("Valor Promedio", f"{valor_promedio:.3f}")
             
             with col2:
                 total_indicadores = df_componente['Indicador'].nunique()
-                st.markdown(f"""
-                <div class="metric-gray">
-                    <div class="metric-label">Total Indicadores</div>
-                    <div class="metric-value">{total_indicadores}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.metric("Total Indicadores", total_indicadores)
             
             with col3:
                 ultima_medicion = df_componente['Fecha'].max()
-                # Manejar fechas NaT de forma segura
                 if pd.notna(ultima_medicion):
                     try:
                         fecha_str = pd.to_datetime(ultima_medicion).strftime('%d/%m/%Y')
-                        fecha_display = fecha_str
+                        st.metric("Última Medición", fecha_str)
                     except:
-                        fecha_display = "No disponible"
+                        st.metric("Última Medición", "No disponible")
                 else:
-                    fecha_display = "No disponible"
-                
-                st.markdown(f"""
-                <div class="metric-gray">
-                    <div class="metric-label">Última Medición</div>
-                    <div class="metric-value">{fecha_display}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                    st.metric("Última Medición", "No disponible")
             
-            # Tabla de categorías con colores - usando valores más recientes
+            # Tabla de categorías
             try:
                 ChartGenerator.show_category_table_simple(df, componente_analisis)
             except Exception as e:
                 st.error(f"Error al mostrar categorías: {e}")
-                
-                # Fallback: mostrar datos básicos
-                st.subheader("📊 Datos por Categoría (Fallback)")
-                try:
-                    df_latest = DataProcessor._get_latest_values_by_indicator(df)
-                    df_comp = df_latest[df_latest['Componente'] == componente_analisis]
-                    
-                    if not df_comp.empty:
-                        categoria_stats = df_comp.groupby('Categoria')['Valor'].agg(['mean', 'count']).reset_index()
-                        categoria_stats.columns = ['Categoría', 'Puntaje Promedio', 'Num. Indicadores']
-                        st.dataframe(categoria_stats, use_container_width=True)
-                    else:
-                        st.warning("No hay datos del componente disponibles")
-                except Exception as e2:
-                    st.error(f"Error en fallback: {e2}")
             
             # Layout con gráficos lado a lado
             col_izq, col_der = st.columns(2)
             
             with col_izq:
-                # Gráfico de evolución del componente - usar datos históricos completos
+                # Gráfico de evolución del componente
                 df_componente_historico = df[df['Componente'] == componente_analisis]
                 fig_evol = ChartGenerator.evolution_chart(df_componente_historico, componente=componente_analisis)
                 st.plotly_chart(fig_evol, use_container_width=True)
             
             with col_der:
-                # Gráfico de radar por categorías - usar valores más recientes
+                # Gráfico de radar por categorías
                 fig_radar_cat = ChartGenerator.radar_chart_categories(
-                    df, componente_analisis, None  # None = usar valores más recientes
+                    df, componente_analisis, None
                 )
                 st.plotly_chart(fig_radar_cat, use_container_width=True)
             
-            # Tabla de indicadores del componente - mostrar valores más recientes
+            # Tabla de indicadores del componente
             st.subheader(f"Indicadores Más Recientes de {componente_analisis}")
             st.dataframe(
                 df_componente[['Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values('Valor', ascending=False),
@@ -249,7 +201,7 @@ class ComponentSummaryTab:
             st.warning("No hay datos para el componente seleccionado")
 
 class EvolutionTab:
-    """Pestaña de evolución - CORREGIDA"""
+    """Pestaña de evolución"""
     
     @staticmethod
     def render(df, filters):
@@ -257,9 +209,8 @@ class EvolutionTab:
         st.subheader("📈 Evolución Temporal de Indicadores")
         
         try:
-            # Verificar que tenemos datos
             if df.empty:
-                st.warning("No hay datos disponibles para mostrar evolución")
+                st.info("📋 No hay datos disponibles para mostrar evolución")
                 return
             
             # Información sobre los datos disponibles
@@ -298,7 +249,7 @@ class EvolutionTab:
                 fig = ChartGenerator.evolution_chart(
                     df,
                     indicador=evolution_filters['indicador'],
-                    componente=None,  # No filtrar por componente aquí
+                    componente=None,
                     tipo_grafico=evolution_filters['tipo_grafico'],
                     mostrar_meta=evolution_filters['mostrar_meta']
                 )
@@ -351,15 +302,9 @@ class EvolutionTab:
             import traceback
             with st.expander("🔧 Debug: Detalles del error"):
                 st.code(traceback.format_exc())
-                st.write("**Datos de entrada:**")
-                st.write(f"- DataFrame shape: {df.shape if df is not None else 'None'}")
-                st.write(f"- Filtros: {filters}")
-                if df is not None and not df.empty:
-                    st.write(f"- Columnas: {list(df.columns)}")
-                    st.write(f"- Códigos únicos: {df['Codigo'].nunique() if 'Codigo' in df.columns else 'N/A'}")
 
 class EditTab:
-    """Pestaña de edición mejorada"""
+    """Pestaña de edición mejorada - SIN RESETEO"""
     
     @staticmethod
     def render(df, csv_path, excel_data=None):
@@ -367,47 +312,75 @@ class EditTab:
         st.subheader("Gestión de Indicadores")
         
         try:
-            # Validar que hay datos
-            if df.empty:
-                st.error("No hay datos disponibles")
-                return
+            # Inicializar session state para preservar selecciones
+            if 'selected_codigo' not in st.session_state:
+                st.session_state.selected_codigo = None
+            if 'last_action' not in st.session_state:
+                st.session_state.last_action = None
             
-            # Seleccionar indicador por código
-            codigos_disponibles = sorted(df['Codigo'].dropna().unique())
-            if not codigos_disponibles:
-                st.error("No hay códigos de indicadores disponibles")
+            # Obtener códigos disponibles
+            if df.empty:
+                st.info("📋 No hay datos disponibles. Puedes crear un nuevo indicador.")
+                codigos_disponibles = []
+            else:
+                codigos_disponibles = sorted(df['Codigo'].dropna().unique())
+            
+            # Agregar opción para crear nuevo código
+            opciones_codigo = ["➕ Crear nuevo código"] + list(codigos_disponibles)
+            
+            # Seleccionar código (mantener selección si es posible)
+            index_actual = 0
+            if st.session_state.selected_codigo and st.session_state.selected_codigo in codigos_disponibles:
+                try:
+                    index_actual = opciones_codigo.index(st.session_state.selected_codigo)
+                except ValueError:
+                    index_actual = 0
+            
+            codigo_editar = st.selectbox(
+                "Seleccionar Código de Indicador", 
+                opciones_codigo,
+                index=index_actual,
+                key="codigo_editar"
+            )
+            
+            # Actualizar session state
+            if codigo_editar != "➕ Crear nuevo código":
+                st.session_state.selected_codigo = codigo_editar
+            
+            # Manejar creación de nuevo código
+            if codigo_editar == "➕ Crear nuevo código":
+                EditTab._render_new_indicator_form(df, csv_path)
                 return
-                
-            codigo_editar = st.selectbox("Seleccionar Código de Indicador", codigos_disponibles, key="codigo_editar")
             
             # Validar que el código seleccionado existe en los datos
-            datos_indicador = df[df['Codigo'] == codigo_editar]
-            if datos_indicador.empty:
+            datos_indicador = df[df['Codigo'] == codigo_editar] if not df.empty else pd.DataFrame()
+            
+            if datos_indicador.empty and not df.empty:
                 st.error(f"No se encontraron datos para el código {codigo_editar}")
                 return
+            elif not df.empty:
+                # Mostrar información del indicador
+                try:
+                    nombre_indicador = datos_indicador['Indicador'].iloc[0]
+                    componente_indicador = datos_indicador['Componente'].iloc[0]
+                    categoria_indicador = datos_indicador['Categoria'].iloc[0]
+                    
+                    st.markdown(f"""
+                    **Indicador seleccionado:** {nombre_indicador}  
+                    **Componente:** {componente_indicador}  
+                    **Categoría:** {categoria_indicador}
+                    """)
+                    
+                except IndexError:
+                    st.error(f"Error al obtener información del indicador {codigo_editar}")
+                    return
             
-            # Mostrar información del indicador
-            try:
-                nombre_indicador = datos_indicador['Indicador'].iloc[0]
-                componente_indicador = datos_indicador['Componente'].iloc[0]
-                categoria_indicador = datos_indicador['Categoria'].iloc[0]
-            except IndexError:
-                st.error(f"Error al obtener información del indicador {codigo_editar}")
-                return
-            
-            st.markdown(f"""
-            **Indicador seleccionado:** {nombre_indicador}  
-            **Componente:** {componente_indicador}  
-            **Categoría:** {categoria_indicador}
-            """)
-
-            # Botón para descargar hoja metodológica en PDF (solo si excel_data está disponible)
+            # Botón para descargar PDF metodológico
             if excel_data is not None and not excel_data.empty:
                 col1, col2 = st.columns([3, 1])
                 with col2:
                     if st.button("📄 Descargar PDF Metodológico", key="download_pdf"):
                         try:
-                            # Importar PDFGenerator aquí para evitar errores si no está disponible
                             from pdf_generator import PDFGenerator
                             pdf_generator = PDFGenerator()
                             pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
@@ -430,7 +403,10 @@ class EditTab:
                 st.info("💡 Para habilitar la descarga en PDF, coloca el archivo Excel en el directorio.")
             
             # Obtener registros existentes del indicador
-            registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
+            if not df.empty and not datos_indicador.empty:
+                registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
+            else:
+                registros_indicador = pd.DataFrame()
             
             # Crear pestañas para diferentes acciones
             tab_ver, tab_agregar, tab_editar, tab_eliminar = st.tabs([
@@ -451,7 +427,7 @@ class EditTab:
                     st.info("No hay registros para este indicador")
             
             with tab_agregar:
-                EditTab._render_add_form(df, codigo_editar, nombre_indicador, csv_path)
+                EditTab._render_add_form(df, codigo_editar, csv_path)
             
             with tab_editar:
                 EditTab._render_edit_form(df, codigo_editar, registros_indicador, csv_path)
@@ -463,10 +439,149 @@ class EditTab:
             st.error(f"Error en la gestión de indicadores: {e}")
             import traceback
             st.code(traceback.format_exc())
-            st.info("Verifica que el archivo CSV contenga todas las columnas necesarias")
     
     @staticmethod
-    def _render_add_form(df, codigo_editar, nombre_indicador, csv_path):
+    def _render_new_indicator_form(df, csv_path):
+        """Formulario para crear nuevo indicador"""
+        st.subheader("Crear Nuevo Indicador")
+        
+        with st.form("form_nuevo_indicador"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                nuevo_codigo = st.text_input(
+                    "Código del Indicador",
+                    placeholder="Ej: D01-3",
+                    help="Código único para identificar el indicador"
+                )
+                
+                nuevo_indicador = st.text_input(
+                    "Nombre del Indicador",
+                    placeholder="Ej: Porcentaje de datos actualizados",
+                    help="Nombre descriptivo del indicador"
+                )
+                
+                nuevo_componente = st.selectbox(
+                    "Componente",
+                    ["Datos", "Seguridad e interoperabilidad", "Gobernanza y estratégia", 
+                     "Herramientas técnicas y tecnológicas", "Aprovechamiento de datos"],
+                    help="Componente al que pertenece el indicador"
+                )
+            
+            with col2:
+                nueva_categoria = st.text_input(
+                    "Categoría",
+                    placeholder="Ej: 01. Disponibilidad",
+                    help="Categoría específica dentro del componente"
+                )
+                
+                nueva_linea = st.text_input(
+                    "Línea de Acción",
+                    placeholder="Ej: LA.2.3.",
+                    help="Línea de acción correspondiente (opcional)"
+                )
+                
+                primer_valor = st.number_input(
+                    "Valor Inicial",
+                    value=0.5,
+                    min_value=0.0,
+                    max_value=1.0,
+                    step=0.01,
+                    help="Primer valor del indicador"
+                )
+                
+                primera_fecha = st.date_input(
+                    "Fecha Inicial",
+                    help="Fecha del primer registro"
+                )
+            
+            submitted = st.form_submit_button("➕ Crear Indicador", use_container_width=True)
+            
+            if submitted:
+                # Validaciones
+                if not nuevo_codigo.strip():
+                    st.error("❌ El código es obligatorio")
+                    return
+                
+                if not nuevo_indicador.strip():
+                    st.error("❌ El nombre del indicador es obligatorio")
+                    return
+                
+                if not nueva_categoria.strip():
+                    st.error("❌ La categoría es obligatoria")
+                    return
+                
+                # Verificar que el código no exista
+                if not df.empty and nuevo_codigo in df['Codigo'].values:
+                    st.error(f"❌ El código '{nuevo_codigo}' ya existe")
+                    return
+                
+                # Crear el nuevo registro
+                try:
+                    # Preparar datos para Google Sheets o CSV
+                    if DataEditor._should_use_google_sheets():
+                        # Para Google Sheets
+                        data_dict = {
+                            'LINEA DE ACCIÓN': nueva_linea.strip(),
+                            'COMPONENTE PROPUESTO': nuevo_componente,
+                            'CATEGORÍA': nueva_categoria.strip(),
+                            'COD': nuevo_codigo.strip(),
+                            'Nombre de indicador': nuevo_indicador.strip(),
+                            'Valor': primer_valor,
+                            'Fecha': primera_fecha.strftime('%d/%m/%Y')
+                        }
+                        
+                        from google_sheets_manager import GoogleSheetsManager
+                        sheets_manager = GoogleSheetsManager()
+                        success = sheets_manager.add_record(data_dict)
+                        
+                    else:
+                        # Para CSV - crear entrada directamente
+                        if not csv_path:
+                            st.error("❌ No se puede crear en CSV sin ruta específica")
+                            return
+                        
+                        # Leer CSV actual o crear nuevo
+                        try:
+                            df_actual = pd.read_csv(csv_path, sep=';')
+                        except FileNotFoundError:
+                            # Crear nuevo CSV
+                            df_actual = pd.DataFrame(columns=[
+                                'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA', 
+                                'COD', 'Nombre de indicador', 'Valor', 'Fecha'
+                            ])
+                        
+                        nueva_fila = {
+                            'LINEA DE ACCIÓN': nueva_linea.strip(),
+                            'COMPONENTE PROPUESTO': nuevo_componente,
+                            'CATEGORÍA': nueva_categoria.strip(),
+                            'COD': nuevo_codigo.strip(),
+                            'Nombre de indicador': nuevo_indicador.strip(),
+                            'Valor': primer_valor,
+                            'Fecha': primera_fecha.strftime('%d/%m/%Y')
+                        }
+                        
+                        df_nuevo = pd.concat([df_actual, pd.DataFrame([nueva_fila])], ignore_index=True)
+                        df_nuevo.to_csv(csv_path, sep=';', index=False)
+                        success = True
+                    
+                    if success:
+                        st.success(f"✅ Indicador '{nuevo_codigo}' creado correctamente")
+                        # Actualizar session state para seleccionar el nuevo código
+                        st.session_state.selected_codigo = nuevo_codigo
+                        # Forzar recarga
+                        st.cache_data.clear()
+                        st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
+                        # No usar st.rerun() para evitar reseteo de pestaña
+                        st.info("🔄 Recarga la página para ver el nuevo indicador en las listas")
+                    else:
+                        st.error("❌ Error al crear el indicador")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error al crear indicador: {e}")
+    
+    @staticmethod
+    def _render_add_form(df, codigo_editar, csv_path):
         """Formulario para agregar nuevo registro"""
         st.subheader("Agregar Nuevo Registro")
         
@@ -494,16 +609,23 @@ class EditTab:
             if submitted:
                 # Verificar si ya existe un registro para esa fecha
                 fecha_dt = pd.to_datetime(nueva_fecha)
-                registro_existente = df[(df['Codigo'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
                 
-                if not registro_existente.empty:
-                    st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')}. Usa la pestaña 'Editar' para modificarlo.")
+                if not df.empty:
+                    registro_existente = df[(df['Codigo'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
+                    
+                    if not registro_existente.empty:
+                        st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')}. Usa la pestaña 'Editar' para modificarlo.")
+                        return
+                
+                # Agregar registro
+                success = DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, csv_path)
+                
+                if success:
+                    st.success("✅ Nuevo registro agregado correctamente")
+                    # NO usar st.rerun() para evitar reseteo de pestaña
+                    st.info("🔄 Los datos se actualizarán automáticamente")
                 else:
-                    if DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, csv_path):
-                        st.success("✅ Nuevo registro agregado correctamente")
-                        st.rerun()
-                    else:
-                        st.error("❌ Error al agregar el nuevo registro")
+                    st.error("❌ Error al agregar el nuevo registro")
     
     @staticmethod
     def _render_edit_form(df, codigo_editar, registros_indicador, csv_path):
@@ -548,13 +670,13 @@ class EditTab:
                 submitted = st.form_submit_button("✏️ Actualizar Registro", use_container_width=True)
                 
                 if submitted:
-                    if DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, csv_path):
+                    success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, csv_path)
+                    
+                    if success:
                         st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente")
                         st.balloons()
-                        # Forzar recarga inmediata
-                        st.cache_data.clear()
-                        time.sleep(0.5)
-                        st.rerun()
+                        # NO usar st.rerun() para evitar reseteo
+                        st.info("🔄 Los datos se actualizarán automáticamente")
                     else:
                         st.error("❌ Error al actualizar el registro")
     
@@ -597,18 +719,18 @@ class EditTab:
             with col2:
                 if confirmar:
                     if st.button("🗑️ ELIMINAR REGISTRO", type="primary", use_container_width=True):
-                        if DataEditor.delete_record(df, codigo_editar, fecha_real, csv_path):
+                        success = DataEditor.delete_record(df, codigo_editar, fecha_real, csv_path)
+                        
+                        if success:
                             st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente")
                             st.balloons()
-                            # Forzar recarga inmediata
-                            st.cache_data.clear()
-                            time.sleep(0.5)
-                            st.rerun()
+                            # NO usar st.rerun() para evitar reseteo
+                            st.info("🔄 Los datos se actualizarán automáticamente")
                         else:
                             st.error("❌ Error al eliminar el registro")
 
 class TabManager:
-    """Gestor de pestañas del dashboard"""
+    """Gestor de pestañas del dashboard - SIN RESETEO"""
     
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
@@ -616,7 +738,9 @@ class TabManager:
         self.excel_data = excel_data
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar todas las pestañas (sin tabla dinámica)"""
+        """Renderizar todas las pestañas manteniendo el estado"""
+        
+        # Crear pestañas
         tab1, tab2, tab3, tab4 = st.tabs([
             "Resumen General", 
             "Resumen por Componente", 
@@ -624,6 +748,7 @@ class TabManager:
             "Gestión de Datos"
         ])
         
+        # Renderizar contenido de cada pestaña
         with tab1:
             GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
         
