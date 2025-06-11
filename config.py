@@ -18,7 +18,7 @@ def apply_dark_theme():
     st.markdown("""
     <style>
         .stApp {
-            background: linear-gradient(135deg, #f1f8e9 0%, #c8e6c9 100%);
+            background: #4472C4;
             color: #2C3E50;
         }
         
