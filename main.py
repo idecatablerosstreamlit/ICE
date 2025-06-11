@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 import os
 from config import configure_page, apply_dark_theme, CSV_FILENAME
-from data_utils import DataLoader
+from data_utils import DataLoader, ExcelDataLoader
 from tabs import TabManager
 
 def main():
