@@ -615,7 +615,8 @@ class DataEditor:
             import traceback
             st.code(traceback.format_exc())
             return False
-    class ExcelDataLoader:
+
+class ExcelDataLoader:
     """Clase para cargar datos del archivo Excel con hojas metodológicas"""
     
     def __init__(self):
@@ -705,6 +706,10 @@ class DataEditor:
                 return indicator_data.iloc[0].to_dict()
             else:
                 return None
+                
+        except Exception as e:
+            st.error(f"Error al obtener datos del indicador {codigo}: {e}")
+            return None
                 
         except Exception as e:
             st.error(f"Error al obtener datos del indicador {codigo}: {e}")
