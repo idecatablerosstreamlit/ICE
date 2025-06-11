@@ -22,8 +22,8 @@ def main():
     
     # Título principal
     st.markdown(f"""
-    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%);
-                  border-radius: 10px; margin-bottom: 2rem; color: white;">
+    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%); 
+                border-radius: 10px; margin-bottom: 2rem; color: white;">
         <h1 style="color: white; margin: 0;">🏢 Dashboard ICE</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.1rem;">
             Sistema de Monitoreo - Infraestructura de Conocimiento Espacial
@@ -177,7 +177,7 @@ def main():
                            padding: 1rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
                     <p style="color: white; margin: 0; font-weight: 500;">
                         📊 Datos sincronizados con Google Sheets
-                        <a href="{spreadsheet_url}" target="_blank" style="color: #4472C4; text-decoration: underline; margin-left: 10px;">
+                        <a href="{spreadsheet_url}" target="_blank" style="color: #E8F5E8; text-decoration: underline; margin-left: 10px;">
                             🔗 Abrir hoja de cálculo
                         </a>
                     </p>
