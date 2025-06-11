@@ -45,7 +45,9 @@ def main():
         data_loader = DataLoader()
         df_loaded = data_loader.load_data()
         return df_loaded, data_loader.csv_path
-    
+        # Cargar datos del Excel para hojas metodológicas
+        excel_loader = ExcelDataLoader()
+        excel_data = excel_loader.load_excel_data()
     try:
         # Obtener timestamp del archivo
         data_loader_temp = DataLoader()
@@ -108,9 +110,8 @@ def main():
             filters = create_simple_filters(df)
             
             # Renderizar pestañas - pasar datos completos
-            tab_manager = TabManager(df_completo, csv_path)
-            tab_manager.render_tabs(df_completo, filters)
-            
+            tab_manager = TabManager(df_completo, csv_path, excel_data)
+            tab_manager.render_tabs(df_completo, filters) 
         else:
             show_error_message()
             
