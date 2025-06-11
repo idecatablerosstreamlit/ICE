@@ -1,4 +1,76 @@
-"""
+# Botón para descargar PDF metodológico y ver ficha
+            if excel_data is not None and not excel_data.empty:
+                col1, col2, col3 = st.columns([2, 1, 1])
+                
+                with col2:
+                    if st.button("📋 Ver Ficha", key="view_sheet"):
+                        # Buscar datos del indicador en Excel
+                        indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
+                        
+                        if not indicador_metodologico.empty:
+                            st.subheader(f"📋 Ficha Metodológica: {codigo_editar}")
+                            
+                            metodologia = indicador_metodologico.iloc[0]
+                            
+                            # Mostrar información metodológica en pestañas
+                            tab1, tab2, tab3 = st.tabs(["📊 Básica", "🔬 Metodología", "📞 Contacto"])
+                            
+                            with tab1:
+                                st.write(f"**Nombre:** {metodologia.get('Nombre_Indicador', 'N/A')}")
+                                st.write(f"**Definición:** {metodologia.get('Definicion', 'N/A')}")
+                                st.write(f"**Objetivo:** {metodologia.get('Objetivo', 'N/A')}")
+                                st.write(f"**Área Temática:** {metodologia.get('Area_Tematica', 'N/A')}")
+                                st.write(f"**Sector:** {metodologia.get('Sector', 'N/A')}")
+                                st.write(f"**Entidad:** {metodologia.get('Entidad', 'N/A')}")
+                            
+                            with tab2:
+                                st.write(f"**Fórmula:** {metodologia.get('Formula_Calculo', 'N/A')}")
+                                st.write(f"**Variables:** {metodologia.get('Variables', 'N/A')}")
+                                st.write(f"**Unidad de medida:** {metodologia.get('Unidad_Medida', 'N/A')}")
+                                st.write(f"**Periodicidad:** {metodologia.get('Periodicidad', 'N/A')}")
+                                st.write(f"**Fuente:** {metodologia.get('Fuente_Informacion', 'N/A')}")
+                                st.write(f"**Tipo:** {metodologia.get('Tipo_Indicador', 'N/A')}")
+                            
+                            with tab3:
+                                st.write(f"**Directivo Responsable:** {metodologia.get('Directivo_Responsable', 'N/A')}")
+                                st.write(f"**Correo:** {metodologia.get('Correo_Directivo', 'N/A')}")
+                                st.write(f"**Teléfono:** {metodologia.get('Telefono_Contacto', 'N/A')}")
+                                if metodologia.get('Enlaces_Web'):
+                                    st.write(f"**Enlaces:** {metodologia.get('Enlaces_Web', 'N/A')}")
+                        else:
+                            st.warning(f"No se encontró información metodológica para {codigo_editar}")
+                
+                with col3:
+                    if st.button("📄 PDF", key="download_pdf"):
+                        try:
+                            from pdf_generator import PDFGenerator
+                            pdf_generator = PDFGenerator()
+                            
+                            if not pdf_generator.is_available():
+                                st.error("📦 **Instalar reportlab:** `pip install reportlab`")
+                            else:
+                                pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
+                                
+                                if pdf_bytes and len(pdf_bytes) > 0:
+                                    st.download_button(
+                                        label="📄 Descargar PDF",
+                                        data=pdf_bytes,
+                                        file_name=f"Hoja_Metodologica_{codigo_editar}.pdf",
+                                        mime="application/pdf",
+                                        key="download_pdf_button"
+                                    )
+                                    st.success("✅ PDF generado correctamente")
+                                else:
+                                    st.error("❌ Error: No se pudo generar el PDF")
+                        except ImportError:
+                            st.error("❌ Módulo PDF Generator no disponible. Instalar: `pip install reportlab`")
+                        except Exception as e:
+                            st.error(f"❌ Error al generar PDF: {e}")
+                            import traceback
+                            with st.expander("🔧 Detalles del error"):
+                                st.code(traceback.format_exc())
+            else:
+                st.info("💡 Para habilitar fichas metodológicas, verifica que el archivo 'Batería de indicadores.xlsx' esté en el directorio.")"""
 Interfaces de usuario para las pestañas del Dashboard ICE - SOLO GOOGLE SHEETS
 """
 
