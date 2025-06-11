@@ -1,232 +1,275 @@
 """
-Generador de PDFs para Hojas Metodológicas del Dashboard ICE - SOLO PDF
+Generador de PDFs para fichas metodológicas del Dashboard ICE
 """
 
 import streamlit as st
+import pandas as pd
+from io import BytesIO
 from datetime import datetime
-import io
 
-# Importar ReportLab
+# Importación condicional de reportlab
 try:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
-    REPORTLAB_AVAILABLE = True
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+    PDF_AVAILABLE = True
 except ImportError:
-    REPORTLAB_AVAILABLE = False
+    PDF_AVAILABLE = False
 
 class PDFGenerator:
-    """Clase para generar SOLO PDFs de hojas metodológicas"""
+    """Generador de fichas metodológicas en PDF"""
     
     def __init__(self):
-        if not REPORTLAB_AVAILABLE:
-            raise ImportError("ReportLab no está instalado. Ejecuta: pip install reportlab")
-        
-        self.styles = getSampleStyleSheet()
-        self._setup_custom_styles()
-    
-    def _setup_custom_styles(self):
-        """Configurar estilos para el PDF"""
-        self.title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=self.styles['Heading1'],
-            fontSize=14,
-            spaceAfter=12,
-            alignment=TA_CENTER,
-            textColor=colors.HexColor('#1f4e79'),
-            fontName='Helvetica-Bold'
-        )
-        
-        self.subtitle_style = ParagraphStyle(
-            'CustomSubtitle',
-            parent=self.styles['Heading2'],
-            fontSize=12,
-            spaceAfter=8,
-            spaceBefore=12,
-            alignment=TA_CENTER,
-            textColor=colors.white,
-            backColor=colors.HexColor('#4472c4'),
-            fontName='Helvetica-Bold'
-        )
-        
-        self.normal_style = ParagraphStyle(
-            'CustomNormal',
-            parent=self.styles['Normal'],
-            fontSize=9,
-            spaceAfter=4,
-            alignment=TA_LEFT
-        )
-        
-        self.label_style = ParagraphStyle(
-            'CustomLabel',
-            parent=self.styles['Normal'],
-            fontSize=9,
-            textColor=colors.HexColor('#1f4e79'),
-            fontName='Helvetica-Bold'
-        )
+        self.pdf_available = PDF_AVAILABLE
     
     def generate_metodological_sheet(self, codigo, excel_data):
-        """Generar hoja metodológica SOLO en PDF"""
-        
-        if not REPORTLAB_AVAILABLE:
-            st.error("❌ ReportLab no está instalado. No se puede generar PDF.")
-            st.info("Instala con: pip install reportlab")
-            return None
-        
+        """Generar ficha metodológica en PDF"""
         try:
-            # Buscar datos del indicador
-            from data_utils import ExcelDataLoader
-            excel_loader = ExcelDataLoader()
-            indicator_data = excel_loader.get_indicator_data(codigo)
-            
-            if not indicator_data:
-                st.error(f"No se encontraron datos para el indicador {codigo}")
+            if not self.pdf_available:
+                st.error("📦 **Falta instalar reportlab:** `pip install reportlab`")
                 return None
             
-            # Crear PDF en memoria
-            buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=0.75*inch, leftMargin=0.75*inch, 
-                                  topMargin=0.75*inch, bottomMargin=0.75*inch)
+            # Buscar datos del indicador
+            indicador_data = excel_data[excel_data['Codigo'] == codigo]
             
+            if indicador_data.empty:
+                st.error(f"❌ No se encontraron datos metodológicos para {codigo}")
+                return None
+            
+            # Obtener datos del indicador
+            datos = indicador_data.iloc[0]
+            
+            # Crear documento PDF
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=18
+            )
+            
+            # Crear estilos
+            styles = getSampleStyleSheet()
+            
+            # Estilo personalizado para título
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                spaceAfter=30,
+                alignment=TA_CENTER,
+                textColor=colors.HexColor('#4472C4')
+            )
+            
+            # Estilo para subtítulos
+            subtitle_style = ParagraphStyle(
+                'CustomSubtitle',
+                parent=styles['Heading2'],
+                fontSize=14,
+                spaceAfter=12,
+                textColor=colors.HexColor('#4472C4')
+            )
+            
+            # Estilo para texto normal
+            normal_style = ParagraphStyle(
+                'CustomNormal',
+                parent=styles['Normal'],
+                fontSize=11,
+                spaceAfter=8,
+                alignment=TA_JUSTIFY
+            )
+            
+            # Construir contenido del documento
             story = []
             
             # Título principal
-            story.append(Paragraph("SISTEMA DE SEGUIMIENTO Y EVALUACION IDECA - ICE", self.title_style))
-            story.append(Paragraph("FICHA METODOLÓGICA DEL INDICADOR", self.title_style))
+            story.append(Paragraph("FICHA METODOLÓGICA DE INDICADOR", title_style))
+            story.append(Spacer(1, 12))
+            
+            # Información institucional
+            institucion_data = [
+                ['Sistema:', 'Dashboard ICE - Infraestructura de Conocimiento Espacial'],
+                ['Fecha de generación:', datetime.now().strftime('%d/%m/%Y %H:%M:%S')],
+                ['Código del indicador:', codigo]
+            ]
+            
+            institucion_table = Table(institucion_data, colWidths=[2*inch, 4*inch])
+            institucion_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#4472C4')),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(institucion_table)
             story.append(Spacer(1, 20))
             
-            # Crear las secciones
-            story.extend(self._create_section_i(indicator_data))
-            story.append(Spacer(1, 20))
-            story.extend(self._create_section_ii(indicator_data))
-            story.append(Spacer(1, 20))
-            story.extend(self._create_section_iii(indicator_data))
-            story.append(Spacer(1, 20))
-            story.extend(self._create_section_iv())
+            # Información básica del indicador
+            story.append(Paragraph("1. INFORMACIÓN BÁSICA", subtitle_style))
+            
+            basic_data = [
+                ['Nombre del indicador:', datos.get('Nombre_Indicador', 'N/A')],
+                ['Código:', codigo],
+                ['Área temática:', datos.get('Area_Tematica', 'N/A')],
+                ['Tema:', datos.get('Tema', 'N/A')],
+                ['Sector:', datos.get('Sector', 'N/A')],
+                ['Entidad responsable:', datos.get('Entidad', 'N/A')],
+                ['Dependencia:', datos.get('Dependencia', 'N/A')]
+            ]
+            
+            basic_table = Table(basic_data, colWidths=[2*inch, 4*inch])
+            basic_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E7F3FF')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(basic_table)
+            story.append(Spacer(1, 15))
+            
+            # Definición y objetivo
+            story.append(Paragraph("2. DEFINICIÓN Y OBJETIVO", subtitle_style))
+            
+            story.append(Paragraph("<b>Definición:</b>", normal_style))
+            story.append(Paragraph(datos.get('Definicion', 'No disponible'), normal_style))
+            story.append(Spacer(1, 8))
+            
+            story.append(Paragraph("<b>Objetivo:</b>", normal_style))
+            story.append(Paragraph(datos.get('Objetivo', 'No disponible'), normal_style))
+            story.append(Spacer(1, 15))
+            
+            # Metodología de cálculo
+            story.append(Paragraph("3. METODOLOGÍA DE CÁLCULO", subtitle_style))
+            
+            methodology_data = [
+                ['Fórmula de cálculo:', datos.get('Formula_Calculo', 'N/A')],
+                ['Variables:', datos.get('Variables', 'N/A')],
+                ['Unidad de medida:', datos.get('Unidad_Medida', 'N/A')],
+                ['Metodología de cálculo:', datos.get('Metodologia_Calculo', 'N/A')],
+                ['Tipo de acumulación:', datos.get('Tipo_Acumulacion', 'N/A')]
+            ]
+            
+            methodology_table = Table(methodology_data, colWidths=[2*inch, 4*inch])
+            methodology_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E7F3FF')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(methodology_table)
+            story.append(Spacer(1, 15))
+            
+            # Información técnica
+            story.append(Paragraph("4. INFORMACIÓN TÉCNICA", subtitle_style))
+            
+            technical_data = [
+                ['Fuente de información:', datos.get('Fuente_Informacion', 'N/A')],
+                ['Tipo de indicador:', datos.get('Tipo_Indicador', 'N/A')],
+                ['Periodicidad:', datos.get('Periodicidad', 'N/A')],
+                ['Desagregación geográfica:', datos.get('Desagregacion_Geografica', 'N/A')],
+                ['Desagregación poblacional:', datos.get('Desagregacion_Poblacional', 'N/A')],
+                ['Clasificación según calidad:', datos.get('Clasificacion_Calidad', 'N/A')],
+                ['Clasificación según intervención:', datos.get('Clasificacion_Intervencion', 'N/A')]
+            ]
+            
+            technical_table = Table(technical_data, colWidths=[2*inch, 4*inch])
+            technical_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E7F3FF')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(technical_table)
+            story.append(Spacer(1, 15))
+            
+            # Observaciones y limitaciones
+            if datos.get('Observaciones') or datos.get('Limitaciones'):
+                story.append(Paragraph("5. OBSERVACIONES Y LIMITACIONES", subtitle_style))
+                
+                if datos.get('Observaciones'):
+                    story.append(Paragraph("<b>Observaciones:</b>", normal_style))
+                    story.append(Paragraph(datos.get('Observaciones', 'N/A'), normal_style))
+                    story.append(Spacer(1, 8))
+                
+                if datos.get('Limitaciones'):
+                    story.append(Paragraph("<b>Limitaciones:</b>", normal_style))
+                    story.append(Paragraph(datos.get('Limitaciones', 'N/A'), normal_style))
+                    story.append(Spacer(1, 8))
+                
+                if datos.get('Interpretacion'):
+                    story.append(Paragraph("<b>Interpretación:</b>", normal_style))
+                    story.append(Paragraph(datos.get('Interpretacion', 'N/A'), normal_style))
+                    story.append(Spacer(1, 15))
+            
+            # Información de contacto
+            story.append(Paragraph("6. INFORMACIÓN DE CONTACTO", subtitle_style))
+            
+            contact_data = [
+                ['Directivo responsable:', datos.get('Directivo_Responsable', 'N/A')],
+                ['Correo electrónico:', datos.get('Correo_Directivo', 'N/A')],
+                ['Teléfono de contacto:', datos.get('Telefono_Contacto', 'N/A')]
+            ]
+            
+            contact_table = Table(contact_data, colWidths=[2*inch, 4*inch])
+            contact_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E7F3FF')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP')
+            ]))
+            
+            story.append(contact_table)
+            
+            # Enlaces web
+            if datos.get('Enlaces_Web'):
+                story.append(Spacer(1, 15))
+                story.append(Paragraph("7. ENLACES RELACIONADOS", subtitle_style))
+                story.append(Paragraph(datos.get('Enlaces_Web', 'N/A'), normal_style))
+            
+            # Soporte legal
+            if datos.get('Soporte_Legal'):
+                story.append(Spacer(1, 15))
+                story.append(Paragraph("8. SOPORTE LEGAL", subtitle_style))
+                story.append(Paragraph(datos.get('Soporte_Legal', 'N/A'), normal_style))
             
             # Generar PDF
             doc.build(story)
-            pdf_bytes = buffer.getvalue()
+            
+            # Obtener datos del buffer
+            pdf_data = buffer.getvalue()
             buffer.close()
             
-            st.success("✅ PDF generado correctamente")
-            return pdf_bytes
+            return pdf_data
             
         except Exception as e:
             st.error(f"❌ Error al generar PDF: {e}")
+            import traceback
+            st.code(traceback.format_exc())
             return None
     
-    def _create_section_i(self, data):
-        """Sección I: Descripción del indicador"""
-        story = []
-        story.append(Paragraph("I. DESCRIPCIÓN DEL INDICADOR", self.subtitle_style))
-        story.append(Spacer(1, 10))
-        
-        section_data = [
-            ['I.1. Código del indicador', self._safe_get(data, 'Codigo', '')],
-            ['I.2. Nombre del indicador', self._safe_get(data, 'Nombre_Indicador', '')],
-            ['I.3. Definición', self._safe_get(data, 'Definicion', '')],
-            ['I.4. Objetivo', self._safe_get(data, 'Objetivo', '')],
-            ['I.5. Área temática', self._safe_get(data, 'Area_Tematica', '')],
-            ['I.6. Tema', self._safe_get(data, 'Tema', '')],
-            ['I.7. Soporte Legal', self._safe_get(data, 'Soporte_Legal', '')]
-        ]
-        
-        table_data = [[Paragraph(label, self.label_style), Paragraph(str(value), self.normal_style)] for label, value in section_data]
-        table = Table(table_data, colWidths=[2.2*inch, 4*inch])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e7f3ff')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#4472c4')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        
-        story.append(table)
-        return story
-    
-    def _create_section_ii(self, data):
-        """Sección II: Características del indicador"""
-        story = []
-        story.append(Paragraph("II. CARACTERÍSTICAS DEL INDICADOR", self.subtitle_style))
-        story.append(Spacer(1, 10))
-        
-        section_data = [
-            ['II.1. Fórmula de cálculo', self._safe_get(data, 'Formula_Calculo', '')],
-            ['II.2. Variables', self._safe_get(data, 'Variables', '')],
-            ['II.3. Unidad de medida', self._safe_get(data, 'Unidad_Medida', '')],
-            ['II.4. Metodología de cálculo', self._safe_get(data, 'Metodologia_Calculo', '')],
-            ['II.5. Fuente de Información', self._safe_get(data, 'Fuente_Informacion', '')],
-            ['II.6. Tipo de indicador', self._safe_get(data, 'Tipo_Indicador', '')],
-            ['II.7. Periodicidad', self._safe_get(data, 'Periodicidad', '')],
-            ['II.8. Interpretación', self._safe_get(data, 'Interpretacion', '')],
-            ['II.9. Limitaciones', self._safe_get(data, 'Limitaciones', '')]
-        ]
-        
-        table_data = [[Paragraph(label, self.label_style), Paragraph(str(value), self.normal_style)] for label, value in section_data]
-        table = Table(table_data, colWidths=[2.2*inch, 4*inch])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e7f3ff')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#4472c4')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        
-        story.append(table)
-        return story
-    
-    def _create_section_iii(self, data):
-        """Sección III: Datos del responsable"""
-        story = []
-        story.append(Paragraph("III. DATOS DEL RESPONSABLE QUE REPORTA LA INFORMACIÓN", self.subtitle_style))
-        story.append(Spacer(1, 10))
-        
-        section_data = [
-            ['III.1. Sector', self._safe_get(data, 'Sector', '')],
-            ['III.2. Entidad', self._safe_get(data, 'Entidad', '')],
-            ['III.3. Dependencia', self._safe_get(data, 'Dependencia', '')],
-            ['III.4. Directivo/a Responsable', self._safe_get(data, 'Directivo_Responsable', '')],
-            ['III.5. Correo electrónico', self._safe_get(data, 'Correo_Directivo', '')],
-            ['III.6. Teléfono de contacto', self._safe_get(data, 'Telefono_Contacto', '')]
-        ]
-        
-        table_data = [[Paragraph(label, self.label_style), Paragraph(str(value), self.normal_style)] for label, value in section_data]
-        table = Table(table_data, colWidths=[2.2*inch, 4*inch])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e7f3ff')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#4472c4')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        
-        story.append(table)
-        return story
-    
-    def _create_section_iv(self):
-        """Sección IV: Otras consideraciones"""
-        story = []
-        story.append(Paragraph("IV. OTRAS CONSIDERACIONES", self.subtitle_style))
-        story.append(Spacer(1, 10))
-        
-        fecha_actual = datetime.now().strftime("%d/%m/%Y")
-        section_data = [['IV.1. Fecha de elaboración de la ficha', fecha_actual]]
-        
-        table_data = [[Paragraph(label, self.label_style), Paragraph(str(value), self.normal_style)] for label, value in section_data]
-        table = Table(table_data, colWidths=[2.2*inch, 4*inch])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e7f3ff')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#4472c4')),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        
-        story.append(table)
-        return story
-    
-    def _safe_get(self, data, key, default=''):
-        """Obtener valor de forma segura"""
-        try:
-            value = data.get(key, default)
-            if value is None or str(value).strip() == '' or str(value).lower() == 'nan':
-                return default
-            return str(value)
-        except:
-            return default
+    def is_available(self):
+        """Verificar si PDF está disponible"""
+        return self.pdf_available
