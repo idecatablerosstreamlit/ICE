@@ -12,9 +12,9 @@ from pdf_generator import PDFGenerator
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
-    
+
     @staticmethod
-    def render(df, fecha_seleccionada):
+    def render(df, csv_path, excel_data=None):
         """Renderizar la pestaña de resumen general"""
         st.header("Resumen General")
         
