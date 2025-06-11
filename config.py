@@ -29,13 +29,13 @@ def apply_dark_theme():
             margin: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
+
         .stTabs [data-baseweb="tab-list"] {
-            background: linear-gradient(90deg, #0F9D58 0%, #34A853 100%);
+            background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%);
             border-radius: 10px 10px 0 0;
             padding: 10px;
         }
-        
+                
         .stTabs [data-baseweb="tab"] {
             color: white;
             font-weight: 500;
