@@ -432,48 +432,16 @@ class EditTab:
     def _render_metodological_section(codigo_editar, excel_data):
         """Renderizar sección de información metodológica"""
         if excel_data is not None and not excel_data.empty:
+            st.subheader("📋 Información Metodológica")
+            
             col1, col2, col3 = st.columns([2, 1, 1])
             
             with col2:
                 if st.button("📋 Ver Ficha", key="view_sheet", use_container_width=True):
-                    # Buscar datos del indicador en Excel
-                    indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
-                    
-                    if not indicador_metodologico.empty:
-                        st.subheader(f"📋 Ficha Metodológica: {codigo_editar}")
-                        
-                        metodologia = indicador_metodologico.iloc[0]
-                        
-                        # Mostrar información metodológica en pestañas
-                        tab1, tab2, tab3 = st.tabs(["📊 Básica", "🔬 Metodología", "📞 Contacto"])
-                        
-                        with tab1:
-                            st.write(f"**Nombre:** {metodologia.get('Nombre_Indicador', 'N/A')}")
-                            st.write(f"**Definición:** {metodologia.get('Definicion', 'N/A')}")
-                            st.write(f"**Objetivo:** {metodologia.get('Objetivo', 'N/A')}")
-                            st.write(f"**Área Temática:** {metodologia.get('Area_Tematica', 'N/A')}")
-                            st.write(f"**Sector:** {metodologia.get('Sector', 'N/A')}")
-                            st.write(f"**Entidad:** {metodologia.get('Entidad', 'N/A')}")
-                        
-                        with tab2:
-                            st.write(f"**Fórmula:** {metodologia.get('Formula_Calculo', 'N/A')}")
-                            st.write(f"**Variables:** {metodologia.get('Variables', 'N/A')}")
-                            st.write(f"**Unidad de medida:** {metodologia.get('Unidad_Medida', 'N/A')}")
-                            st.write(f"**Periodicidad:** {metodologia.get('Periodicidad', 'N/A')}")
-                            st.write(f"**Fuente:** {metodologia.get('Fuente_Informacion', 'N/A')}")
-                            st.write(f"**Tipo:** {metodologia.get('Tipo_Indicador', 'N/A')}")
-                        
-                        with tab3:
-                            st.write(f"**Directivo Responsable:** {metodologia.get('Directivo_Responsable', 'N/A')}")
-                            st.write(f"**Correo:** {metodologia.get('Correo_Directivo', 'N/A')}")
-                            st.write(f"**Teléfono:** {metodologia.get('Telefono_Contacto', 'N/A')}")
-                            if metodologia.get('Enlaces_Web'):
-                                st.write(f"**Enlaces:** {metodologia.get('Enlaces_Web', 'N/A')}")
-                    else:
-                        st.warning(f"No se encontró información metodológica para {codigo_editar}")
+                    st.session_state.show_ficha = True
             
             with col3:
-                if st.button("📄 PDF", key="download_pdf", use_container_width=True):
+                if st.button("📄 Generar PDF", key="generate_pdf", use_container_width=True):
                     try:
                         from pdf_generator import PDFGenerator
                         pdf_generator = PDFGenerator()
@@ -481,23 +449,111 @@ class EditTab:
                         if not pdf_generator.is_available():
                             st.error("📦 **Instalar reportlab:** `pip install reportlab`")
                         else:
-                            pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
-                            
-                            if pdf_bytes and len(pdf_bytes) > 0:
-                                st.download_button(
-                                    label="📄 Descargar PDF",
-                                    data=pdf_bytes,
-                                    file_name=f"Hoja_Metodologica_{codigo_editar}.pdf",
-                                    mime="application/pdf",
-                                    key="download_pdf_button"
-                                )
-                                st.success("✅ PDF generado correctamente")
-                            else:
-                                st.error("❌ Error: No se pudo generar el PDF")
+                            with st.spinner("Generando PDF..."):
+                                pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
+                                
+                                if pdf_bytes and len(pdf_bytes) > 0:
+                                    st.success("✅ PDF generado correctamente")
+                                    # Crear botón de descarga
+                                    st.download_button(
+                                        label="📄 Descargar PDF",
+                                        data=pdf_bytes,
+                                        file_name=f"Hoja_Metodologica_{codigo_editar}.pdf",
+                                        mime="application/pdf",
+                                        key="download_pdf_button",
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.error("❌ Error: No se pudo generar el PDF")
                     except ImportError:
-                        st.error("❌ `pip install reportlab`")
+                        st.error("❌ Instalar: `pip install reportlab`")
                     except Exception as e:
                         st.error(f"❌ Error al generar PDF: {e}")
+                        with st.expander("🔧 Detalles del error"):
+                            import traceback
+                            st.code(traceback.format_exc())
+            
+            # Mostrar ficha si se solicitó
+            if st.session_state.get('show_ficha', False):
+                # Buscar datos del indicador en Excel
+                indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
+                
+                if not indicador_metodologico.empty:
+                    st.markdown("---")
+                    st.subheader(f"📋 Ficha Metodológica: {codigo_editar}")
+                    
+                    metodologia = indicador_metodologico.iloc[0]
+                    
+                    # Mostrar información metodológica en pestañas
+                    tab1, tab2, tab3 = st.tabs(["📊 Información Básica", "🔬 Metodología", "📞 Contacto"])
+                    
+                    with tab1:
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.write(f"**Nombre:** {metodologia.get('Nombre_Indicador', 'N/A')}")
+                            st.write(f"**Área Temática:** {metodologia.get('Area_Tematica', 'N/A')}")
+                            st.write(f"**Sector:** {metodologia.get('Sector', 'N/A')}")
+                        with col_b:
+                            st.write(f"**Entidad:** {metodologia.get('Entidad', 'N/A')}")
+                            st.write(f"**Dependencia:** {metodologia.get('Dependencia', 'N/A')}")
+                            st.write(f"**Tema:** {metodologia.get('Tema', 'N/A')}")
+                        
+                        st.write("**Definición:**")
+                        st.write(metodologia.get('Definicion', 'N/A'))
+                        
+                        st.write("**Objetivo:**")
+                        st.write(metodologia.get('Objetivo', 'N/A'))
+                    
+                    with tab2:
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.write(f"**Unidad de medida:** {metodologia.get('Unidad_Medida', 'N/A')}")
+                            st.write(f"**Periodicidad:** {metodologia.get('Periodicidad', 'N/A')}")
+                            st.write(f"**Tipo de indicador:** {metodologia.get('Tipo_Indicador', 'N/A')}")
+                        with col_b:
+                            st.write(f"**Fuente de información:** {metodologia.get('Fuente_Informacion', 'N/A')}")
+                            st.write(f"**Tipo de acumulación:** {metodologia.get('Tipo_Acumulacion', 'N/A')}")
+                        
+                        st.write("**Fórmula de cálculo:**")
+                        st.write(metodologia.get('Formula_Calculo', 'N/A'))
+                        
+                        st.write("**Variables:**")
+                        st.write(metodologia.get('Variables', 'N/A'))
+                        
+                        if metodologia.get('Metodologia_Calculo'):
+                            st.write("**Metodología de cálculo:**")
+                            st.write(metodologia.get('Metodologia_Calculo', 'N/A'))
+                    
+                    with tab3:
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.write(f"**Directivo Responsable:** {metodologia.get('Directivo_Responsable', 'N/A')}")
+                            st.write(f"**Correo electrónico:** {metodologia.get('Correo_Directivo', 'N/A')}")
+                            st.write(f"**Teléfono:** {metodologia.get('Telefono_Contacto', 'N/A')}")
+                        with col_b:
+                            if metodologia.get('Enlaces_Web'):
+                                st.write("**Enlaces web:**")
+                                st.write(metodologia.get('Enlaces_Web', 'N/A'))
+                            if metodologia.get('Soporte_Legal'):
+                                st.write("**Soporte legal:**")
+                                st.write(metodologia.get('Soporte_Legal', 'N/A'))
+                        
+                        if metodologia.get('Observaciones'):
+                            st.write("**Observaciones:**")
+                            st.write(metodologia.get('Observaciones', 'N/A'))
+                        
+                        if metodologia.get('Limitaciones'):
+                            st.write("**Limitaciones:**")
+                            st.write(metodologia.get('Limitaciones', 'N/A'))
+                    
+                    # Botón para ocultar ficha
+                    if st.button("🔼 Ocultar Ficha", key="hide_ficha"):
+                        st.session_state.show_ficha = False
+                        st.rerun()
+                        
+                else:
+                    st.warning(f"No se encontró información metodológica para {codigo_editar}")
+                    st.session_state.show_ficha = False
         else:
             st.info("💡 Para fichas metodológicas, coloca 'Batería de indicadores.xlsx' en el directorio.")
     
