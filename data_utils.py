@@ -10,6 +10,7 @@ import openpyxl  # Para leer archivos Excel
 class DataLoader:
     """Clase para cargar y procesar datos del CSV"""
     
+      
     def __init__(self):
         self.df = None
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -621,7 +622,7 @@ class ExcelDataLoader:
     
     def __init__(self):
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.excel_path = os.path.join(self.script_dir, "Batería de indicadores 120325 1.xlsx")
+        self.excel_path = os.path.join(self.script_dir, "Batería de indicadores.xlsx")
         self.metodologicas_data = None
     
     def load_excel_data(self):
