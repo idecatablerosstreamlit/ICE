@@ -1,4 +1,4 @@
-a"""
+"""
 Configuración y estilos para el Dashboard ICE - SOLO GOOGLE SHEETS
 """
 
