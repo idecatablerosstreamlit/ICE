@@ -5,7 +5,7 @@ Utilidades para el manejo de datos del Dashboard ICE
 import pandas as pd
 import os
 import streamlit as st
-from config import COLUMN_MAPPING, DEFAULT_META, CSV_SEPARATOR, CSV_FILENAME
+from config import COLUMN_MAPPING, DEFAULT_META, CSV_SEPARATOR, CSV_FILENAME, EXCEL_FILENAME
 
 class DataLoader:
     """Clase para cargar y procesar datos del CSV"""
