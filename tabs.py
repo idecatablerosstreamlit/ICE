@@ -607,4 +607,6 @@ class TabManager:
             EvolutionTab.render(self.df, filters)
         
         with tab4:
-            EditTab.render(self.df, self.csv_path)
+            EditTab.render(self.df, self.csv_path, self.excel_data)
+
+    
