@@ -7,14 +7,14 @@ import streamlit as st
 def configure_page():
     """Configurar la página de Streamlit"""
     st.set_page_config(
-        page_title="Dashboard ICE - Ideca",
+        page_title="Dashboard ICE - Google Sheets",
         page_icon="🏢",
         layout="wide",
         initial_sidebar_state="collapsed"
     )
 
 def apply_dark_theme():
-    """Aplicar tema corporativo moderno con colores de Google Sheets"""
+    """Aplicar tema corporativo moderno con colores institucionales azules"""
     st.markdown("""
     <style>
         .stApp {
@@ -29,13 +29,13 @@ def apply_dark_theme():
             margin: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-
+        
         .stTabs [data-baseweb="tab-list"] {
             background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%);
             border-radius: 10px 10px 0 0;
             padding: 10px;
         }
-                
+        
         .stTabs [data-baseweb="tab"] {
             color: white;
             font-weight: 500;
@@ -63,7 +63,7 @@ def apply_dark_theme():
         }
         
         div.stButton > button {
-            background: linear-gradient(45deg, #0F9D58 0%, #34A853 100%);
+            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
             color: white;
             border: none;
             border-radius: 6px;
@@ -78,7 +78,7 @@ def apply_dark_theme():
         }
         
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #0F9D58 0%, #34A853 100%);
+            background: linear-gradient(180deg, #4472C4 0%, #5B9BD5 100%);
             border-right: 3px solid #BDC3C7;
         }
         
@@ -90,7 +90,7 @@ def apply_dark_theme():
         }
         
         .metric-card {
-            background: linear-gradient(135deg, #0F9D58 0%, #34A853 100%);
+            background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
             padding: 1rem;
             border-radius: 10px;
             color: white;
@@ -102,7 +102,7 @@ def apply_dark_theme():
             background: rgba(255, 255, 255, 0.1);
             padding: 1rem;
             border-radius: 8px;
-            border-left: 4px solid #0F9D58;
+            border-left: 4px solid #4472C4;
         }
         
         .stMetric label {
@@ -129,7 +129,7 @@ def apply_dark_theme():
         
         .stAlert {
             border-radius: 8px;
-            border-left: 4px solid #0F9D58;
+            border-left: 4px solid #4472C4;
         }
         
         .stSelectbox > div > div {
@@ -138,9 +138,9 @@ def apply_dark_theme():
             border: 1px solid #BDC3C7;
         }
         
-        /* Indicadores específicos de Google Sheets */
+        /* Indicadores específicos institucionales */
         .sheets-indicator {
-            background: linear-gradient(45deg, #0F9D58 0%, #34A853 100%);
+            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
             color: white;
             padding: 0.3rem 0.8rem;
             border-radius: 15px;
@@ -151,7 +151,7 @@ def apply_dark_theme():
         }
         
         .sheets-connected {
-            background: linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%);
+            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
             color: white;
             padding: 0.5rem 1rem;
             border-radius: 20px;
