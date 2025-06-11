@@ -11,8 +11,9 @@ from filters import EvolutionFilters
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
+    
     @staticmethod
-    def render(df, csv_path, excel_data=None):
+    def render(df, fecha_seleccionada):
         """Renderizar la pestaña de resumen general"""
         st.header("Resumen General")
         
@@ -361,7 +362,7 @@ class EditTab:
     """Pestaña de edición mejorada"""
     
     @staticmethod
-    def render(df, csv_path):
+    def render(df, csv_path, excel_data=None):
         """Renderizar la pestaña de edición con capacidades completas"""
         st.subheader("Gestión de Indicadores")
         
@@ -400,12 +401,14 @@ class EditTab:
             **Categoría:** {categoria_indicador}
             """)
 
-            # Botón para descargar hoja metodológica en PDF
+            # Botón para descargar hoja metodológica en PDF (solo si excel_data está disponible)
             if excel_data is not None and not excel_data.empty:
                 col1, col2 = st.columns([3, 1])
                 with col2:
                     if st.button("📄 Descargar PDF Metodológico", key="download_pdf"):
                         try:
+                            # Importar PDFGenerator aquí para evitar errores si no está disponible
+                            from pdf_generator import PDFGenerator
                             pdf_generator = PDFGenerator()
                             pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
                             
@@ -419,10 +422,13 @@ class EditTab:
                                 )
                             else:
                                 st.error("Error: No se pudo generar el PDF")
+                        except ImportError:
+                            st.error("Módulo PDF Generator no disponible")
                         except Exception as e:
                             st.error(f"Error al generar PDF: {e}")
             else:
                 st.info("💡 Para habilitar la descarga en PDF, coloca el archivo Excel en el directorio.")
+            
             # Obtener registros existentes del indicador
             registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
             
@@ -626,6 +632,6 @@ class TabManager:
         
         with tab3:
             EvolutionTab.render(self.df, filters)
-        with tab4:
-        EditTab.render(self.df, self.csv_path, self.excel_data)
         
+        with tab4:
+            EditTab.render(self.df, self.csv_path, self.excel_data)
