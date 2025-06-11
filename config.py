@@ -155,3 +155,4 @@ COLUMN_MAPPING = {
 DEFAULT_META = 1.0
 CSV_SEPARATOR = ";"
 CSV_FILENAME = "IndicadoresICE.csv"
+EXCEL_FILENAME = "Batería de indicadores.xlsx"
