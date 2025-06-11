@@ -1,5 +1,5 @@
 """
-Utilidades para el manejo de datos del Dashboard ICE
+Utilidades para el manejo de datos del Dashboard ICE - Compatible con Google Sheets
 """
 
 import pandas as pd
@@ -7,189 +7,210 @@ import os
 import streamlit as st
 from config import COLUMN_MAPPING, DEFAULT_META, CSV_SEPARATOR, CSV_FILENAME, EXCEL_FILENAME
 import openpyxl  # Para leer archivos Excel
+from google_sheets_manager import GoogleSheetsManager
+
 class DataLoader:
-    """Clase para cargar y procesar datos del CSV"""
+    """Clase para cargar y procesar datos - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
     
-      
-    def __init__(self):
+    def __init__(self, use_google_sheets=True):
         self.df = None
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.csv_path = os.path.join(self.script_dir, CSV_FILENAME)
+        self.use_google_sheets = use_google_sheets
+        self.sheets_manager = GoogleSheetsManager() if use_google_sheets else None
     
     def load_data(self):
-        """Cargar datos desde el archivo CSV - CORREGIDO"""
+        """Cargar datos desde Google Sheets o CSV como fallback"""
         try:
-            # Cargar el archivo CSV con punto y coma como separador
-            self.df = pd.read_csv(self.csv_path, sep=CSV_SEPARATOR)
-            
-            import streamlit as st
-            # Debug: Mostrar estructura original del CSV
-            with st.expander("🔧 Debug: Estructura del CSV cargado", expanded=False):
-                st.write(f"**Archivo:** {self.csv_path}")
-                st.write(f"**Shape original:** {self.df.shape}")
-                st.write(f"**Columnas originales:** {list(self.df.columns)}")
-                if not self.df.empty:
-                    st.write("**Primeras filas:**")
-                    st.dataframe(self.df.head())
-            
-            # Renombrar columnas
-            self._rename_columns()
-            
-            # Debug: Mostrar después del renombrado
-            with st.expander("🔧 Debug: Después del renombrado de columnas", expanded=False):
-                st.write(f"**Columnas después del renombrado:** {list(self.df.columns)}")
+            # Intentar cargar desde Google Sheets primero
+            if self.use_google_sheets and self.sheets_manager:
+                st.info("🔄 Intentando cargar desde Google Sheets...")
+                df_sheets = self._load_from_google_sheets()
                 
-            # Procesar fechas y valores
-            self._process_dates()
-            self._process_values()
+                if df_sheets is not None:
+                    self.df = df_sheets
+                    return self.df
+                else:
+                    st.warning("⚠️ Google Sheets no disponible, usando CSV como fallback")
             
-            # Añadir columnas por defecto
-            self._add_default_columns()
+            # Fallback a CSV
+            st.info("🔄 Cargando desde archivo CSV...")
+            df_csv = self._load_from_csv()
             
-            # Verificación final
-            required_final_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
-            missing_final = [col for col in required_final_columns if col not in self.df.columns]
-            if missing_final:
-                st.error(f"❌ Faltan columnas esenciales después del procesamiento: {missing_final}")
-                st.write("**Columnas disponibles:**", list(self.df.columns))
-                return None
-            
-            # Limpiar datos problemáticos
-            self.df = self.df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
-            
-            if self.df.empty:
-                st.error("❌ No hay datos válidos después de la limpieza")
+            if df_csv is not None:
+                self.df = df_csv
+                return self.df
+            else:
+                st.error("❌ No se pudieron cargar datos desde ninguna fuente")
                 return None
                 
-            st.success(f"✅ Datos cargados correctamente: {len(self.df)} registros, {self.df['Codigo'].nunique()} indicadores únicos")
-            
-            return self.df
-            
         except Exception as e:
-            import streamlit as st
-            st.error(f"❌ Error crítico al cargar datos: {e}")
+            st.error(f"❌ Error crítico en load_data: {e}")
             import traceback
             st.code(traceback.format_exc())
             return None
     
-    def _rename_columns(self):
-        """Renombrar columnas según el mapeo"""
-        for original, nuevo in COLUMN_MAPPING.items():
-            if original in self.df.columns:
-                self.df = self.df.rename(columns={original: nuevo})
-    
-    def _process_dates(self):
-        """Procesar columna de fechas - CORREGIDO para múltiples formatos"""
-        import streamlit as st
-        
+    def _load_from_google_sheets(self):
+        """Cargar datos desde Google Sheets"""
         try:
-            # Debug: Mostrar fechas originales
-            with st.expander("🔧 Debug: Procesamiento de fechas", expanded=False):
-                st.write("**Fechas originales (primeras 10):**")
-                st.write(self.df['Fecha'].head(10).tolist())
-                st.write(f"**Tipos de datos originales:** {self.df['Fecha'].dtype}")
-                
-                # Mostrar ejemplos de diferentes formatos encontrados
-                unique_samples = self.df['Fecha'].dropna().astype(str).unique()[:5]
-                st.write(f"**Ejemplos de formatos encontrados:** {list(unique_samples)}")
+            df = self.sheets_manager.load_data()
             
-            # Lista de formatos de fecha a intentar
+            if df is None or df.empty:
+                return None
+            
+            # Procesar datos igual que CSV
+            self._process_dataframe(df)
+            
+            # Verificar y limpiar
+            if self._verify_and_clean_dataframe(df):
+                st.success(f"✅ Datos cargados desde Google Sheets: {len(df)} registros")
+                return df
+            else:
+                return None
+                
+        except Exception as e:
+            st.warning(f"⚠️ Error al cargar desde Google Sheets: {e}")
+            return None
+    
+    def _load_from_csv(self):
+        """Cargar datos desde CSV (método original mantenido)"""
+        try:
+            # Código original del CSV
+            self.df = pd.read_csv(self.csv_path, sep=CSV_SEPARATOR)
+            
+            # Debug info
+            with st.expander("🔧 Debug: CSV cargado", expanded=False):
+                st.write(f"**Archivo:** {self.csv_path}")
+                st.write(f"**Shape:** {self.df.shape}")
+                st.write(f"**Columnas:** {list(self.df.columns)}")
+                if not self.df.empty:
+                    st.dataframe(self.df.head(3))
+            
+            # Procesar datos
+            self._process_dataframe(self.df)
+            
+            # Verificar y limpiar
+            if self._verify_and_clean_dataframe(self.df):
+                st.success(f"✅ Datos cargados desde CSV: {len(self.df)} registros")
+                return self.df
+            else:
+                return None
+                
+        except Exception as e:
+            st.error(f"❌ Error al cargar CSV: {e}")
+            return None
+    
+    def _process_dataframe(self, df):
+        """Procesar DataFrame (común para Google Sheets y CSV)"""
+        try:
+            # Renombrar columnas
+            for original, nuevo in COLUMN_MAPPING.items():
+                if original in df.columns:
+                    df.rename(columns={original: nuevo}, inplace=True)
+            
+            # Procesar fechas
+            self._process_dates(df)
+            
+            # Procesar valores
+            self._process_values(df)
+            
+            # Añadir columnas por defecto
+            self._add_default_columns(df)
+            
+        except Exception as e:
+            st.error(f"Error al procesar DataFrame: {e}")
+    
+    def _verify_and_clean_dataframe(self, df):
+        """Verificar y limpiar DataFrame"""
+        try:
+            # Verificar columnas esenciales
+            required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                st.error(f"❌ Faltan columnas: {missing_columns}")
+                st.write("**Columnas disponibles:**", list(df.columns))
+                return False
+            
+            # Limpiar datos problemáticos
+            df.dropna(subset=['Codigo', 'Fecha', 'Valor'], inplace=True)
+            
+            if df.empty:
+                st.error("❌ No hay datos válidos después de la limpieza")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            st.error(f"Error en verificación: {e}")
+            return False
+    
+    def _process_dates(self, df):
+        """Procesar fechas (método original mantenido)"""
+        try:
             date_formats = [
-                '%d/%m/%Y',    # 01/01/2025
-                '%d-%m-%Y',    # 01-01-2025  
-                '%Y-%m-%d',    # 2025-01-01
-                '%Y/%m/%d',    # 2025/01/01
-                '%m/%d/%Y',    # 01/01/2025 (formato US)
-                '%d.%m.%Y',    # 01.01.2025
+                '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', 
+                '%Y/%m/%d', '%m/%d/%Y', '%d.%m.%Y'
             ]
             
             fechas_convertidas = None
-            formato_exitoso = None
             
-            # Intentar cada formato
             for formato in date_formats:
                 try:
-                    fechas_convertidas = pd.to_datetime(self.df['Fecha'], format=formato, errors='coerce')
-                    # Verificar si la conversión fue exitosa (menos de 50% de NaT)
+                    fechas_convertidas = pd.to_datetime(df['Fecha'], format=formato, errors='coerce')
                     porcentaje_validas = (fechas_convertidas.notna().sum() / len(fechas_convertidas)) * 100
                     
-                    if porcentaje_validas >= 50:  # Si al menos 50% se convirtieron bien
-                        formato_exitoso = formato
-                        st.success(f"✅ Formato exitoso: {formato} ({porcentaje_validas:.1f}% válidas)")
+                    if porcentaje_validas >= 50:
                         break
-                    else:
-                        st.warning(f"⚠️ Formato {formato}: solo {porcentaje_validas:.1f}% válidas")
-                        
-                except ValueError as e:
-                    st.info(f"ℹ️ Formato {formato} no compatible: {e}")
+                except ValueError:
                     continue
             
-            # Si ningún formato específico funcionó, usar conversión automática
-            if fechas_convertidas is None or formato_exitoso is None:
-                st.warning("⚠️ Ningún formato específico funcionó, intentando conversión automática...")
-                try:
-                    fechas_convertidas = pd.to_datetime(self.df['Fecha'], errors='coerce', dayfirst=True)
-                    formato_exitoso = "automático (dayfirst=True)"
-                except Exception as e:
-                    st.error(f"❌ Error en conversión automática: {e}")
-                    fechas_convertidas = pd.to_datetime(self.df['Fecha'], errors='coerce')
-                    formato_exitoso = "automático (estándar)"
+            if fechas_convertidas is None:
+                fechas_convertidas = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
             
-            # Aplicar las fechas convertidas
-            self.df['Fecha'] = fechas_convertidas
+            df['Fecha'] = fechas_convertidas
             
-            # Análisis de resultados
-            fechas_validas = self.df['Fecha'].notna().sum()
-            fechas_invalidas = self.df['Fecha'].isna().sum()
-            
-            # Debug: Mostrar resultados de conversión
-            with st.expander("🔧 Debug: Resultados de conversión", expanded=False):
-                st.write(f"**Formato usado:** {formato_exitoso}")
-                st.write(f"**Fechas válidas:** {fechas_validas}")
-                st.write(f"**Fechas inválidas:** {fechas_invalidas}")
+            # Filtrar fechas inválidas si son muchas
+            fechas_invalidas = df['Fecha'].isna().sum()
+            if fechas_invalidas > 5:
+                df.dropna(subset=['Fecha'], inplace=True)
+                st.warning(f"⚠️ Excluidas {fechas_invalidas} filas con fechas inválidas")
                 
-                if fechas_validas > 0:
-                    st.write("**Fechas convertidas (muestra):**")
-                    st.write(self.df[self.df['Fecha'].notna()]['Fecha'].head().tolist())
-                
-                if fechas_invalidas > 0:
-                    st.write("**Fechas problemáticas:**")
-                    fechas_problematicas = self.df[self.df['Fecha'].isna()]['Fecha'].head()
-                    st.write(list(fechas_problematicas))
-            
-            # Filtrar filas con fechas inválidas solo si hay muchas
-            if fechas_invalidas > 0:
-                if fechas_invalidas <= 5:  # Si son pocas, solo avisar
-                    st.warning(f"⚠️ Se encontraron {fechas_invalidas} filas con fechas inválidas (se mantendrán para revisión)")
-                else:  # Si son muchas, excluir
-                    st.warning(f"⚠️ Se encontraron {fechas_invalidas} filas con fechas inválidas que serán excluidas del análisis")
-                    self.df = self.df.dropna(subset=['Fecha'])
-                    
         except Exception as e:
-            st.error(f"❌ Error crítico al procesar fechas: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-            # En caso de error, intentar conversión básica
-            try:
-                self.df['Fecha'] = pd.to_datetime(self.df['Fecha'], errors='coerce')
-            except:
-                st.error("❌ No se pudieron procesar las fechas en absoluto")
-                pass
+            st.warning(f"Error al procesar fechas: {e}")
     
-    def _process_values(self):
+    def _process_values(self, df):
         """Procesar valores numéricos"""
-        if self.df['Valor'].dtype == 'object':
-            self.df['Valor'] = self.df['Valor'].str.replace(',', '.').astype(float)
+        try:
+            if df['Valor'].dtype == 'object':
+                df['Valor'] = pd.to_numeric(
+                    df['Valor'].astype(str).str.replace(',', '.'), 
+                    errors='coerce'
+                )
+        except Exception as e:
+            st.warning(f"Error al procesar valores: {e}")
     
-    def _add_default_columns(self):
-        """Añadir columnas por defecto si no existen"""
-        if 'Meta' not in self.df.columns:
-            self.df['Meta'] = DEFAULT_META
-        
-        # Asignar peso igual a todos los indicadores (será normalizado por componente)
-        if 'Peso' not in self.df.columns:
-            self.df['Peso'] = 1.0
+    def _add_default_columns(self, df):
+        """Añadir columnas por defecto"""
+        if 'Meta' not in df.columns:
+            df['Meta'] = DEFAULT_META
+        if 'Peso' not in df.columns:
+            df['Peso'] = 1.0
+    
+    def get_data_source_info(self):
+        """Obtener información sobre la fuente de datos"""
+        if self.use_google_sheets and self.sheets_manager:
+            return {
+                'source': 'Google Sheets',
+                'connection_info': self.sheets_manager.get_connection_info()
+            }
+        else:
+            return {
+                'source': 'CSV',
+                'csv_path': self.csv_path
+            }
 
+# MANTENER TODAS LAS CLASES ORIGINALES SIN CAMBIOS
 class DataProcessor:
     """Clase para procesar y calcular métricas de los datos"""
     
@@ -411,7 +432,11 @@ class DataProcessor:
         return pd.DataFrame()  # Función deshabilitada
 
 class DataEditor:
-    """Clase para editar datos con operaciones CRUD completas"""
+    """Clase para editar datos - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+    
+    def __init__(self, use_google_sheets=True):
+        self.use_google_sheets = use_google_sheets
+        self.sheets_manager = GoogleSheetsManager() if use_google_sheets else None
     
     @staticmethod
     def save_edit(df, codigo, fecha, nuevo_valor, csv_path):
@@ -420,7 +445,149 @@ class DataEditor:
     
     @staticmethod
     def add_new_record(df, codigo, fecha, valor, csv_path):
-        """Agregar un nuevo registro para un indicador - CORREGIDO formato de fecha"""
+        """Agregar un nuevo registro - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+        try:
+            # Determinar si usar Google Sheets o CSV
+            use_sheets = DataEditor._should_use_google_sheets()
+            
+            if use_sheets:
+                return DataEditor._add_record_google_sheets(df, codigo, fecha, valor)
+            else:
+                return DataEditor._add_record_csv(df, codigo, fecha, valor, csv_path)
+                
+        except Exception as e:
+            st.error(f"❌ Error al agregar registro: {e}")
+            return False
+    
+    @staticmethod
+    def update_record(df, codigo, fecha, nuevo_valor, csv_path):
+        """Actualizar un registro existente - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+        try:
+            # Determinar si usar Google Sheets o CSV
+            use_sheets = DataEditor._should_use_google_sheets()
+            
+            if use_sheets:
+                return DataEditor._update_record_google_sheets(codigo, fecha, nuevo_valor)
+            else:
+                return DataEditor._update_record_csv(df, codigo, fecha, nuevo_valor, csv_path)
+                
+        except Exception as e:
+            st.error(f"❌ Error al actualizar registro: {e}")
+            return False
+    
+    @staticmethod
+    def delete_record(df, codigo, fecha, csv_path):
+        """Eliminar un registro existente - COMPATIBLE CON GOOGLE SHEETS Y CSV"""
+        try:
+            # Determinar si usar Google Sheets o CSV
+            use_sheets = DataEditor._should_use_google_sheets()
+            
+            if use_sheets:
+                return DataEditor._delete_record_google_sheets(codigo, fecha)
+            else:
+                return DataEditor._delete_record_csv(df, codigo, fecha, csv_path)
+                
+        except Exception as e:
+            st.error(f"❌ Error al eliminar registro: {e}")
+            return False
+    
+    @staticmethod
+    def _should_use_google_sheets():
+        """Determinar si debe usar Google Sheets basado en la configuración"""
+        try:
+            # Verificar si Google Sheets está configurado
+            return ("google_sheets" in st.secrets and 
+                    "spreadsheet_url" in st.secrets["google_sheets"])
+        except:
+            return False
+    
+    @staticmethod
+    def _add_record_google_sheets(df, codigo, fecha, valor):
+        """Agregar registro a Google Sheets"""
+        try:
+            sheets_manager = GoogleSheetsManager()
+            
+            # Buscar información base del indicador
+            indicador_existente = df[df['Codigo'] == codigo]
+            if indicador_existente.empty:
+                st.error(f"❌ No se encontró información base para el código {codigo}")
+                return False
+            
+            indicador_base = indicador_existente.iloc[0]
+            
+            # Formatear fecha
+            fecha_formateada = fecha.strftime('%d/%m/%Y') if hasattr(fecha, 'strftime') else pd.to_datetime(fecha).strftime('%d/%m/%Y')
+            
+            # Crear diccionario de datos
+            data_dict = {
+                'Linea_Accion': indicador_base.get('Linea_Accion', ''),
+                'Componente': indicador_base.get('Componente', ''),
+                'Categoria': indicador_base.get('Categoria', ''),
+                'Codigo': codigo,
+                'Indicador': indicador_base.get('Indicador', ''),
+                'Valor': valor,
+                'Fecha': fecha_formateada
+            }
+            
+            # Agregar a Google Sheets
+            success = sheets_manager.add_record(data_dict)
+            
+            if success:
+                # Forzar recarga de cache
+                st.cache_data.clear()
+                if 'data_timestamp' not in st.session_state:
+                    st.session_state.data_timestamp = 0
+                st.session_state.data_timestamp += 1
+            
+            return success
+            
+        except Exception as e:
+            st.error(f"❌ Error en Google Sheets: {e}")
+            return False
+    
+    @staticmethod
+    def _update_record_google_sheets(codigo, fecha, nuevo_valor):
+        """Actualizar registro en Google Sheets"""
+        try:
+            sheets_manager = GoogleSheetsManager()
+            success = sheets_manager.update_record(codigo, fecha, nuevo_valor)
+            
+            if success:
+                # Forzar recarga de cache
+                st.cache_data.clear()
+                if 'data_timestamp' not in st.session_state:
+                    st.session_state.data_timestamp = 0
+                st.session_state.data_timestamp += 1
+            
+            return success
+            
+        except Exception as e:
+            st.error(f"❌ Error en Google Sheets: {e}")
+            return False
+    
+    @staticmethod
+    def _delete_record_google_sheets(codigo, fecha):
+        """Eliminar registro de Google Sheets"""
+        try:
+            sheets_manager = GoogleSheetsManager()
+            success = sheets_manager.delete_record(codigo, fecha)
+            
+            if success:
+                # Forzar recarga de cache
+                st.cache_data.clear()
+                if 'data_timestamp' not in st.session_state:
+                    st.session_state.data_timestamp = 0
+                st.session_state.data_timestamp += 1
+            
+            return success
+            
+        except Exception as e:
+            st.error(f"❌ Error en Google Sheets: {e}")
+            return False
+    
+    @staticmethod
+    def _add_record_csv(df, codigo, fecha, valor, csv_path):
+        """Agregar registro a CSV (método original mantenido)"""
         try:
             # Leer el CSV actual para mantener el formato original
             df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
@@ -513,8 +680,8 @@ class DataEditor:
             return False
     
     @staticmethod
-    def update_record(df, codigo, fecha, nuevo_valor, csv_path):
-        """Actualizar un registro existente - CORREGIDO"""
+    def _update_record_csv(df, codigo, fecha, nuevo_valor, csv_path):
+        """Actualizar un registro existente en CSV (método original mantenido)"""
         try:
             # Leer el CSV actual con el mismo separador
             df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
@@ -568,8 +735,8 @@ class DataEditor:
             return False
     
     @staticmethod
-    def delete_record(df, codigo, fecha, csv_path):
-        """Eliminar un registro existente - CORREGIDO"""
+    def _delete_record_csv(df, codigo, fecha, csv_path):
+        """Eliminar un registro existente de CSV (método original mantenido)"""
         try:
             # Leer el CSV actual
             df_actual = pd.read_csv(csv_path, sep=CSV_SEPARATOR)
@@ -617,6 +784,7 @@ class DataEditor:
             st.code(traceback.format_exc())
             return False
 
+# MANTENER CLASE ORIGINAL SIN CAMBIOS
 class ExcelDataLoader:
     """Clase para cargar datos del archivo Excel con hojas metodológicas"""
     
@@ -707,10 +875,6 @@ class ExcelDataLoader:
                 return indicator_data.iloc[0].to_dict()
             else:
                 return None
-                
-        except Exception as e:
-            st.error(f"Error al obtener datos del indicador {codigo}: {e}")
-            return None
                 
         except Exception as e:
             st.error(f"Error al obtener datos del indicador {codigo}: {e}")
