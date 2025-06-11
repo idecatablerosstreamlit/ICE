@@ -8,6 +8,7 @@ import time
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
 from filters import EvolutionFilters
+from pdf_generator import PDFGenerator
 
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
@@ -582,9 +583,10 @@ class EditTab:
 class TabManager:
     """Gestor de pestañas del dashboard"""
     
-    def __init__(self, df, csv_path):
-        self.df = df
-        self.csv_path = csv_path
+    def __init__(self, df, csv_path, excel_data=None):
+    self.df = df
+    self.csv_path = csv_path
+    self.excel_data = excel_data
     
     def render_tabs(self, df_filtrado, filters):
         """Renderizar todas las pestañas (sin tabla dinámica)"""
