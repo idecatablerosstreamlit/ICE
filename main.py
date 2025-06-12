@@ -1,5 +1,6 @@
 """
 Dashboard ICE - Archivo Principal - SOLO GOOGLE SHEETS
+VERSIÓN CORREGIDA: Persistencia de pestañas y funcionalidad PDF
 Sistema de monitoreo y seguimiento de indicadores de la Infraestructura de Conocimiento Espacial
 """
 
@@ -19,6 +20,12 @@ def main():
     # Configurar página
     configure_page()
     apply_dark_theme()
+    
+    # ✅ CORRECCIÓN CRÍTICA: Inicializar persistencia de pestañas ANTES de todo
+    if 'active_tab_index' not in st.session_state:
+        st.session_state.active_tab_index = 0
+    if 'data_timestamp' not in st.session_state:
+        st.session_state.data_timestamp = 0
     
     # Título principal
     st.markdown(f"""
@@ -46,10 +53,6 @@ def main():
             show_setup_instructions()
         
         st.stop()
-    
-    # Sistema de recarga automática de datos
-    if 'data_timestamp' not in st.session_state:
-        st.session_state.data_timestamp = 0
     
     # Función de carga desde Google Sheets
     @st.cache_data(ttl=30, show_spinner=True)
@@ -132,18 +135,18 @@ def main():
                     st.write("**Columnas disponibles:**", list(df.columns))
                     st.stop()
             
-            # Botón de recarga manual
+            # ✅ CORRECCIÓN CRÍTICA: Botón de recarga que MANTIENE la pestaña activa
             col_reload1, col_reload2, col_reload3 = st.columns([2, 1, 2])
             with col_reload2:
                 if st.button("🔄 Actualizar desde Google Sheets", help="Recarga los datos desde Google Sheets"):
-                    # Guardar pestaña activa antes de recargar
-                    current_tab = st.session_state.get('active_tab', 0)
+                    # ✅ GUARDAR pestaña activa ANTES de recargar
+                    current_tab = st.session_state.get('active_tab_index', 0)
                     
                     st.cache_data.clear()
                     st.session_state.data_timestamp += 1
                     
-                    # Restaurar pestaña activa
-                    st.session_state.active_tab = current_tab
+                    # ✅ RESTAURAR pestaña activa DESPUÉS de actualizar
+                    st.session_state.active_tab_index = current_tab
                     
                     st.rerun()
             
@@ -168,12 +171,12 @@ def main():
                 else:
                     st.error("❌ **Desconectado**")
             
-            # Mostrar enlace a Google Sheets
+            # ✅ CORRECCIÓN: Usar color AZUL institucional en lugar de verde
             connection_info = source_info.get('connection_info', {})
             if connection_info.get('spreadsheet_url'):
                 spreadsheet_url = connection_info['spreadsheet_url']
                 st.markdown(f"""
-                <div style="background: linear-gradient(45deg, #0F9D58 0%, #34A853 100%); 
+                <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
                            padding: 1rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
                     <p style="color: white; margin: 0; font-weight: 500;">
                         📊 Datos sincronizados con Google Sheets
@@ -187,7 +190,7 @@ def main():
             # Crear filtros simples
             filters = create_simple_filters(df)
             
-            # Renderizar pestañas (sin CSV path ya que solo usamos Google Sheets)
+            # ✅ CORRECCIÓN CRÍTICA: Renderizar pestañas con persistencia mejorada
             tab_manager = TabManager(df, None, excel_data)
             tab_manager.render_tabs(df, filters)
             
@@ -203,15 +206,15 @@ def main():
         with st.expander("🔧 Detalles del error (para desarrolladores)"):
             st.code(traceback.format_exc())
             
-        # Botón para intentar recargar
+        # ✅ CORRECCIÓN: Botón para intentar recargar que MANTIENE pestaña activa
         if st.button("🔄 Intentar Recargar"):
             # Guardar pestaña activa antes de recargar
-            current_tab = st.session_state.get('active_tab', 0)
+            current_tab = st.session_state.get('active_tab_index', 0)
             
             st.cache_data.clear()
             
             # Restaurar pestaña activa
-            st.session_state.active_tab = current_tab
+            st.session_state.active_tab_index = current_tab
             
             st.rerun()
 
