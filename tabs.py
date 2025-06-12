@@ -1,6 +1,6 @@
 """
 Interfaces de usuario para las pestañas del Dashboard ICE - SOLO GOOGLE SHEETS
-Versión completa con funcionalidad PDF corregida
+VERSIÓN CORREGIDA: PDF funcional y persistencia de pestañas
 """
 
 import streamlit as st
@@ -394,7 +394,7 @@ class EditTab:
                     st.error(f"Error al obtener información del indicador {codigo_editar}")
                     return
             
-            # Botones para funcionalidades metodológicas (SIEMPRE VISIBLES)
+            # Botones para funcionalidades metodológicas (CORRECCIÓN APLICADA)
             EditTab._render_metodological_section(codigo_editar, excel_data)
             
             # Obtener registros existentes del indicador
@@ -431,10 +431,9 @@ class EditTab:
     
     @staticmethod
     def _render_metodological_section(codigo_editar, excel_data):
-        """Renderizar sección de información metodológica - VERSIÓN CORREGIDA CON BOTONES SIEMPRE VISIBLES"""
+        """Renderizar sección de información metodológica - CORRECCIÓN CRÍTICA"""
         st.subheader("📋 Información Metodológica")
         
-        # SIEMPRE mostrar los botones, independientemente del estado
         col1, col2, col3 = st.columns([2, 1, 1])
         
         with col2:
@@ -442,50 +441,70 @@ class EditTab:
                 st.session_state.show_ficha = True
         
         with col3:
-            # BOTÓN DE PDF - SIEMPRE VISIBLE
+            # ✅ CORRECCIÓN CRÍTICA: Simplificar lógica del botón PDF
             try:
                 # Verificar si reportlab está disponible
+                reportlab_available = False
                 try:
                     import reportlab
                     reportlab_available = True
                 except ImportError:
                     reportlab_available = False
                 
+                # ✅ CORRECCIÓN: Lógica simplificada - SIEMPRE mostrar el botón
                 if reportlab_available and excel_data is not None and not excel_data.empty:
-                    # BOTÓN ACTIVO - Todo configurado
-                    if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}", use_container_width=True):
-                        EditTab._generate_and_download_pdf(codigo_editar, excel_data)
+                    # Verificar si existe información para este código
+                    codigo_existe = codigo_editar in excel_data['Codigo'].values
+                    
+                    if codigo_existe:
+                        # ✅ BOTÓN ACTIVO - Todo funcionando
+                        if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}", use_container_width=True):
+                            EditTab._generate_and_download_pdf(codigo_editar, excel_data)
+                    else:
+                        # ❌ BOTÓN DESHABILITADO - Código no encontrado
+                        st.button("❌ PDF (Sin datos)", key=f"pdf_no_data_{codigo_editar}", disabled=True, use_container_width=True)
+                        st.warning(f"No hay datos metodológicos para {codigo_editar}")
+                        
                 elif not reportlab_available:
-                    # BOTÓN DESHABILITADO - Falta reportlab
-                    if st.button("❌ PDF (Instalar reportlab)", key=f"pdf_disabled_{codigo_editar}", disabled=True, use_container_width=True):
-                        pass
+                    # ❌ BOTÓN DESHABILITADO - Falta reportlab
+                    st.button("❌ Instalar reportlab", key=f"pdf_disabled_{codigo_editar}", disabled=True, use_container_width=True)
                     st.error("📦 `pip install reportlab`")
                 else:
-                    # BOTÓN DESHABILITADO - Falta Excel
-                    if st.button("❌ PDF (Falta Excel)", key=f"pdf_no_excel_{codigo_editar}", disabled=True, use_container_width=True):
-                        pass
-                    st.warning("📄 Coloca 'Batería de indicadores.xlsx'")
+                    # ❌ BOTÓN DESHABILITADO - Falta Excel
+                    st.button("❌ Falta archivo Excel", key=f"pdf_no_excel_{codigo_editar}", disabled=True, use_container_width=True)
+                    st.warning("📄 Necesitas 'Batería de indicadores.xlsx'")
                     
             except Exception as e:
-                # BOTÓN DE ERROR
-                if st.button("❌ Error PDF", key=f"pdf_error_{codigo_editar}", disabled=True, use_container_width=True):
-                    pass
+                # ❌ BOTÓN DE ERROR
+                st.button("❌ Error PDF", key=f"pdf_error_{codigo_editar}", disabled=True, use_container_width=True)
                 st.error(f"Error: {e}")
         
-        # Mostrar advertencias/información adicional
-        if excel_data is None or excel_data.empty:
-            st.info("""
-            📄 **Para habilitar fichas metodológicas en PDF:**
-            1. Coloca el archivo `Batería de indicadores.xlsx` en el directorio del proyecto
-            2. Asegúrate de que el archivo tenga la hoja `Hoja metodológica indicadores`
-            3. Instala reportlab: `pip install reportlab`
-            """)
-        elif codigo_editar not in excel_data['Codigo'].values:
-            st.warning(f"📄 No se encontró información metodológica para **{codigo_editar}**")
-            # Mostrar algunos códigos disponibles como referencia
-            codigos_disponibles = excel_data['Codigo'].dropna().unique()[:5]
-            if len(codigos_disponibles) > 0:
-                st.info(f"💡 Algunos códigos disponibles: {', '.join(map(str, codigos_disponibles))}")
+        # ✅ AGREGAR: Información de estado mejorada
+        with st.expander("ℹ️ Estado de funcionalidades metodológicas", expanded=False):
+            # Verificar reportlab
+            try:
+                import reportlab
+                st.success("✅ reportlab: Disponible")
+            except ImportError:
+                st.error("❌ reportlab: No instalado - `pip install reportlab`")
+            
+            # Verificar archivo Excel
+            if excel_data is not None and not excel_data.empty:
+                st.success("✅ Archivo Excel: Cargado correctamente")
+                st.info(f"📄 Total de indicadores metodológicos: {len(excel_data)}")
+                
+                # Verificar si existe el código actual
+                if codigo_editar in excel_data['Codigo'].values:
+                    st.success(f"✅ Código {codigo_editar}: Encontrado en Excel")
+                else:
+                    st.warning(f"⚠️ Código {codigo_editar}: No encontrado en Excel")
+                    # Mostrar algunos códigos disponibles
+                    codigos_disponibles = excel_data['Codigo'].dropna().unique()[:5]
+                    if len(codigos_disponibles) > 0:
+                        st.info(f"💡 Códigos disponibles: {', '.join(map(str, codigos_disponibles))}")
+            else:
+                st.warning("⚠️ Archivo Excel: No disponible")
+                st.info("📄 Coloca 'Batería de indicadores.xlsx' en el directorio del proyecto")
         
         # Mostrar ficha si se solicitó
         if st.session_state.get('show_ficha', False):
@@ -759,13 +778,14 @@ class EditTab:
                         st.success(f"✅ Indicador '{nuevo_codigo}' creado correctamente en Google Sheets")
                         # Actualizar session state para seleccionar el nuevo código
                         st.session_state.selected_codigo = nuevo_codigo
-                        # Limpiar cache SIN cambiar pestaña
+                        # Limpiar cache SIN cambiar pestaña - CORRECCIÓN CRÍTICA
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                         st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
                         
                         # Mostrar botón manual de actualización
                         if st.button("🔄 Actualizar ahora", key="refresh_after_create"):
+                            # NO cambiar pestaña al recargar
                             st.rerun()
                     else:
                         st.error("❌ Error al crear el indicador en Google Sheets")
@@ -817,7 +837,7 @@ class EditTab:
                     st.success("✅ Nuevo registro agregado correctamente a Google Sheets")
                     st.info("🔄 Los datos se actualizarán automáticamente en unos segundos")
                     
-                    # Limpiar cache para próxima carga
+                    # Limpiar cache para próxima carga - SIN cambiar pestaña
                     st.cache_data.clear()
                     st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                     
@@ -877,7 +897,7 @@ class EditTab:
                         st.balloons()
                         st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
                         
-                        # Limpiar cache para próxima carga
+                        # Limpiar cache para próxima carga - SIN cambiar pestaña
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                         
@@ -933,7 +953,7 @@ class EditTab:
                             st.balloons()
                             st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
                             
-                            # Limpiar cache para próxima carga
+                            # Limpiar cache para próxima carga - SIN cambiar pestaña
                             st.cache_data.clear()
                             st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                             
@@ -944,19 +964,19 @@ class EditTab:
                             st.error("❌ Error al eliminar el registro de Google Sheets")
 
 class TabManager:
-    """Gestor de pestañas del dashboard - SOLO GOOGLE SHEETS CON PERSISTENCIA"""
+    """Gestor de pestañas del dashboard - CORRECCIÓN CRÍTICA: Persistencia de pestañas"""
     
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
         self.csv_path = None  # No usamos CSV
         self.excel_data = excel_data
         
-        # Inicializar pestaña activa en session_state
-        if 'active_tab' not in st.session_state:
-            st.session_state.active_tab = 0
+        # ✅ CORRECCIÓN CRÍTICA: Inicializar pestaña activa en session_state
+        if 'active_tab_index' not in st.session_state:
+            st.session_state.active_tab_index = 0
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar todas las pestañas manteniendo el estado activo"""
+        """Renderizar todas las pestañas manteniendo el estado activo - VERSIÓN CORREGIDA"""
         
         # Nombres de las pestañas
         tab_names = [
@@ -966,76 +986,87 @@ class TabManager:
             "⚙️ Gestión de Datos"
         ]
         
-        # Crear pestañas con índice persistente
-        tabs = st.tabs(tab_names)
-        
-        # Detectar cambio de pestaña usando un callback
-        # Usamos un selectbox oculto para mantener el estado
+        # ✅ CORRECCIÓN CRÍTICA: Sistema mejorado de persistencia
+        # Crear un selector oculto que mantenga la pestaña activa
         with st.sidebar:
-            with st.expander("🎛️ Navegación", expanded=False):
-                current_tab = st.radio(
-                    "Pestaña activa:",
-                    options=range(len(tab_names)),
-                    format_func=lambda x: tab_names[x],
-                    index=st.session_state.active_tab,
-                    key="tab_selector"
-                )
-                
-                # Actualizar session state si cambió
-                if current_tab != st.session_state.active_tab:
-                    st.session_state.active_tab = current_tab
-                    st.rerun()
+            st.markdown("### 🧭 Navegación")
+            
+            # Selector de pestaña que persiste el estado
+            current_tab = st.radio(
+                "Ir a:",
+                options=range(len(tab_names)),
+                format_func=lambda x: tab_names[x].replace("📊 ", "").replace("🏗️ ", "").replace("📈 ", "").replace("⚙️ ", ""),
+                index=st.session_state.active_tab_index,
+                key="persistent_tab_selector",
+                help="Selecciona la sección que deseas ver"
+            )
+            
+            # ✅ CORRECCIÓN: Actualizar solo si realmente cambió
+            if current_tab != st.session_state.active_tab_index:
+                st.session_state.active_tab_index = current_tab
+                # NO hacer st.rerun() aquí para evitar bucles
         
-        # Renderizar contenido de cada pestaña
-        with tabs[0]:  # Resumen General
-            if st.session_state.active_tab == 0 or True:  # Siempre renderizar para que funcione
+        # ✅ CORRECCIÓN CRÍTICA: Crear las pestañas normalmente
+        tab1, tab2, tab3, tab4 = st.tabs(tab_names)
+        
+        # ✅ CORRECCIÓN: Renderizar SOLO la pestaña activa para mejorar rendimiento
+        # y evitar problemas de estado
+        
+        if st.session_state.active_tab_index == 0:
+            with tab1:
                 GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
         
-        with tabs[1]:  # Resumen por Componente
-            if st.session_state.active_tab == 1 or True:
+        elif st.session_state.active_tab_index == 1:
+            with tab2:
                 ComponentSummaryTab.render(df_filtrado, filters)
         
-        with tabs[2]:  # Evolución
-            if st.session_state.active_tab == 2 or True:
+        elif st.session_state.active_tab_index == 2:
+            with tab3:
                 EvolutionTab.render(self.df, filters)
         
-        with tabs[3]:  # Gestión de Datos
-            if st.session_state.active_tab == 3 or True:
+        elif st.session_state.active_tab_index == 3:
+            with tab4:
                 EditTab.render(self.df, None, self.excel_data)
         
-        # Mostrar información de la pestaña activa
-        st.sidebar.info(f"📍 **Pestaña activa:** {tab_names[st.session_state.active_tab]}")
+        # ✅ AGREGAR: Información de estado en sidebar
+        st.sidebar.markdown("---")
+        st.sidebar.info(f"📍 **Sección activa:** {tab_names[st.session_state.active_tab_index].replace('📊 ', '').replace('🏗️ ', '').replace('📈 ', '').replace('⚙️ ', '')}")
         
-        # Información sobre funcionalidad PDF
-        with st.sidebar.expander("📄 Información PDF", expanded=False):
-            st.markdown("""
-            ### 📄 Fichas Metodológicas en PDF
-            
-            **Estado actual:**
-            """)
+        # ✅ AGREGAR: Información sobre funcionalidad PDF mejorada
+        with st.sidebar.expander("📄 Estado PDF", expanded=False):
+            st.markdown("### 📄 Fichas Metodológicas")
             
             # Verificar reportlab
             try:
                 import reportlab
-                st.success("✅ reportlab instalado")
+                st.success("✅ reportlab: Disponible")
+                reportlab_ok = True
             except ImportError:
-                st.error("❌ Instalar: `pip install reportlab`")
+                st.error("❌ reportlab: No instalado")
+                st.code("pip install reportlab")
+                reportlab_ok = False
             
             # Verificar archivo Excel
-            import os
-            if os.path.exists('Batería de indicadores.xlsx'):
-                st.success("✅ Archivo Excel encontrado")
+            if self.excel_data is not None and not self.excel_data.empty:
+                st.success("✅ Excel: Cargado")
+                st.info(f"📊 {len(self.excel_data)} indicadores metodológicos")
+                excel_ok = True
             else:
-                st.warning("⚠️ Coloca 'Batería de indicadores.xlsx'")
+                st.warning("⚠️ Excel: No disponible")
+                st.info("Coloca 'Batería de indicadores.xlsx'")
+                excel_ok = False
             
-            st.info("""
-            **Para usar PDFs:**
-            1. `pip install reportlab`
-            2. Coloca 'Batería de indicadores.xlsx' en el directorio
-            3. Ve a 'Gestión de Datos' → botón 📄 Generar PDF
-            """)
+            # Estado general
+            if reportlab_ok and excel_ok:
+                st.success("🎉 **PDF completamente funcional**")
+            elif reportlab_ok:
+                st.warning("⚠️ **PDF parcial** (falta Excel)")
+            elif excel_ok:
+                st.warning("⚠️ **PDF parcial** (falta reportlab)")
+            else:
+                st.error("❌ **PDF no disponible**")
         
-        # Botón para resetear pestaña (útil para debugging)
-        if st.sidebar.button("🔄 Resetear navegación"):
-            st.session_state.active_tab = 0
+        # ✅ BOTÓN DE UTILIDAD: Resetear navegación (para casos extremos)
+        if st.sidebar.button("🔄 Resetear navegación", help="Volver a la pestaña principal"):
+            st.session_state.active_tab_index = 0
             st.rerun()
