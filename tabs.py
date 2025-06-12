@@ -1,6 +1,6 @@
 """
 Interfaces de usuario para las pestañas del Dashboard ICE - SOLO GOOGLE SHEETS
-VERSIÓN COMPLETA CORREGIDA: PDF funcional y persistencia de pestañas
+VERSIÓN CORREGIDA: Persistencia completa de pestañas en todas las operaciones
 """
 
 import streamlit as st
@@ -431,7 +431,7 @@ class EditTab:
     
     @staticmethod
     def _render_metodological_section(codigo_editar, excel_data):
-        """Renderizar sección de información metodológica - CORRECCIÓN CRÍTICA"""
+        """Renderizar sección de información metodológica"""
         st.subheader("📋 Información Metodológica")
         
         col1, col2, col3 = st.columns([2, 1, 1])
@@ -441,45 +441,31 @@ class EditTab:
                 st.session_state.show_ficha = True
         
         with col3:
-            # ✅ CORRECCIÓN CRÍTICA: Simplificar lógica del botón PDF
+            # Verificar disponibilidad de PDF
             try:
-                # Verificar si reportlab está disponible
+                import reportlab
+                reportlab_available = True
+            except ImportError:
                 reportlab_available = False
-                try:
-                    import reportlab
-                    reportlab_available = True
-                except ImportError:
-                    reportlab_available = False
+            
+            if reportlab_available and excel_data is not None and not excel_data.empty:
+                codigo_existe = codigo_editar in excel_data['Codigo'].values
                 
-                # ✅ CORRECCIÓN: Lógica simplificada - SIEMPRE mostrar el botón
-                if reportlab_available and excel_data is not None and not excel_data.empty:
-                    # Verificar si existe información para este código
-                    codigo_existe = codigo_editar in excel_data['Codigo'].values
-                    
-                    if codigo_existe:
-                        # ✅ BOTÓN ACTIVO - Todo funcionando
-                        if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}", use_container_width=True):
-                            EditTab._generate_and_download_pdf(codigo_editar, excel_data)
-                    else:
-                        # ❌ BOTÓN DESHABILITADO - Código no encontrado
-                        st.button("❌ PDF (Sin datos)", key=f"pdf_no_data_{codigo_editar}", disabled=True, use_container_width=True)
-                        st.warning(f"No hay datos metodológicos para {codigo_editar}")
-                        
-                elif not reportlab_available:
-                    # ❌ BOTÓN DESHABILITADO - Falta reportlab
-                    st.button("❌ Instalar reportlab", key=f"pdf_disabled_{codigo_editar}", disabled=True, use_container_width=True)
-                    st.error("📦 `pip install reportlab`")
+                if codigo_existe:
+                    if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}", use_container_width=True):
+                        EditTab._generate_and_download_pdf(codigo_editar, excel_data)
                 else:
-                    # ❌ BOTÓN DESHABILITADO - Falta Excel
-                    st.button("❌ Falta archivo Excel", key=f"pdf_no_excel_{codigo_editar}", disabled=True, use_container_width=True)
-                    st.warning("📄 Necesitas 'Batería de indicadores.xlsx'")
-                    
-            except Exception as e:
-                # ❌ BOTÓN DE ERROR
-                st.button("❌ Error PDF", key=f"pdf_error_{codigo_editar}", disabled=True, use_container_width=True)
-                st.error(f"Error: {e}")
+                    st.button("❌ PDF (Sin datos)", key=f"pdf_no_data_{codigo_editar}", disabled=True, use_container_width=True)
+                    st.warning(f"No hay datos metodológicos para {codigo_editar}")
+                        
+            elif not reportlab_available:
+                st.button("❌ Instalar reportlab", key=f"pdf_disabled_{codigo_editar}", disabled=True, use_container_width=True)
+                st.error("📦 `pip install reportlab`")
+            else:
+                st.button("❌ Falta archivo Excel", key=f"pdf_no_excel_{codigo_editar}", disabled=True, use_container_width=True)
+                st.warning("📄 Necesitas 'Batería de indicadores.xlsx'")
         
-        # ✅ AGREGAR: Información de estado mejorada
+        # Información de estado de funcionalidades
         with st.expander("ℹ️ Estado de funcionalidades metodológicas", expanded=False):
             # Verificar reportlab
             try:
@@ -493,12 +479,10 @@ class EditTab:
                 st.success("✅ Archivo Excel: Cargado correctamente")
                 st.info(f"📄 Total de indicadores metodológicos: {len(excel_data)}")
                 
-                # Verificar si existe el código actual
                 if codigo_editar in excel_data['Codigo'].values:
                     st.success(f"✅ Código {codigo_editar}: Encontrado en Excel")
                 else:
                     st.warning(f"⚠️ Código {codigo_editar}: No encontrado en Excel")
-                    # Mostrar algunos códigos disponibles
                     codigos_disponibles = excel_data['Codigo'].dropna().unique()[:5]
                     if len(codigos_disponibles) > 0:
                         st.info(f"💡 Códigos disponibles: {', '.join(map(str, codigos_disponibles))}")
@@ -514,21 +498,18 @@ class EditTab:
     def _generate_and_download_pdf(codigo_editar, excel_data):
         """Generar y mostrar botón de descarga de PDF"""
         try:
-            # Verificar que reportlab esté disponible
             try:
                 import reportlab
             except ImportError:
                 st.error("📦 **Instalar reportlab:** `pip install reportlab`")
                 return
             
-            # Importar generador de PDF
             try:
                 from pdf_generator import PDFGenerator
             except ImportError:
                 st.error("❌ Archivo pdf_generator.py no encontrado")
                 return
             
-            # Crear instancia del generador
             pdf_generator = PDFGenerator()
             
             if not pdf_generator.is_available():
@@ -542,11 +523,9 @@ class EditTab:
                     st.success("✅ PDF generado correctamente")
                     st.balloons()
                     
-                    # Crear nombre de archivo único
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"Ficha_Metodologica_{codigo_editar}_{timestamp}.pdf"
                     
-                    # Botón de descarga
                     st.download_button(
                         label="📄 Descargar Ficha Metodológica PDF",
                         data=pdf_bytes,
@@ -756,6 +735,9 @@ class EditTab:
                     st.error(f"❌ El código '{nuevo_codigo}' ya existe en Google Sheets")
                     return
                 
+                # ✅ CORRECCIÓN CRÍTICA: Preservar pestaña activa antes de crear
+                st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
+                
                 # Crear el nuevo registro en Google Sheets
                 try:
                     from google_sheets_manager import GoogleSheetsManager
@@ -778,14 +760,14 @@ class EditTab:
                         st.success(f"✅ Indicador '{nuevo_codigo}' creado correctamente en Google Sheets")
                         # Actualizar session state para seleccionar el nuevo código
                         st.session_state.selected_codigo = nuevo_codigo
-                        # Limpiar cache SIN cambiar pestaña - CORRECCIÓN CRÍTICA
+                        # Limpiar cache
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                         st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
                         
-                        # Mostrar botón manual de actualización
+                        # Botón manual de actualización que preserva la pestaña
                         if st.button("🔄 Actualizar ahora", key="refresh_after_create"):
-                            # NO cambiar pestaña al recargar
+                            st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
                             st.rerun()
                     else:
                         st.error("❌ Error al crear el indicador en Google Sheets")
@@ -830,6 +812,9 @@ class EditTab:
                         st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')} en Google Sheets. Usa la pestaña 'Editar' para modificarlo.")
                         return
                 
+                # ✅ CORRECCIÓN CRÍTICA: Preservar pestaña activa antes de agregar
+                st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
+                
                 # Agregar registro a Google Sheets
                 success = DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, None)
                 
@@ -837,12 +822,13 @@ class EditTab:
                     st.success("✅ Nuevo registro agregado correctamente a Google Sheets")
                     st.info("🔄 Los datos se actualizarán automáticamente en unos segundos")
                     
-                    # Limpiar cache para próxima carga - SIN cambiar pestaña
+                    # Limpiar cache
                     st.cache_data.clear()
                     st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                     
-                    # Botón manual de actualización
+                    # Botón manual de actualización que preserva la pestaña
                     if st.button("🔄 Ver cambios ahora", key="refresh_after_add"):
+                        st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
                         st.rerun()
                 else:
                     st.error("❌ Error al agregar el nuevo registro a Google Sheets")
@@ -890,6 +876,9 @@ class EditTab:
                 submitted = st.form_submit_button("✏️ Actualizar en Google Sheets", use_container_width=True)
                 
                 if submitted:
+                    # ✅ CORRECCIÓN CRÍTICA: Preservar pestaña activa antes de editar
+                    st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
+                    
                     success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, None)
                     
                     if success:
@@ -897,12 +886,13 @@ class EditTab:
                         st.balloons()
                         st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
                         
-                        # Limpiar cache para próxima carga - SIN cambiar pestaña
+                        # Limpiar cache
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                         
-                        # Botón manual de actualización
+                        # Botón manual de actualización que preserva la pestaña
                         if st.button("🔄 Ver cambios ahora", key="refresh_after_edit"):
+                            st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
                             st.rerun()
                     else:
                         st.error("❌ Error al actualizar el registro en Google Sheets")
@@ -946,6 +936,9 @@ class EditTab:
             with col2:
                 if confirmar:
                     if st.button("🗑️ ELIMINAR DE GOOGLE SHEETS", type="primary", use_container_width=True):
+                        # ✅ CORRECCIÓN CRÍTICA: Preservar pestaña activa antes de eliminar
+                        st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
+                        
                         success = DataEditor.delete_record(df, codigo_editar, fecha_real, None)
                         
                         if success:
@@ -953,12 +946,13 @@ class EditTab:
                             st.balloons()
                             st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
                             
-                            # Limpiar cache para próxima carga - SIN cambiar pestaña
+                            # Limpiar cache
                             st.cache_data.clear()
                             st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                             
-                            # Botón manual de actualización
+                            # Botón manual de actualización que preserva la pestaña
                             if st.button("🔄 Ver cambios ahora", key="refresh_after_delete"):
+                                st.session_state.active_tab_index = 3  # Mantener en Gestión de Datos
                                 st.rerun()
                         else:
                             st.error("❌ Error al eliminar el registro de Google Sheets")
@@ -991,7 +985,7 @@ class TabManager:
             st.markdown("### 🧭 Navegación")
             st.info(f"📍 **Sección actual:** {tab_names[st.session_state.active_tab_index].replace('📊 ', '').replace('🏗️ ', '').replace('📈 ', '').replace('⚙️ ', '')}")
             
-            # Información de estado mejorada
+            # Botones de navegación que preservan el estado
             if st.button("🔄 Ir a Resumen General", use_container_width=True):
                 st.session_state.active_tab_index = 0
                 st.rerun()
@@ -1024,10 +1018,10 @@ class TabManager:
         with tab4:
             EditTab.render(self.df, None, self.excel_data)
         
-        # ✅ SIMPLIFICAR: Información de estado en sidebar sin complejidad
+        # ✅ INFORMACIÓN DE ESTADO en sidebar
         st.sidebar.markdown("---")
         
-        # ✅ AGREGAR: Información sobre funcionalidad PDF simplificada
+        # ✅ INFORMACIÓN sobre funcionalidad PDF
         with st.sidebar.expander("📄 Estado PDF", expanded=False):
             st.markdown("### 📄 Fichas Metodológicas")
             
