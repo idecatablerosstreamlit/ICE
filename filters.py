@@ -1,5 +1,5 @@
 """
-Sistema de filtros para el Dashboard ICE
+Sistema de filtros para el Dashboard ICE - VERSIÓN ESTABLE
 """
 
 import streamlit as st
@@ -152,11 +152,11 @@ class FilterManager:
         return active_filters
 
 class EvolutionFilters:
-    """Filtros específicos para la pestaña de evolución - CORREGIDOS"""
+    """Filtros específicos para la pestaña de evolución - VERSIÓN ESTABLE"""
     
     @staticmethod
-    def create_evolution_filters(df):
-        """Crear filtros para la pestaña de evolución"""
+    def create_evolution_filters_stable(df):
+        """Crear filtros para la pestaña de evolución SIN causar rerun"""
         st.markdown("### 🎛️ Configuración de Visualización")
         
         col1, col2 = st.columns(2)
@@ -165,6 +165,12 @@ class EvolutionFilters:
             st.markdown("**📊 Selección de Indicador**")
             
             try:
+                # ✅ INICIALIZAR estado si no existe
+                if 'evolution_selected_codigo' not in st.session_state:
+                    st.session_state.evolution_selected_codigo = None
+                if 'evolution_selected_indicador' not in st.session_state:
+                    st.session_state.evolution_selected_indicador = None
+                
                 # Obtener códigos únicos disponibles
                 if 'Codigo' in df.columns:
                     codigos_disponibles = sorted([c for c in df['Codigo'].dropna().unique() if str(c).strip()])
@@ -197,20 +203,34 @@ class EvolutionFilters:
                         st.warning(f"Error procesando código {codigo}: {e}")
                         continue
                 
-                # Selector principal
+                # ✅ DETERMINAR índice actual basado en session_state
+                index_actual = 0
+                if st.session_state.evolution_selected_codigo:
+                    for i, opcion in enumerate(opciones_display):
+                        if codigo_map.get(opcion) == st.session_state.evolution_selected_codigo:
+                            index_actual = i
+                            break
+                
+                # ✅ Selector principal con KEY ÚNICO
                 seleccion = st.selectbox(
                     "Indicador a analizar:",
                     opciones_display,
+                    index=index_actual,
+                    key="evolution_indicador_selector_stable",
                     help="Selecciona un indicador específico o la vista general"
                 )
                 
                 codigo_seleccionado = codigo_map.get(seleccion)
+                
+                # ✅ ACTUALIZAR session_state
+                st.session_state.evolution_selected_codigo = codigo_seleccionado
                 
                 # Obtener nombre del indicador si se seleccionó uno específico
                 if codigo_seleccionado:
                     try:
                         indicador_data = df[df['Codigo'] == codigo_seleccionado].iloc[0]
                         indicador_seleccionado = indicador_data['Indicador']
+                        st.session_state.evolution_selected_indicador = indicador_seleccionado
                         
                         # Mostrar información adicional del indicador seleccionado
                         st.info(f"""
@@ -221,8 +241,10 @@ class EvolutionFilters:
                     except Exception as e:
                         st.error(f"Error al obtener datos del indicador: {e}")
                         indicador_seleccionado = None
+                        st.session_state.evolution_selected_indicador = None
                 else:
                     indicador_seleccionado = None
+                    st.session_state.evolution_selected_indicador = None
                     
             except Exception as e:
                 st.error(f"Error crítico al crear filtros: {e}")
@@ -233,20 +255,31 @@ class EvolutionFilters:
         with col2:
             st.markdown("**🎨 Opciones de Visualización**")
             
-            # Opción para mostrar línea de meta
+            # ✅ INICIALIZAR estado para opciones de visualización
+            if 'evolution_mostrar_meta' not in st.session_state:
+                st.session_state.evolution_mostrar_meta = True
+            if 'evolution_tipo_grafico' not in st.session_state:
+                st.session_state.evolution_tipo_grafico = "Línea"
+            
+            # Opción para mostrar línea de meta con KEY ÚNICO
             mostrar_meta = st.checkbox(
                 "📏 Mostrar línea de referencia (Meta = 1.0)", 
-                value=True,
+                value=st.session_state.evolution_mostrar_meta,
+                key="evolution_mostrar_meta_stable",
                 help="Muestra una línea horizontal en 100% como referencia"
             )
+            st.session_state.evolution_mostrar_meta = mostrar_meta
             
-            # Seleccionar tipo de gráfico
+            # Seleccionar tipo de gráfico con KEY ÚNICO
             tipo_grafico = st.radio(
                 "📊 Tipo de gráfico:",
                 options=["Línea", "Barras"],
+                index=0 if st.session_state.evolution_tipo_grafico == "Línea" else 1,
                 horizontal=True,
+                key="evolution_tipo_grafico_stable",
                 help="Línea: mejor para ver tendencias / Barras: mejor para comparar valores puntuales"
             )
+            st.session_state.evolution_tipo_grafico = tipo_grafico
             
             # Mostrar estadísticas si hay un indicador seleccionado
             if codigo_seleccionado:
@@ -263,3 +296,8 @@ class EvolutionFilters:
             'mostrar_meta': mostrar_meta,
             'tipo_grafico': tipo_grafico
         }
+    
+    @staticmethod
+    def create_evolution_filters(df):
+        """Método de compatibilidad - redirige a la versión estable"""
+        return EvolutionFilters.create_evolution_filters_stable(df)
