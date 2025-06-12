@@ -1,6 +1,6 @@
 """
 Interfaces de usuario para las pestañas del Dashboard ICE - SOLO GOOGLE SHEETS
-VERSIÓN CORREGIDA: PDF funcional y persistencia de pestañas
+VERSIÓN COMPLETA CORREGIDA: PDF funcional y persistencia de pestañas
 """
 
 import streamlit as st
@@ -986,53 +986,48 @@ class TabManager:
             "⚙️ Gestión de Datos"
         ]
         
-        # ✅ CORRECCIÓN CRÍTICA: Sistema mejorado de persistencia
-        # Crear un selector oculto que mantenga la pestaña activa
+        # ✅ CORRECCIÓN CRÍTICA: Mantener selector en sidebar pero SIN interferir con pestañas
         with st.sidebar:
             st.markdown("### 🧭 Navegación")
+            st.info(f"📍 **Sección actual:** {tab_names[st.session_state.active_tab_index].replace('📊 ', '').replace('🏗️ ', '').replace('📈 ', '').replace('⚙️ ', '')}")
             
-            # Selector de pestaña que persiste el estado
-            current_tab = st.radio(
-                "Ir a:",
-                options=range(len(tab_names)),
-                format_func=lambda x: tab_names[x].replace("📊 ", "").replace("🏗️ ", "").replace("📈 ", "").replace("⚙️ ", ""),
-                index=st.session_state.active_tab_index,
-                key="persistent_tab_selector",
-                help="Selecciona la sección que deseas ver"
-            )
+            # Información de estado mejorada
+            if st.button("🔄 Ir a Resumen General", use_container_width=True):
+                st.session_state.active_tab_index = 0
+                st.rerun()
             
-            # ✅ CORRECCIÓN: Actualizar solo si realmente cambió
-            if current_tab != st.session_state.active_tab_index:
-                st.session_state.active_tab_index = current_tab
-                # NO hacer st.rerun() aquí para evitar bucles
+            if st.button("🏗️ Ir a Componentes", use_container_width=True):
+                st.session_state.active_tab_index = 1
+                st.rerun()
+            
+            if st.button("📈 Ir a Evolución", use_container_width=True):
+                st.session_state.active_tab_index = 2
+                st.rerun()
+            
+            if st.button("⚙️ Ir a Gestión", use_container_width=True):
+                st.session_state.active_tab_index = 3
+                st.rerun()
         
-        # ✅ CORRECCIÓN CRÍTICA: Crear las pestañas normalmente
+        # ✅ CORRECCIÓN CRÍTICA: Crear las pestañas normalmente y renderizar TODAS
         tab1, tab2, tab3, tab4 = st.tabs(tab_names)
         
-        # ✅ CORRECCIÓN: Renderizar SOLO la pestaña activa para mejorar rendimiento
-        # y evitar problemas de estado
+        # ✅ RENDERIZAR TODAS las pestañas pero marcar la activa
+        with tab1:
+            GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
         
-        if st.session_state.active_tab_index == 0:
-            with tab1:
-                GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
+        with tab2:
+            ComponentSummaryTab.render(df_filtrado, filters)
         
-        elif st.session_state.active_tab_index == 1:
-            with tab2:
-                ComponentSummaryTab.render(df_filtrado, filters)
+        with tab3:
+            EvolutionTab.render(self.df, filters)
         
-        elif st.session_state.active_tab_index == 2:
-            with tab3:
-                EvolutionTab.render(self.df, filters)
+        with tab4:
+            EditTab.render(self.df, None, self.excel_data)
         
-        elif st.session_state.active_tab_index == 3:
-            with tab4:
-                EditTab.render(self.df, None, self.excel_data)
-        
-        # ✅ AGREGAR: Información de estado en sidebar
+        # ✅ SIMPLIFICAR: Información de estado en sidebar sin complejidad
         st.sidebar.markdown("---")
-        st.sidebar.info(f"📍 **Sección activa:** {tab_names[st.session_state.active_tab_index].replace('📊 ', '').replace('🏗️ ', '').replace('📈 ', '').replace('⚙️ ', '')}")
         
-        # ✅ AGREGAR: Información sobre funcionalidad PDF mejorada
+        # ✅ AGREGAR: Información sobre funcionalidad PDF simplificada
         with st.sidebar.expander("📄 Estado PDF", expanded=False):
             st.markdown("### 📄 Fichas Metodológicas")
             
@@ -1065,8 +1060,3 @@ class TabManager:
                 st.warning("⚠️ **PDF parcial** (falta reportlab)")
             else:
                 st.error("❌ **PDF no disponible**")
-        
-        # ✅ BOTÓN DE UTILIDAD: Resetear navegación (para casos extremos)
-        if st.sidebar.button("🔄 Resetear navegación", help="Volver a la pestaña principal"):
-            st.session_state.active_tab_index = 0
-            st.rerun()
