@@ -1,5 +1,5 @@
 """
-Funciones de visualización para el Dashboard ICE
+Funciones de visualización para el Dashboard ICE - ACTUALIZADO
 """
 
 import plotly.express as px
@@ -25,7 +25,7 @@ class ChartGenerator:
 
             # Calcular promedio ponderado por categoría
             def weighted_avg_category(group):
-                valores = group['Valor'].clip(0, 1)
+                valores = group['Valor_Normalizado'].clip(0, 1)
                 pesos = group.get('Peso', pd.Series([1.0] * len(group)))
                 peso_total = pesos.sum()
                 
@@ -82,8 +82,84 @@ class ChartGenerator:
                 
         except Exception as e:
             st.error(f"Error al mostrar tabla de categorías: {e}")
-            import traceback
-            st.code(traceback.format_exc())
+
+    @staticmethod
+    def horizontal_bar_chart(df, componente, fecha=None):
+        """Gráfico de barras horizontales por categoría - NUEVO"""
+        try:
+            if fecha:
+                df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
+                if df_filtrado.empty:
+                    df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+                    df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
+            else:
+                df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+                df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
+
+            if len(df_filtrado) == 0:
+                return ChartGenerator._empty_chart(f"No hay datos para {componente}")
+
+            # Calcular promedio ponderado por categoría usando valores normalizados
+            def weighted_avg_category(group):
+                valores = group['Valor_Normalizado'].clip(0, 1)
+                pesos = group.get('Peso', pd.Series([1.0] * len(group)))
+                peso_total = pesos.sum()
+                
+                if peso_total > 0:
+                    return (valores * pesos).sum() / peso_total
+                else:
+                    return valores.mean()
+
+            datos_categorias = df_filtrado.groupby('Categoria').agg({
+                'Valor_Normalizado': lambda x: weighted_avg_category(pd.DataFrame({'Valor_Normalizado': x, 'Peso': [1.0] * len(x)})),
+                'Indicador': 'count'
+            }).reset_index()
+            
+            datos_categorias.columns = ['Categoria', 'Puntaje', 'Num_Indicadores']
+            datos_categorias['Porcentaje'] = datos_categorias['Puntaje'] * 100
+            datos_categorias = datos_categorias.sort_values('Puntaje', ascending=True)
+
+            # Colores por puntaje
+            colores = []
+            for puntaje in datos_categorias['Puntaje']:
+                if puntaje >= 0.8:
+                    colores.append('#2E8B57')  # Verde
+                elif puntaje >= 0.6:
+                    colores.append('#DAA520')  # Dorado
+                elif puntaje >= 0.4:
+                    colores.append('#FF8C00')  # Naranja
+                else:
+                    colores.append('#DC143C')  # Rojo
+
+            fig = go.Figure(go.Bar(
+                y=datos_categorias['Categoria'],
+                x=datos_categorias['Porcentaje'],
+                orientation='h',
+                marker=dict(color=colores),
+                text=[f'{val:.1f}%' for val in datos_categorias['Porcentaje']],
+                textposition='outside',
+                hovertemplate='<b>%{y}</b><br>Puntaje: %{x:.1f}%<br>Indicadores: %{customdata}<extra></extra>',
+                customdata=datos_categorias['Num_Indicadores']
+            ))
+
+            fig.update_layout(
+                title=f"Puntajes por Categoría - {componente}",
+                plot_bgcolor='rgba(248,249,250,0.9)',
+                paper_bgcolor='rgba(248,249,250,0.9)',
+                font_color='#2C3E50',
+                xaxis_title="Porcentaje de Cumplimiento (%)",
+                yaxis_title="",
+                height=max(300, len(datos_categorias) * 60),
+                title_font_size=16,
+                title_font_color='#2C3E50',
+                xaxis=dict(range=[0, 110], gridcolor='#BDC3C7'),
+                yaxis=dict(gridcolor='#BDC3C7')
+            )
+
+            return fig
+
+        except Exception as e:
+            return ChartGenerator._empty_chart(f"Error en barras horizontales: {e}")
 
     @staticmethod
     def _get_latest_values_by_indicator(df):
@@ -108,12 +184,10 @@ class ChartGenerator:
         try:
             if fecha:
                 df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
-                # Si no hay datos para esa fecha, usar valores más recientes del componente
                 if df_filtrado.empty:
                     df_latest = ChartGenerator._get_latest_values_by_indicator(df)
                     df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
             else:
-                # Usar valores más recientes de cada indicador del componente
                 df_latest = ChartGenerator._get_latest_values_by_indicator(df)
                 df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
 
@@ -122,7 +196,7 @@ class ChartGenerator:
 
             # Calcular promedio ponderado por categoría dentro del componente
             def weighted_avg_category(group):
-                valores = group['Valor'].clip(0, 1)
+                valores = group['Valor_Normalizado'].clip(0, 1)
                 pesos = group.get('Peso', pd.Series([1.0] * len(group)))
                 peso_total = pesos.sum()
                 
@@ -178,9 +252,8 @@ class ChartGenerator:
 
     @staticmethod
     def evolution_chart(df, indicador=None, componente=None, tipo_grafico="Línea", mostrar_meta=True):
-        """Generar gráfico de evolución temporal - CORREGIDO para mostrar datos históricos"""
+        """Generar gráfico de evolución temporal usando valores normalizados"""
         try:
-            # Debug: Mostrar información de entrada
             import streamlit as st
             
             # Filtrar datos según los parámetros
@@ -197,21 +270,16 @@ class ChartGenerator:
             if len(df_filtrado) == 0:
                 return ChartGenerator._empty_chart("No hay datos disponibles para el filtro seleccionado")
 
-            # Debug: Mostrar datos filtrados
-            with st.expander("🔍 Debug: Datos para evolución", expanded=False):
-                st.write(f"**Filtro aplicado:** {indicador or componente or 'General'}")
-                st.write(f"**Registros encontrados:** {len(df_filtrado)}")
-                st.dataframe(df_filtrado[['Fecha', 'Valor', 'Indicador', 'Componente']].sort_values('Fecha'))
-
-            # Preparar datos para gráfico
+            # Preparar datos para gráfico usando valores normalizados
             if indicador:
-                # Para indicador específico: mostrar todos sus valores históricos
-                df_evolucion = df_filtrado[['Fecha', 'Valor']].sort_values('Fecha')
-                df_evolucion = df_evolucion.dropna(subset=['Fecha', 'Valor'])
+                # Para indicador específico: mostrar todos sus valores históricos normalizados
+                df_evolucion = df_filtrado[['Fecha', 'Valor_Normalizado']].sort_values('Fecha')
+                df_evolucion = df_evolucion.dropna(subset=['Fecha', 'Valor_Normalizado'])
+                df_evolucion.rename(columns={'Valor_Normalizado': 'Valor'}, inplace=True)
             elif componente:
-                # Para componente: promedio ponderado por fecha
+                # Para componente: promedio ponderado por fecha usando valores normalizados
                 def weighted_avg_by_date(group):
-                    valores = group['Valor'].clip(0, 1)
+                    valores = group['Valor_Normalizado'].clip(0, 1)
                     pesos = group.get('Peso', pd.Series([1.0] * len(group)))
                     peso_total = pesos.sum()
                     
@@ -223,8 +291,9 @@ class ChartGenerator:
                 df_evolucion = df_filtrado.groupby('Fecha').apply(weighted_avg_by_date).reset_index()
                 df_evolucion.columns = ['Fecha', 'Valor']
             else:
-                # Para vista general: promedio simple por fecha
-                df_evolucion = df_filtrado.groupby('Fecha')['Valor'].mean().reset_index()
+                # Para vista general: promedio simple por fecha usando valores normalizados
+                df_evolucion = df_filtrado.groupby('Fecha')['Valor_Normalizado'].mean().reset_index()
+                df_evolucion.rename(columns={'Valor_Normalizado': 'Valor'}, inplace=True)
 
             # Verificar que tenemos datos para graficar
             if len(df_evolucion) == 0:
@@ -237,7 +306,7 @@ class ChartGenerator:
                     x='Fecha', 
                     y='Valor', 
                     title=titulo,
-                    markers=True  # Agregar marcadores para ver puntos individuales
+                    markers=True
                 )
                 fig.update_traces(line_color='#3498DB', line_width=3, marker_size=8)
             else:  # Barras
@@ -261,13 +330,13 @@ class ChartGenerator:
                 paper_bgcolor='rgba(248,249,250,0.9)',
                 font_color='#2C3E50',
                 xaxis_title="Fecha",
-                yaxis_title="Valor",
+                yaxis_title="Valor Normalizado",
                 legend_title_text="",
                 height=400,
                 title_font_size=16,
                 title_font_color='#2C3E50',
                 xaxis=dict(gridcolor='#BDC3C7'),
-                yaxis=dict(gridcolor='#BDC3C7', range=[0, 1.1])  # Fijar rango Y
+                yaxis=dict(gridcolor='#BDC3C7', range=[0, 1.1])
             )
 
             # Mejorar formato de fechas en eje X
@@ -281,29 +350,25 @@ class ChartGenerator:
         except Exception as e:
             import streamlit as st
             st.error(f"Error crítico en evolution_chart: {e}")
-            import traceback
-            st.code(traceback.format_exc())
             return ChartGenerator._empty_chart("Error al generar gráfico de evolución")
 
     @staticmethod
     def radar_chart(df, fecha=None):
-        """Generar gráfico de radar por componente usando valores más recientes"""
+        """Generar gráfico de radar por componente usando valores normalizados"""
         try:
             if fecha:
                 df_filtrado = df[df['Fecha'] == fecha].copy()
-                # Si no hay datos para esa fecha, usar valores más recientes
                 if df_filtrado.empty:
                     df_filtrado = ChartGenerator._get_latest_values_by_indicator(df)
             else:
-                # Usar valores más recientes de cada indicador
                 df_filtrado = ChartGenerator._get_latest_values_by_indicator(df)
 
             if len(df_filtrado) == 0:
                 return ChartGenerator._empty_chart("No hay datos disponibles")
 
-            # Calcular promedio ponderado por componente (0-100 para visualización)
+            # Calcular promedio ponderado por componente usando valores normalizados
             def weighted_avg_component(group):
-                valores = group['Valor'].clip(0, 1)
+                valores = group['Valor_Normalizado'].clip(0, 1)
                 pesos = group.get('Peso', pd.Series([1.0] * len(group)))
                 peso_total = pesos.sum()
                 
@@ -362,16 +427,14 @@ class ChartGenerator:
 
     @staticmethod
     def radar_chart_categories(df, componente, fecha=None):
-        """Generar gráfico de radar por categorías de un componente específico usando valores más recientes"""
+        """Generar gráfico de radar por categorías de un componente específico usando valores normalizados"""
         try:
             if fecha:
                 df_filtrado = df[(df['Fecha'] == fecha) & (df['Componente'] == componente)].copy()
-                # Si no hay datos para esa fecha, usar valores más recientes del componente
                 if df_filtrado.empty:
                     df_latest = ChartGenerator._get_latest_values_by_indicator(df)
                     df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
             else:
-                # Usar valores más recientes de cada indicador del componente
                 df_latest = ChartGenerator._get_latest_values_by_indicator(df)
                 df_filtrado = df_latest[df_latest['Componente'] == componente].copy()
 
@@ -380,7 +443,7 @@ class ChartGenerator:
 
             # Calcular promedio ponderado por categoría dentro del componente
             def weighted_avg_category(group):
-                valores = group['Valor'].clip(0, 1)
+                valores = group['Valor_Normalizado'].clip(0, 1)
                 pesos = group.get('Peso', pd.Series([1.0] * len(group)))
                 peso_total = pesos.sum()
                 
