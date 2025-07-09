@@ -1,6 +1,5 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE - SOLO GOOGLE SHEETS
-VERSIÓN COMPLETAMENTE CORREGIDA: Contenedores condicionales en lugar de st.tabs()
+Interfaces de usuario para las pestañas del Dashboard ICE - ACTUALIZADO
 """
 
 import streamlit as st
@@ -55,10 +54,7 @@ class GeneralSummaryTab:
                 return
             
             # Mostrar información sobre qué datos se están usando
-            st.info("""
-            📊 **Cálculos basados en valores más recientes desde Google Sheets:** Los puntajes se calculan 
-            usando el valor más reciente de cada indicador, asegurando consistencia.
-            """)
+            st.info("📊 **Puntajes calculados usando valores normalizados:** Los indicadores se normalizan según su tipo antes del cálculo.")
             
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
@@ -100,30 +96,26 @@ class GeneralSummaryTab:
         
         except Exception as e:
             st.error(f"❌ Error al calcular puntajes desde Google Sheets: {e}")
-            import traceback
-            with st.expander("🔧 Detalles del error"):
-                st.code(traceback.format_exc())
         
         # Mostrar tabla de datos más recientes
-        with st.expander("📋 Ver datos más recientes por indicador (desde Google Sheets)"):
+        with st.expander("📋 Ver datos más recientes por indicador"):
             try:
                 df_latest = DataProcessor._get_latest_values_by_indicator(df)
                 if not df_latest.empty:
-                    st.dataframe(
-                        df_latest[['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Fecha']], 
-                        use_container_width=True
-                    )
+                    columns_to_show = ['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
+                    available_columns = [col for col in columns_to_show if col in df_latest.columns]
+                    st.dataframe(df_latest[available_columns], use_container_width=True)
                 else:
                     st.info("No hay datos para mostrar")
             except Exception as e:
                 st.error(f"Error al mostrar datos: {e}")
 
 class ComponentSummaryTab:
-    """Pestaña de resumen por componente"""
+    """Pestaña de resumen por componente - ACTUALIZADA CON BARRAS HORIZONTALES"""
     
     @staticmethod
     def render(df, filters):
-        """Renderizar la pestaña de resumen por componente"""
+        """Renderizar la pestaña de resumen por componente con visualizaciones adaptivas"""
         st.header("🏗️ Resumen por Componente")
         
         if df.empty:
@@ -136,7 +128,6 @@ class ComponentSummaryTab:
             st.info("📋 No hay componentes disponibles en Google Sheets")
             return
             
-        # ✅ USAR KEY ÚNICO para evitar conflictos de estado
         componente_analisis = st.selectbox(
             "Seleccionar componente para análisis detallado", 
             componentes,
@@ -149,16 +140,16 @@ class ComponentSummaryTab:
         
         if not df_componente.empty:
             # Información sobre los datos que se están usando
-            st.info(f"""
-            📊 **Análisis de {componente_analisis}:** Basado en los valores más recientes 
-            de cada indicador de este componente desde Google Sheets.
-            """)
+            st.info(f"📊 **Análisis de {componente_analisis}:** Basado en valores normalizados de cada indicador.")
             
             # Métricas del componente
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                valor_promedio = df_componente['Valor'].mean()
+                if 'Valor_Normalizado' in df_componente.columns:
+                    valor_promedio = df_componente['Valor_Normalizado'].mean()
+                else:
+                    valor_promedio = df_componente['Valor'].mean()
                 st.metric("Valor Promedio", f"{valor_promedio:.3f}")
             
             with col2:
@@ -192,20 +183,64 @@ class ComponentSummaryTab:
                 st.plotly_chart(fig_evol, use_container_width=True)
             
             with col_der:
-                # Gráfico de radar por categorías
-                fig_radar_cat = ChartGenerator.radar_chart_categories(
-                    df, componente_analisis, None
-                )
-                st.plotly_chart(fig_radar_cat, use_container_width=True)
+                # NUEVO: Selector de tipo de visualización
+                ComponentSummaryTab._render_category_visualization(df, componente_analisis)
             
             # Tabla de indicadores del componente
             st.subheader(f"📊 Indicadores Más Recientes de {componente_analisis}")
+            columns_to_show = ['Indicador', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
+            available_columns = [col for col in columns_to_show if col in df_componente.columns]
             st.dataframe(
-                df_componente[['Indicador', 'Categoria', 'Valor', 'Fecha']].sort_values('Valor', ascending=False),
+                df_componente[available_columns].sort_values('Valor_Normalizado' if 'Valor_Normalizado' in df_componente.columns else 'Valor', ascending=False),
                 use_container_width=True
             )
         else:
             st.warning("No hay datos para el componente seleccionado en Google Sheets")
+    
+    @staticmethod
+    def _render_category_visualization(df, componente):
+        """Renderizar visualización de categorías - NUEVO"""
+        # Contar categorías para determinar mejor visualización
+        df_latest = DataProcessor._get_latest_values_by_indicator(df)
+        df_componente = df_latest[df_latest['Componente'] == componente]
+        num_categorias = df_componente['Categoria'].nunique()
+        
+        # Selector de tipo de visualización
+        if num_categorias < 3:
+            opciones = [
+                "📊 Barras Horizontales",
+                "🎯 Radar (requiere 3+ categorías)"
+            ]
+            default_viz = "📊 Barras Horizontales"
+        else:
+            opciones = [
+                "📊 Barras Horizontales", 
+                "🎯 Radar de Categorías"
+            ]
+            default_viz = "🎯 Radar de Categorías"
+        
+        tipo_viz = st.selectbox(
+            f"Visualización para {componente} ({num_categorias} categorías):",
+            opciones,
+            index=0 if "Barras" in default_viz else 1,
+            key=f"viz_selector_{componente}"
+        )
+        
+        # Renderizar la visualización seleccionada
+        if "Barras" in tipo_viz:
+            # Usar barras horizontales
+            fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None)
+            st.plotly_chart(fig_bar, use_container_width=True)
+        elif "Radar" in tipo_viz:
+            if num_categorias >= 3:
+                # Usar radar de categorías
+                fig_radar_cat = ChartGenerator.radar_chart_categories(df, componente, None)
+                st.plotly_chart(fig_radar_cat, use_container_width=True)
+            else:
+                st.warning(f"Se requieren al menos 3 categorías para el radar. {componente} tiene {num_categorias}.")
+                # Fallback a barras horizontales
+                fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None)
+                st.plotly_chart(fig_bar, use_container_width=True)
 
 class EvolutionTab:
     """Pestaña de evolución"""
@@ -221,12 +256,9 @@ class EvolutionTab:
                 return
             
             # Información sobre los datos disponibles
-            st.info(f"""
-            📊 **Datos desde Google Sheets:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos
-            📅 **Rango de fechas:** {df['Fecha'].min().strftime('%d/%m/%Y')} - {df['Fecha'].max().strftime('%d/%m/%Y')}
-            """)
+            st.info(f"📊 **Datos desde Google Sheets:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos")
             
-            # ✅ CREAR FILTROS SIN CAUSAR RERUN - usando keys únicos
+            # Crear filtros sin causar rerun
             evolution_filters = EvolutionFilters.create_evolution_filters_stable(df)
             
             # Mostrar información del filtro seleccionado
@@ -241,10 +273,9 @@ class EvolutionTab:
                     
                     # Mostrar tabla de datos del indicador
                     with st.expander("📋 Ver datos históricos del indicador"):
-                        st.dataframe(
-                            datos_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
-                            use_container_width=True
-                        )
+                        columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
+                        available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
+                        st.dataframe(datos_indicador[available_columns], use_container_width=True)
                 else:
                     st.warning("No se encontraron datos históricos para este indicador en Google Sheets")
                     return
@@ -265,9 +296,6 @@ class EvolutionTab:
                 
             except Exception as e:
                 st.error(f"Error al generar gráfico: {e}")
-                import traceback
-                with st.expander("Detalles del error"):
-                    st.code(traceback.format_exc())
             
             # Mostrar análisis adicional si hay un indicador seleccionado
             if evolution_filters['codigo'] and evolution_filters['indicador']:
@@ -276,16 +304,18 @@ class EvolutionTab:
                 datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
                 
                 if len(datos_indicador) > 1:
-                    # Métricas de evolución
+                    # Métricas de evolución usando valores normalizados
                     col1, col2, col3, col4 = st.columns(4)
                     
+                    valor_col = 'Valor_Normalizado' if 'Valor_Normalizado' in datos_indicador.columns else 'Valor'
+                    
                     with col1:
-                        valor_inicial = datos_indicador.iloc[0]['Valor']
-                        st.metric("Valor Inicial", f"{valor_inicial:.3f}")
+                        valor_inicial = datos_indicador.iloc[0][valor_col]
+                        st.metric("Valor Inicial (Norm.)", f"{valor_inicial:.3f}")
                     
                     with col2:
-                        valor_actual = datos_indicador.iloc[-1]['Valor']
-                        st.metric("Valor Actual", f"{valor_actual:.3f}")
+                        valor_actual = datos_indicador.iloc[-1][valor_col]
+                        st.metric("Valor Actual (Norm.)", f"{valor_actual:.3f}")
                     
                     with col3:
                         cambio = valor_actual - valor_inicial
@@ -299,19 +329,15 @@ class EvolutionTab:
                             st.metric("Cambio %", "N/A")
                 
                 # Tabla de datos históricos
-                st.dataframe(
-                    datos_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
-                    use_container_width=True
-                )
+                columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
+                available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
+                st.dataframe(datos_indicador[available_columns], use_container_width=True)
         
         except Exception as e:
             st.error(f"Error crítico en pestaña de evolución: {e}")
-            import traceback
-            with st.expander("🔧 Debug: Detalles del error"):
-                st.code(traceback.format_exc())
 
 class EditTab:
-    """Pestaña de edición - SOLO GOOGLE SHEETS CON PDF CORREGIDO"""
+    """Pestaña de edición - ACTUALIZADA CON TIPO"""
     
     @staticmethod
     def render(df, csv_path, excel_data=None):
@@ -348,7 +374,6 @@ class EditTab:
                 except ValueError:
                     index_actual = 0
             
-            # ✅ USAR KEY ÚNICO para selectbox principal
             codigo_editar = st.selectbox(
                 "Seleccionar Código de Indicador", 
                 opciones_codigo,
@@ -378,6 +403,7 @@ class EditTab:
                     nombre_indicador = datos_indicador['Indicador'].iloc[0]
                     componente_indicador = datos_indicador['Componente'].iloc[0]
                     categoria_indicador = datos_indicador['Categoria'].iloc[0]
+                    tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
                     
                     # Card con información del indicador
                     st.markdown(f"""
@@ -387,7 +413,8 @@ class EditTab:
                         <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
                             <strong>Componente:</strong> {componente_indicador}<br>
                             <strong>Categoría:</strong> {categoria_indicador}<br>
-                            <strong>Código:</strong> {codigo_editar}
+                            <strong>Código:</strong> {codigo_editar}<br>
+                            <strong>Tipo:</strong> {tipo_indicador}
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
@@ -405,14 +432,11 @@ class EditTab:
             else:
                 registros_indicador = pd.DataFrame()
             
-            # ✅ REEMPLAZAR st.tabs() CON CONTENEDORES CONDICIONALES
+            # Renderizar sub-pestañas con contenedores condicionales
             EditTab._render_conditional_tabs(df, codigo_editar, registros_indicador)
         
         except Exception as e:
             st.error(f"Error en la gestión de indicadores: {e}")
-            import traceback
-            with st.expander("🔧 Detalles del error"):
-                st.code(traceback.format_exc())
     
     @staticmethod
     def _render_conditional_tabs(df, codigo_editar, registros_indicador):
@@ -547,9 +571,6 @@ class EditTab:
                     
         except Exception as e:
             st.error(f"❌ Error al generar PDF: {e}")
-            import traceback
-            with st.expander("🔧 Detalles del error"):
-                st.code(traceback.format_exc())
 
     @staticmethod
     def _show_metodological_info_display(codigo_editar, excel_data):
@@ -605,17 +626,18 @@ class EditTab:
         """Renderizar tabla de registros existentes"""
         st.subheader("📋 Registros Existentes en Google Sheets")
         if not registros_indicador.empty:
-            st.dataframe(
-                registros_indicador[['Fecha', 'Valor', 'Componente', 'Categoria']], 
-                use_container_width=True
-            )
+            columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
+            available_columns = [col for col in columns_to_show if col in registros_indicador.columns]
+            st.dataframe(registros_indicador[available_columns], use_container_width=True)
         else:
             st.info("No hay registros para este indicador en Google Sheets")
     
     @staticmethod
     def _render_new_indicator_form(df):
-        """Formulario para crear nuevo indicador en Google Sheets"""
+        """Formulario para crear nuevo indicador en Google Sheets - ACTUALIZADO CON TIPO"""
         st.subheader("➕ Crear Nuevo Indicador en Google Sheets")
+        
+        from config import INDICATOR_TYPES
         
         with st.form("form_nuevo_indicador_unique"):
             col1, col2 = st.columns(2)
@@ -639,6 +661,13 @@ class EditTab:
                      "Herramientas técnicas y tecnológicas", "Aprovechamiento de datos"],
                     help="Componente al que pertenece el indicador"
                 )
+                
+                # NUEVO: Selector de tipo
+                nuevo_tipo = st.selectbox(
+                    "Tipo de Indicador",
+                    list(INDICATOR_TYPES.keys()),
+                    help="Tipo de indicador para normalización correcta"
+                )
             
             with col2:
                 nueva_categoria = st.text_input(
@@ -653,13 +682,16 @@ class EditTab:
                     help="Línea de acción correspondiente (opcional)"
                 )
                 
+                # Mostrar información del tipo seleccionado
+                if nuevo_tipo in INDICATOR_TYPES:
+                    tipo_info = INDICATOR_TYPES[nuevo_tipo]
+                    st.info(f"**{nuevo_tipo.title()}:** {tipo_info['description']}")
+                    st.caption(f"Ejemplos: {', '.join(tipo_info['examples'])}")
+                
                 primer_valor = st.number_input(
                     "Valor Inicial",
-                    value=0.5,
-                    min_value=0.0,
-                    max_value=1.0,
-                    step=0.01,
-                    help="Primer valor del indicador"
+                    value=0.5 if nuevo_tipo == 'porcentaje' else 100.0,
+                    help=f"Primer valor del indicador (tipo: {nuevo_tipo})"
                 )
                 
                 primera_fecha = st.date_input(
@@ -701,7 +733,8 @@ class EditTab:
                         'COD': nuevo_codigo.strip(),
                         'Nombre de indicador': nuevo_indicador.strip(),
                         'Valor': primer_valor,
-                        'Fecha': primera_fecha.strftime('%d/%m/%Y')
+                        'Fecha': primera_fecha.strftime('%d/%m/%Y'),
+                        'Tipo': nuevo_tipo  # NUEVO
                     }
                     
                     success = sheets_manager.add_record(data_dict)
@@ -729,6 +762,13 @@ class EditTab:
         """Formulario para agregar nuevo registro a Google Sheets"""
         st.subheader("➕ Agregar Nuevo Registro")
         
+        # Obtener tipo del indicador si existe
+        if not df.empty:
+            datos_indicador = df[df['Codigo'] == codigo_editar]
+            if not datos_indicador.empty:
+                tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
+                st.info(f"📊 Tipo de indicador: **{tipo_indicador}**")
+        
         with st.form("form_agregar_unique"):
             col1, col2 = st.columns(2)
             
@@ -742,10 +782,7 @@ class EditTab:
                 nuevo_valor = st.number_input(
                     "Nuevo Valor",
                     value=0.5,
-                    min_value=0.0,
-                    max_value=1.0,
-                    step=0.01,
-                    help="Valor entre 0 y 1, donde 1 = 100% de cumplimiento"
+                    help="Valor según el tipo del indicador (se normalizará automáticamente)"
                 )
             
             submitted = st.form_submit_button("➕ Agregar a Google Sheets", use_container_width=True)
@@ -813,9 +850,6 @@ class EditTab:
                     nuevo_valor = st.number_input(
                         "Nuevo Valor",
                         value=float(valor_actual),
-                        min_value=0.0,
-                        max_value=1.0,
-                        step=0.01,
                         help="Nuevo valor para este registro en Google Sheets"
                     )
                 
@@ -897,19 +931,19 @@ class EditTab:
                             st.error("❌ Error al eliminar el registro de Google Sheets")
 
 class TabManager:
-    """Gestor de pestañas del dashboard - SOLUCIÓN DEFINITIVA CON CONTENEDORES CONDICIONALES"""
+    """Gestor de pestañas del dashboard - ACTUALIZADO"""
     
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
         self.csv_path = None  # No usamos CSV
         self.excel_data = excel_data
         
-        # ✅ Inicializar pestaña activa en session_state
+        # Inicializar pestaña activa en session_state
         if 'active_tab_index' not in st.session_state:
             st.session_state.active_tab_index = 0
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar pestañas usando CONTENEDORES CONDICIONALES - SOLUCIÓN DEFINITIVA"""
+        """Renderizar pestañas usando CONTENEDORES CONDICIONALES"""
         
         # Nombres de las pestañas
         tab_names = [
@@ -919,7 +953,7 @@ class TabManager:
             "⚙️ Gestión de Datos"
         ]
         
-        # ✅ CREAR NAVEGACIÓN PRINCIPAL CON BOTONES
+        # Crear navegación principal con botones
         st.markdown("### 🧭 Navegación Principal")
         col1, col2, col3, col4 = st.columns(4)
         
@@ -957,7 +991,7 @@ class TabManager:
         </div>
         """, unsafe_allow_html=True)
         
-        # ✅ RENDERIZAR CONTENIDO SEGÚN PESTAÑA ACTIVA
+        # Renderizar contenido según pestaña activa
         if st.session_state.active_tab_index == 0:
             GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
         elif st.session_state.active_tab_index == 1:
@@ -967,7 +1001,7 @@ class TabManager:
         elif st.session_state.active_tab_index == 3:
             EditTab.render(self.df, None, self.excel_data)
         
-        # ✅ INFORMACIÓN DE ESTADO en sidebar
+        # Información de estado en sidebar - SIMPLIFICADA
         with st.sidebar:
             st.markdown("### 📊 Estado del Sistema")
             
@@ -978,10 +1012,15 @@ class TabManager:
             if not self.df.empty:
                 st.success(f"📊 **{len(self.df)}** registros cargados")
                 st.success(f"🔢 **{self.df['Codigo'].nunique()}** indicadores únicos")
+                
+                # Mostrar información de tipos si existe la columna
+                if 'Tipo' in self.df.columns:
+                    tipos_count = self.df['Tipo'].value_counts()
+                    st.info(f"📝 **Tipos:** {dict(tipos_count)}")
             else:
                 st.warning("📋 Google Sheets vacío")
             
-            # Estado PDF
+            # Estado PDF - SIMPLIFICADO
             with st.expander("📄 Estado PDF", expanded=False):
                 try:
                     import reportlab
@@ -989,12 +1028,10 @@ class TabManager:
                     reportlab_ok = True
                 except ImportError:
                     st.error("❌ reportlab: No instalado")
-                    st.code("pip install reportlab")
                     reportlab_ok = False
                 
                 if self.excel_data is not None and not self.excel_data.empty:
                     st.success("✅ Excel: Cargado")
-                    st.info(f"📊 {len(self.excel_data)} fichas metodológicas")
                     excel_ok = True
                 else:
                     st.warning("⚠️ Excel: No disponible")
