@@ -16,14 +16,14 @@ class GeneralSummaryTab:
     @staticmethod
     def render(df, fecha_seleccionada):
         """Renderizar la pestaña de resumen general"""
-        st.header("📊 Resumen General")
+        st.header("Resumen General")
         
         try:
             # Verificación previa de datos
             if df.empty:
-                st.info("📋 Google Sheets está vacío. Puedes agregar datos en la pestaña 'Gestión de Datos'")
+                st.info("Google Sheets está vacío. Puedes agregar datos en la pestaña 'Gestión de Datos'")
                 st.markdown("""
-                ### 🚀 Primeros pasos:
+                ### Primeros pasos:
                 1. Ve a la pestaña **"Gestión de Datos"**
                 2. Selecciona un código de indicador (o crea uno nuevo)
                 3. Agrega algunos registros con valores y fechas
@@ -42,7 +42,7 @@ class GeneralSummaryTab:
             # Verificar que hay datos válidos
             datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
             if datos_validos.empty:
-                st.info("📋 Los datos en Google Sheets están vacíos o incompletos")
+                st.info("Los datos en Google Sheets están vacíos o incompletos")
                 return
             
             # Calcular puntajes
@@ -50,11 +50,11 @@ class GeneralSummaryTab:
             
             # Verificar que los cálculos fueron exitosos
             if puntajes_componente.empty and puntajes_categoria.empty and puntaje_general == 0:
-                st.info("📊 Agregando más datos podrás ver los puntajes y análisis")
+                st.info("Agregando más datos podrás ver los puntajes y análisis")
                 return
             
             # Mostrar información sobre qué datos se están usando
-            st.info("📊 **Puntajes calculados usando valores normalizados:** Los indicadores se normalizan según su tipo antes del cálculo.")
+            st.info("**Puntajes calculados usando valores normalizados:** Los indicadores se normalizan según su tipo antes del cálculo.")
             
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
@@ -83,7 +83,7 @@ class GeneralSummaryTab:
                     st.error(f"Error en gráfico radar: {e}")
             
             # Puntajes por componente
-            st.subheader("📈 Puntajes por Componente")
+            st.subheader("Puntajes por Componente")
             if not puntajes_componente.empty:
                 try:
                     fig_comp = ChartGenerator.component_bar_chart(puntajes_componente)
@@ -98,7 +98,7 @@ class GeneralSummaryTab:
             st.error(f"❌ Error al calcular puntajes desde Google Sheets: {e}")
         
         # Mostrar tabla de datos más recientes
-        with st.expander("📋 Ver datos más recientes por indicador"):
+        with st.expander("Ver datos más recientes por indicador"):
             try:
                 df_latest = DataProcessor._get_latest_values_by_indicator(df)
                 if not df_latest.empty:
@@ -116,16 +116,16 @@ class ComponentSummaryTab:
     @staticmethod
     def render(df, filters):
         """Renderizar la pestaña de resumen por componente con visualizaciones adaptivas"""
-        st.header("🏗️ Resumen por Componente")
+        st.header("Resumen por Componente")
         
         if df.empty:
-            st.info("📋 No hay datos disponibles en Google Sheets para análisis por componente")
+            st.info("No hay datos disponibles en Google Sheets para análisis por componente")
             return
         
         # Selector de componente específico para esta vista
         componentes = sorted(df['Componente'].unique())
         if not componentes:
-            st.info("📋 No hay componentes disponibles en Google Sheets")
+            st.info("No hay componentes disponibles en Google Sheets")
             return
             
         componente_analisis = st.selectbox(
@@ -140,7 +140,7 @@ class ComponentSummaryTab:
         
         if not df_componente.empty:
             # Información sobre los datos que se están usando
-            st.info(f"📊 **Análisis de {componente_analisis}:** Basado en valores normalizados de cada indicador.")
+            st.info(f"**Análisis de {componente_analisis}:** Basado en valores normalizados de cada indicador.")
             
             # Métricas del componente
             col1, col2, col3 = st.columns(3)
@@ -187,7 +187,7 @@ class ComponentSummaryTab:
                 ComponentSummaryTab._render_category_visualization(df, componente_analisis)
             
             # Tabla de indicadores del componente
-            st.subheader(f"📊 Indicadores Más Recientes de {componente_analisis}")
+            st.subheader(f"Indicadores Más Recientes de {componente_analisis}")
             columns_to_show = ['Indicador', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
             available_columns = [col for col in columns_to_show if col in df_componente.columns]
             st.dataframe(
@@ -252,18 +252,18 @@ class EvolutionTab:
         
         try:
             if df.empty:
-                st.info("📋 No hay datos disponibles en Google Sheets para mostrar evolución")
+                st.info("No hay datos disponibles en Google Sheets para mostrar evolución")
                 return
             
             # Información sobre los datos disponibles
-            st.info(f"📊 **Datos desde Google Sheets:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos")
+            st.info(f"**Datos desde Google Sheets:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos")
             
             # Crear filtros sin causar rerun
             evolution_filters = EvolutionFilters.create_evolution_filters_stable(df)
             
             # Mostrar información del filtro seleccionado
             if evolution_filters['indicador']:
-                st.success(f"**📊 Indicador seleccionado:** {evolution_filters['indicador']}")
+                st.success(f"**Indicador seleccionado:** {evolution_filters['indicador']}")
                 
                 # Mostrar datos específicos del indicador
                 datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
@@ -272,7 +272,7 @@ class EvolutionTab:
                     st.write(f"**Registros históricos encontrados:** {len(datos_indicador)}")
                     
                     # Mostrar tabla de datos del indicador
-                    with st.expander("📋 Ver datos históricos del indicador"):
+                    with st.expander("Ver datos históricos del indicador"):
                         columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
                         available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
                         st.dataframe(datos_indicador[available_columns], use_container_width=True)
@@ -280,7 +280,7 @@ class EvolutionTab:
                     st.warning("No se encontraron datos históricos para este indicador en Google Sheets")
                     return
             else:
-                st.info("**📊 Vista general:** Mostrando evolución promedio de todos los indicadores")
+                st.info("**Vista general:** Mostrando evolución promedio de todos los indicadores")
             
             # Generar gráfico de evolución
             try:
@@ -299,7 +299,7 @@ class EvolutionTab:
             
             # Mostrar análisis adicional si hay un indicador seleccionado
             if evolution_filters['codigo'] and evolution_filters['indicador']:
-                st.subheader(f"📊 Análisis Detallado: {evolution_filters['indicador']}")
+                st.subheader(f"Análisis Detallado: {evolution_filters['indicador']}")
                 
                 datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
                 
@@ -342,8 +342,8 @@ class EditTab:
     @staticmethod
     def render(df, csv_path, excel_data=None):
         """Renderizar la pestaña de edición con Google Sheets"""
-        st.header("⚙️ Gestión de Indicadores")
-        st.caption("📊 Conectado a Google Sheets")
+        st.header("Gestión de Indicadores")
+        
         
         try:
             # Verificar que Google Sheets esté disponible
@@ -516,10 +516,10 @@ class EditTab:
                         
             elif not reportlab_available:
                 st.button("❌ Instalar reportlab", key=f"pdf_disabled_{codigo_editar}_unique", disabled=True, use_container_width=True)
-                st.error("📦 `pip install reportlab`")
+                st.error("`pip install reportlab`")
             else:
                 st.button("❌ Falta archivo Excel", key=f"pdf_no_excel_{codigo_editar}_unique", disabled=True, use_container_width=True)
-                st.warning("📄 Necesitas 'Batería de indicadores.xlsx'")
+                st.warning("Necesitas 'Batería de indicadores.xlsx'")
         
         # Mostrar ficha si se solicitó
         if st.session_state.get('show_ficha', False):
@@ -624,7 +624,7 @@ class EditTab:
     @staticmethod
     def _render_view_records(registros_indicador):
         """Renderizar tabla de registros existentes"""
-        st.subheader("📋 Registros Existentes en Google Sheets")
+        st.subheader("Registros Existentes en Google Sheets")
         if not registros_indicador.empty:
             columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
             available_columns = [col for col in columns_to_show if col in registros_indicador.columns]
