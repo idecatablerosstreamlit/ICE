@@ -1,5 +1,5 @@
-"""
-Configuración y estilos para el Dashboard ICE - SOLO GOOGLE SHEETS
+""""
+Configuración y estilos para el Dashboard ICE - ACTUALIZADO
 """
 
 import streamlit as st
@@ -170,7 +170,7 @@ def apply_dark_theme():
     </style>
     """, unsafe_allow_html=True)
 
-# Configuración de columnas para Google Sheets
+# Configuración de columnas para Google Sheets - ACTUALIZADO CON TIPO
 COLUMN_MAPPING = {
     'LINEA DE ACCIÓN': 'Linea_Accion',
     'COMPONENTE PROPUESTO': 'Componente',
@@ -178,25 +178,50 @@ COLUMN_MAPPING = {
     'COD': 'Codigo',
     'Nombre de indicador': 'Indicador',
     'Valor': 'Valor',
-    'Fecha': 'Fecha'
+    'Fecha': 'Fecha',
+    'Tipo': 'Tipo'  # NUEVO: Mapeo para columna tipo
 }
 
 # Configuración por defecto
 DEFAULT_META = 1.0
 EXCEL_FILENAME = "Batería de indicadores.xlsx"
 
-# Configuración Google Sheets
+# Configuración Google Sheets - ACTUALIZADA
 GOOGLE_SHEETS_CONFIG = {
     'worksheet_name': 'IndicadoresICE',
     'required_columns': [
         'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA', 
-        'COD', 'Nombre de indicador', 'Valor', 'Fecha'
+        'COD', 'Nombre de indicador', 'Valor', 'Fecha', 'Tipo'  # NUEVO: Incluir Tipo
     ],
     'cache_ttl_seconds': 30,
     'max_retries': 3
 }
 
-# Mensajes de ayuda para configuración
+# NUEVO: Tipos de indicadores soportados
+INDICATOR_TYPES = {
+    'porcentaje': {
+        'description': 'Valores entre 0-1 o 0-100%',
+        'examples': ['0.75', '75%'],
+        'normalization': 'direct'
+    },
+    'numero': {
+        'description': 'Cantidades numéricas',
+        'examples': ['150', '1250'],
+        'normalization': 'by_max'
+    },
+    'moneda': {
+        'description': 'Valores monetarios',
+        'examples': ['$50000', '2500000'],
+        'normalization': 'by_max'
+    },
+    'indice': {
+        'description': 'Índices y ratios',
+        'examples': ['1.5', '0.85'],
+        'normalization': 'by_max'
+    }
+}
+
+# Mensajes de ayuda para configuración - ACTUALIZADO
 GOOGLE_SHEETS_SETUP_GUIDE = """
 ## 🔧 Configuración de Google Sheets para Dashboard ICE
 
@@ -234,7 +259,7 @@ spreadsheet_url = "https://docs.google.com/spreadsheets/d/TU_SPREADSHEET_ID/edit
 3. Comparte con el email del Service Account (`tu-service-account@proyecto.iam.gserviceaccount.com`)
 4. Dale permisos de **"Editor"**
 
-### 4. Estructura de la hoja:
+### 4. Estructura de la hoja - ACTUALIZADA:
 La hoja debe tener estas columnas en la **primera fila**:
 - `LINEA DE ACCIÓN`
 - `COMPONENTE PROPUESTO`  
@@ -243,8 +268,15 @@ La hoja debe tener estas columnas en la **primera fila**:
 - `Nombre de indicador`
 - `Valor`
 - `Fecha`
+- `Tipo` **(NUEVA COLUMNA)**
 
-### 5. Installar dependencias:
+### 5. Tipos de indicadores soportados:
+- **porcentaje**: Valores entre 0-1 o 0-100%
+- **numero**: Cantidades numéricas (se normaliza por el máximo)
+- **moneda**: Valores monetarios (se normaliza por el máximo)
+- **indice**: Índices y ratios (se normaliza por el máximo)
+
+### 6. Installar dependencias:
 ```bash
 pip install gspread google-auth
 ```
@@ -254,6 +286,7 @@ pip install gspread google-auth
 - El Service Account debe tener permisos de Editor en la hoja
 - La URL debe ser la completa de Google Sheets (incluye `/edit` al final)
 - Los nombres de las columnas deben coincidir exactamente
+- La columna **Tipo** es obligatoria para la normalización correcta
 """
 
 def validate_google_sheets_config():
@@ -289,7 +322,7 @@ def show_setup_instructions():
     """Mostrar instrucciones de configuración"""
     st.markdown(GOOGLE_SHEETS_SETUP_GUIDE)
     
-    # Mostrar ejemplo de estructura
+    # Mostrar ejemplo de estructura - ACTUALIZADO CON TIPO
     st.subheader("📊 Ejemplo de estructura de Google Sheets:")
     
     example_data = {
@@ -300,16 +333,17 @@ def show_setup_instructions():
         'Nombre de indicador': [
             'Porcentaje de datos de licencia abierta',
             'Porcentaje de datos que se consumen como servicios',
-            'Porcentaje de incremento ingresos propios anuales'
+            'Incremento ingresos propios anuales (millones COP)'
         ],
-        'Valor': [0.5, 0.75, 0.3],
-        'Fecha': ['1/01/2025', '1/01/2025', '1/01/2025']
+        'Valor': [0.5, 0.75, 1250],
+        'Fecha': ['1/01/2025', '1/01/2025', '1/01/2025'],
+        'Tipo': ['porcentaje', 'porcentaje', 'moneda']  # NUEVO
     }
     
     example_df = pd.DataFrame(example_data)
     st.dataframe(example_df, use_container_width=True)
     
-    st.info("💡 **Tip:** Puedes copiar esta estructura a tu Google Sheets como punto de partida.")
+    st.info("💡 **Tip:** Nota la nueva columna 'Tipo' que define cómo normalizar cada indicador.")
 
 def get_connection_status():
     """Obtener estado de conexión de Google Sheets"""
