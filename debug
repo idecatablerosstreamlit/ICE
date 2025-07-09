@@ -130,13 +130,7 @@ class GoogleSheetsManager:
             df = pd.DataFrame(data)
             
             # Debug info
-            with st.expander("🔧 Debug: Google Sheets", expanded=False):
-                st.write(f"**URL:** {self.spreadsheet_url}")
-                st.write(f"**Worksheet:** {self.worksheet_name}")
-                st.write(f"**Registros:** {len(df)}")
-                st.write(f"**Columnas:** {list(df.columns)}")
-                if not df.empty:
-                    st.dataframe(df.head(3))
+            
             
             return df
             
