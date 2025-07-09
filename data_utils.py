@@ -187,9 +187,7 @@ class DataLoader:
             # Asegurar que todos los valores normalizados estén entre 0 y 1
             df['Valor_Normalizado'] = df['Valor_Normalizado'].clip(0, 1)
             
-            # Reportar normalización
-            tipos_unicos = df['Tipo'].value_counts()
-            st.info(f"✅ Valores normalizados por tipo: {dict(tipos_unicos)}")
+            
             
         except Exception as e:
             st.error(f"Error al normalizar valores: {e}")
