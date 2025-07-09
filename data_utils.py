@@ -1,5 +1,5 @@
 """
-Utilidades para el manejo de datos del Dashboard ICE - SOLO GOOGLE SHEETS
+Utilidades para el manejo de datos del Dashboard ICE - ACTUALIZADO CON NORMALIZACIÓN
 """
 
 import pandas as pd
@@ -73,23 +73,20 @@ class DataLoader:
                 
         except Exception as e:
             st.error(f"❌ **Error crítico al cargar desde Google Sheets:** {e}")
-            import traceback
-            with st.expander("🔧 Detalles del error"):
-                st.code(traceback.format_exc())
-            
             return self._create_empty_dataframe()
     
     def _create_empty_dataframe(self):
         """Crear DataFrame vacío con estructura correcta"""
         empty_df = pd.DataFrame(columns=[
             'Linea_Accion', 'Componente', 'Categoria', 
-            'Codigo', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso'
+            'Codigo', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado'
         ])
         
         # Asegurar tipos correctos
         empty_df['Valor'] = empty_df['Valor'].astype(float)
         empty_df['Meta'] = empty_df['Meta'].astype(float)
         empty_df['Peso'] = empty_df['Peso'].astype(float)
+        empty_df['Valor_Normalizado'] = empty_df['Valor_Normalizado'].astype(float)
         
         return empty_df
     
@@ -113,8 +110,91 @@ class DataLoader:
             # Añadir columnas por defecto
             self._add_default_columns(df)
             
+            # NUEVO: Normalizar valores según tipo
+            self._normalize_values(df)
+            
         except Exception as e:
             st.error(f"Error al procesar datos de Google Sheets: {e}")
+    
+    def _normalize_values(self, df):
+        """Normalizar valores según el tipo de indicador - NUEVO"""
+        try:
+            if df.empty or 'Valor' not in df.columns:
+                return
+            
+            # Inicializar columna de valores normalizados
+            df['Valor_Normalizado'] = df['Valor'].copy()
+            
+            # Si no hay columna tipo, asumir que todos son tipo "porcentaje" (0-1)
+            if 'Tipo' not in df.columns:
+                df['Tipo'] = 'porcentaje'
+                st.info("ℹ️ No se encontró columna 'Tipo', asumiendo todos como porcentajes (0-1)")
+            
+            # Normalizar por tipo de indicador
+            for tipo in df['Tipo'].unique():
+                if pd.isna(tipo):
+                    continue
+                    
+                mask = df['Tipo'] == tipo
+                valores = df.loc[mask, 'Valor']
+                
+                if len(valores) == 0:
+                    continue
+                
+                tipo_lower = str(tipo).lower().strip()
+                
+                if tipo_lower in ['porcentaje', 'percentage', '%']:
+                    # Porcentajes: ya están entre 0-1 o 0-100
+                    if valores.max() <= 1:
+                        df.loc[mask, 'Valor_Normalizado'] = valores.clip(0, 1)
+                    else:
+                        df.loc[mask, 'Valor_Normalizado'] = (valores / 100).clip(0, 1)
+                        
+                elif tipo_lower in ['numero', 'number', 'cantidad', 'count']:
+                    # Números: normalizar por el máximo valor del grupo
+                    max_val = valores.max()
+                    if max_val > 0:
+                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
+                    else:
+                        df.loc[mask, 'Valor_Normalizado'] = 0
+                        
+                elif tipo_lower in ['moneda', 'currency', 'dinero', 'money', 'pesos', 'dolares']:
+                    # Moneda: normalizar por el máximo valor del grupo
+                    max_val = valores.max()
+                    if max_val > 0:
+                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
+                    else:
+                        df.loc[mask, 'Valor_Normalizado'] = 0
+                        
+                elif tipo_lower in ['indice', 'index', 'ratio']:
+                    # Índices: normalizar por el máximo valor del grupo
+                    max_val = valores.max()
+                    if max_val > 0:
+                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
+                    else:
+                        df.loc[mask, 'Valor_Normalizado'] = 0
+                        
+                else:
+                    # Tipo desconocido: normalizar por el máximo valor del grupo
+                    max_val = valores.max()
+                    if max_val > 0:
+                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
+                    else:
+                        df.loc[mask, 'Valor_Normalizado'] = 0
+                    
+                    st.warning(f"⚠️ Tipo de indicador desconocido '{tipo}', normalizando por máximo del grupo")
+            
+            # Asegurar que todos los valores normalizados estén entre 0 y 1
+            df['Valor_Normalizado'] = df['Valor_Normalizado'].clip(0, 1)
+            
+            # Reportar normalización
+            tipos_unicos = df['Tipo'].value_counts()
+            st.info(f"✅ Valores normalizados por tipo: {dict(tipos_unicos)}")
+            
+        except Exception as e:
+            st.error(f"Error al normalizar valores: {e}")
+            # Fallback: usar valores originales (asumiendo que están entre 0-1)
+            df['Valor_Normalizado'] = df['Valor'].clip(0, 1)
     
     def _process_dates(self, df):
         """Procesar fechas de Google Sheets"""
@@ -185,6 +265,8 @@ class DataLoader:
             df['Meta'] = DEFAULT_META
         if 'Peso' not in df.columns:
             df['Peso'] = 1.0
+        if 'Tipo' not in df.columns:
+            df['Tipo'] = 'porcentaje'  # Valor por defecto
         
         # Asegurar tipos correctos
         df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce').fillna(DEFAULT_META)
@@ -234,11 +316,11 @@ class DataLoader:
             }
 
 class DataProcessor:
-    """Clase para procesar y calcular métricas de los datos"""
+    """Clase para procesar y calcular métricas de los datos - ACTUALIZADA"""
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """Calcular puntajes usando SIEMPRE el valor más reciente de cada indicador."""
+        """Calcular puntajes usando valores normalizados."""
         try:
             if df.empty:
                 st.info("📋 No hay datos disponibles para calcular puntajes")
@@ -253,19 +335,19 @@ class DataProcessor:
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
-            # Verificar columnas esenciales
-            required_columns = ['Valor', 'Peso', 'Componente', 'Categoria']
+            # Verificar columnas esenciales incluyendo valores normalizados
+            required_columns = ['Valor_Normalizado', 'Peso', 'Componente', 'Categoria']
             missing_columns = [col for col in required_columns if col not in df_filtrado.columns]
             if missing_columns:
                 st.error(f"Faltan columnas esenciales: {missing_columns}")
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
 
-            # Normalizar valores (0-1)
-            df_filtrado['Valor_Normalizado'] = df_filtrado['Valor'].clip(0, 1)
+            # Usar valores normalizados directamente (ya están entre 0-1)
+            df_filtrado['Valor_Para_Calculo'] = df_filtrado['Valor_Normalizado'].clip(0, 1)
             
             # Verificar que tenemos datos después de la normalización
-            if df_filtrado['Valor_Normalizado'].isna().all():
+            if df_filtrado['Valor_Para_Calculo'].isna().all():
                 st.error("Todos los valores normalizados son NaN")
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
@@ -292,9 +374,9 @@ class DataProcessor:
             try:
                 peso_total = df_filtrado['Peso'].sum()
                 if peso_total > 0:
-                    puntaje_general = (df_filtrado['Valor_Normalizado'] * df_filtrado['Peso']).sum() / peso_total
+                    puntaje_general = (df_filtrado['Valor_Para_Calculo'] * df_filtrado['Peso']).sum() / peso_total
                 else:
-                    puntaje_general = df_filtrado['Valor_Normalizado'].mean()
+                    puntaje_general = df_filtrado['Valor_Para_Calculo'].mean()
                 
                 # Verificar que el puntaje general es válido
                 if pd.isna(puntaje_general):
@@ -308,8 +390,6 @@ class DataProcessor:
             
         except Exception as e:
             st.error(f"Error crítico en calculate_scores: {e}")
-            import traceback
-            st.code(traceback.format_exc())
             return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
     
@@ -347,7 +427,7 @@ class DataProcessor:
     
     @staticmethod
     def _calculate_weighted_average_by_group(df, group_column):
-        """Calcular promedio ponderado por grupo"""
+        """Calcular promedio ponderado por grupo usando valores normalizados"""
         try:
             if df.empty:
                 return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
@@ -357,7 +437,7 @@ class DataProcessor:
                 return pd.DataFrame(columns=[group_column, 'Puntaje_Ponderado'])
             
             # Verificar que tenemos las columnas necesarias
-            required_cols = ['Valor_Normalizado', 'Peso']
+            required_cols = ['Valor_Para_Calculo', 'Peso']
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
                 st.error(f"Faltan columnas necesarias: {missing_cols}")
@@ -380,13 +460,13 @@ class DataProcessor:
             
             # Calcular promedio ponderado por grupo
             result = df.groupby(group_column).agg({
-                'Valor_Normalizado': list,
+                'Valor_Para_Calculo': list,
                 'Peso': list
             }).reset_index()
             
             result['Puntaje_Ponderado'] = result.apply(
                 lambda row: weighted_avg(
-                    pd.Series(row['Valor_Normalizado']), 
+                    pd.Series(row['Valor_Para_Calculo']), 
                     pd.Series(row['Peso'])
                 ), axis=1
             )
@@ -467,7 +547,8 @@ class DataEditor:
                 'COD': codigo,
                 'Nombre de indicador': indicador_base.get('Indicador', ''),
                 'Valor': valor,
-                'Fecha': fecha_formateada
+                'Fecha': fecha_formateada,
+                'Tipo': indicador_base.get('Tipo', 'porcentaje')  # Incluir tipo
             }
             
             # Agregar a Google Sheets
@@ -482,8 +563,6 @@ class DataEditor:
             
         except Exception as e:
             st.error(f"❌ Error en Google Sheets: {e}")
-            import traceback
-            st.code(traceback.format_exc())
             return False
     
     @staticmethod
