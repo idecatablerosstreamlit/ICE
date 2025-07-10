@@ -26,6 +26,8 @@ def main():
         st.session_state.active_tab_index = 0
     if 'data_timestamp' not in st.session_state:
         st.session_state.data_timestamp = 0
+    if 'system_status_messages' not in st.session_state:
+        st.session_state.system_status_messages = []
     
     # Título principal
     st.markdown(f"""
@@ -51,10 +53,11 @@ def main():
         st.stop()
     
     # Función de carga desde Google Sheets
-    @st.cache_data(ttl=30, show_spinner=True)
+    @st.cache_data(ttl=30, show_spinner=False)
     def load_data_cached(timestamp):
         """Cargar datos únicamente desde Google Sheets"""
         try:
+            st.session_state.system_status_messages = []
             # Cargar desde Google Sheets
             data_loader = DataLoader()
             df_loaded = data_loader.load_data()
@@ -80,7 +83,11 @@ def main():
     try:
         # Cargar datos
         df, source_info, excel_data = load_data_cached(st.session_state.data_timestamp)
-        
+        # Mostrar estado del sistema en sección desplegable
+        if st.session_state.system_status_messages:
+            with st.expander("🔧 Estado del Sistema", expanded=False):
+                for message in st.session_state.system_status_messages:
+                    st.write(message)
        
         
         if df is not None:
@@ -127,7 +134,10 @@ def main():
                 if st.button("Actualizar desde Google Sheets", help="Recarga los datos desde Google Sheets"):
                     # ✅ GUARDAR pestaña activa ANTES de recargar
                     current_tab = st.session_state.get('active_tab_index', 0)
-                    
+                    # Limpiar mensajes de estado
+                    st.session_state.system_status_messages = []
+            
+                   
                     st.cache_data.clear()
                     st.session_state.data_timestamp += 1
                     
@@ -182,6 +192,9 @@ def main():
         if st.button("🔄 Intentar Recargar"):
             # Guardar pestaña activa antes de recargar
             current_tab = st.session_state.get('active_tab_index', 0)
+            # Limpiar mensajes de estado
+            st.session_state.system_status_messages = []
+            
             
             st.cache_data.clear()
             
