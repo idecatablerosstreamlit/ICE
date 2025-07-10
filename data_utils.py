@@ -29,6 +29,38 @@ class DataLoader:
         
         try:
             self.sheets_manager = GoogleSheetsManager()
+        except Exception as e:"""
+Utilidades para el manejo de datos del Dashboard ICE - VERSIÓN CORREGIDA
+CORRECCIÓN: Normalización simplificada y eliminación de bucles infinitos
+"""
+
+import pandas as pd
+import numpy as np
+import streamlit as st
+import os
+from config import COLUMN_MAPPING, DEFAULT_META, EXCEL_FILENAME
+import openpyxl
+
+# Importación de Google Sheets
+try:
+    from google_sheets_manager import GoogleSheetsManager
+    GOOGLE_SHEETS_AVAILABLE = True
+except ImportError:
+    GOOGLE_SHEETS_AVAILABLE = False
+
+class DataLoader:
+    """Clase para cargar datos - VERSIÓN SIMPLIFICADA"""
+    
+    def __init__(self):
+        self.df = None
+        self.sheets_manager = None
+        
+        if not GOOGLE_SHEETS_AVAILABLE:
+            st.error("❌ **Google Sheets no disponible.** Instala: `pip install gspread google-auth`")
+            return
+        
+        try:
+            self.sheets_manager = GoogleSheetsManager()
         except Exception as e:
             st.error(f"❌ Error al inicializar Google Sheets: {e}")
             self.sheets_manager = None
@@ -101,20 +133,71 @@ class DataLoader:
             st.error(f"Error en procesamiento: {e}")
     
     def _process_dates_simple(self, df):
-        """Procesar fechas - SIMPLIFICADO"""
+        """Procesar fechas - MEJORADO"""
         try:
             if 'Fecha' not in df.columns:
                 return
             
-            # Convertir fechas con formato más común
-            df['Fecha'] = pd.to_datetime(df['Fecha'], dayfirst=True, errors='coerce')
+            # Formatos de fecha comunes de Google Sheets
+            date_formats = [
+                '%d/%m/%Y',   # 01/12/2025
+                '%d-%m-%Y',   # 01-12-2025
+                '%Y-%m-%d',   # 2025-12-01
+                '%Y/%m/%d',   # 2025/12/01
+                '%m/%d/%Y',   # 12/01/2025
+                '%d.%m.%Y'    # 01.12.2025
+            ]
             
+            fechas_convertidas = None
+            mejor_formato = None
+            
+            # Probar cada formato
+            for formato in date_formats:
+                try:
+                    temp_fechas = pd.to_datetime(df['Fecha'], format=formato, errors='coerce')
+                    validas = temp_fechas.notna().sum()
+                    
+                    if validas > 0:
+                        if fechas_convertidas is None or validas > fechas_convertidas.notna().sum():
+                            fechas_convertidas = temp_fechas
+                            mejor_formato = formato
+                except:
+                    continue
+            
+            # Si ningún formato específico funcionó, usar conversión automática
+            if fechas_convertidas is None or fechas_convertidas.notna().sum() == 0:
+                try:
+                    fechas_convertidas = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
+                    mejor_formato = "automático"
+                except:
+                    fechas_convertidas = pd.to_datetime(df['Fecha'], errors='coerce')
+                    mejor_formato = "automático (US)"
+            
+            # Asignar fechas convertidas
+            df['Fecha'] = fechas_convertidas
+            
+            # Reportar resultados
+            fechas_validas = df['Fecha'].notna().sum()
             fechas_invalidas = df['Fecha'].isna().sum()
+            
+            if fechas_validas > 0:
+                st.success(f"✅ {fechas_validas} fechas procesadas correctamente (formato: {mejor_formato})")
+            
             if fechas_invalidas > 0:
-                st.warning(f"⚠️ {fechas_invalidas} fechas no válidas")
+                st.warning(f"⚠️ {fechas_invalidas} fechas no se pudieron convertir")
+                
+                # Mostrar ejemplos de fechas problemáticas
+                fechas_problematicas = df[df['Fecha'].isna()]['Fecha'].head(3).tolist()
+                if fechas_problematicas:
+                    st.info(f"Ejemplos de fechas problemáticas: {fechas_problematicas}")
                 
         except Exception as e:
-            st.warning(f"Error al procesar fechas: {e}")
+            st.error(f"Error al procesar fechas: {e}")
+            # Intentar conversión básica como fallback
+            try:
+                df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+            except:
+                pass
     
     def _process_values_simple(self, df):
         """Procesar valores - SIMPLIFICADO"""
@@ -151,7 +234,7 @@ class DataLoader:
         df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
     
     def _normalize_values_simple(self, df):
-        """Normalización SIMPLIFICADA - Sin bucles complejos"""
+        """Normalización SIMPLIFICADA y ROBUSTA"""
         try:
             if df.empty or 'Valor' not in df.columns:
                 return
@@ -159,33 +242,82 @@ class DataLoader:
             # Inicializar valores normalizados
             df['Valor_Normalizado'] = 0.5
             
-            # Normalización por tipo - SIMPLIFICADA
-            for tipo in df['Tipo'].unique():
+            # Verificar que tenemos datos válidos
+            valores_validos = df['Valor'].notna()
+            if not valores_validos.any():
+                st.warning("⚠️ No hay valores válidos para normalizar")
+                return
+            
+            # Procesar cada tipo de indicador
+            tipos_unicos = df['Tipo'].unique()
+            
+            for tipo in tipos_unicos:
                 if pd.isna(tipo):
                     continue
                     
                 mask = df['Tipo'] == tipo
-                valores = df.loc[mask, 'Valor']
+                valores = df.loc[mask, 'Valor'].dropna()
                 
-                if tipo.lower() in ['porcentaje', 'percentage']:
-                    # Porcentajes: convertir a 0-1 si están en 0-100
-                    valores_norm = valores.apply(lambda x: x if x <= 1 else x / 100)
-                    df.loc[mask, 'Valor_Normalizado'] = valores_norm.clip(0, 1)
-                else:
-                    # Otros tipos: normalización simple por máximo
+                if valores.empty:
+                    continue
+                
+                # Normalización por tipo
+                if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
+                    # Porcentajes: asumir que están en 0-100 o 0-1
+                    valores_norm = valores.copy()
+                    # Si los valores son mayores a 1, convertir de 0-100 a 0-1
+                    valores_norm = valores_norm.apply(lambda x: x/100 if x > 1 else x)
+                    valores_norm = valores_norm.clip(0, 1)
+                    
+                elif str(tipo).lower() in ['moneda', 'currency', 'dinero', 'pesos']:
+                    # Valores monetarios: normalizar por máximo
                     if valores.max() > 0:
-                        df.loc[mask, 'Valor_Normalizado'] = (valores / valores.max()).clip(0, 1)
+                        valores_norm = valores / valores.max()
                     else:
-                        df.loc[mask, 'Valor_Normalizado'] = 0.5
+                        valores_norm = pd.Series([0.5] * len(valores), index=valores.index)
+                    
+                elif str(tipo).lower() in ['numero', 'number', 'cantidad', 'count']:
+                    # Números: normalizar por máximo
+                    if valores.max() > 0:
+                        valores_norm = valores / valores.max()
+                    else:
+                        valores_norm = pd.Series([0.5] * len(valores), index=valores.index)
+                    
+                elif str(tipo).lower() in ['indice', 'index', 'ratio']:
+                    # Índices: normalizar por máximo o asumir que ya están normalizados
+                    if valores.max() > 2:  # Si son valores grandes, normalizar
+                        valores_norm = valores / valores.max()
+                    else:  # Si son valores pequeños, asumir que están normalizados
+                        valores_norm = valores.clip(0, 1)
+                        
+                else:
+                    # Tipo desconocido: normalización básica
+                    if valores.max() > 1:
+                        valores_norm = valores / valores.max()
+                    else:
+                        valores_norm = valores.clip(0, 1)
+                
+                # Asignar valores normalizados
+                df.loc[mask & valores_validos, 'Valor_Normalizado'] = valores_norm.clip(0, 1)
             
-            # Asegurar que todos los valores están entre 0 y 1
-            df['Valor_Normalizado'] = df['Valor_Normalizado'].clip(0, 1)
+            # Verificar resultados
+            norm_validos = df['Valor_Normalizado'].notna().sum()
+            norm_min = df['Valor_Normalizado'].min()
+            norm_max = df['Valor_Normalizado'].max()
+            norm_promedio = df['Valor_Normalizado'].mean()
+            
+            st.success(f"✅ Normalización completada: {norm_validos} valores")
+            st.info(f"Rango normalizado: {norm_min:.3f} - {norm_max:.3f}, Promedio: {norm_promedio:.3f}")
             
         except Exception as e:
             st.error(f"Error en normalización: {e}")
-            # Fallback
-            if 'Valor' in df.columns:
-                df['Valor_Normalizado'] = df['Valor'].clip(0, 1)
+            # Fallback: usar valores originales limitados a 0-1
+            try:
+                if 'Valor' in df.columns:
+                    df['Valor_Normalizado'] = df['Valor'].clip(0, 1)
+                    st.warning("⚠️ Usando normalización básica como fallback")
+            except:
+                df['Valor_Normalizado'] = 0.5
     
     def _verify_dataframe_simple(self, df):
         """Verificar DataFrame - SIMPLIFICADO"""
