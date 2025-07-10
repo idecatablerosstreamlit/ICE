@@ -1,7 +1,7 @@
-# Archivo: pdf_generator.py - VERSIÓN CORREGIDA
+# Archivo: pdf_generator.py - VERSIÓN CORREGIDA PARA TEXTO COMPLETO
 
 """
-Generador de PDFs para fichas metodológicas del Dashboard ICE - CORREGIDO
+Generador de PDFs para fichas metodológicas del Dashboard ICE - CORREGIDO PARA MOSTRAR TEXTO COMPLETO
 """
 
 import streamlit as st
@@ -12,7 +12,7 @@ from datetime import datetime
 # Importación condicional de reportlab
 try:
     from reportlab.lib.pagesizes import letter, A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from reportlab.lib import colors
@@ -22,7 +22,7 @@ except ImportError:
     PDF_AVAILABLE = False
 
 class PDFGenerator:
-    """Generador de fichas metodológicas en PDF - CORREGIDO"""
+    """Generador de fichas metodológicas en PDF - CORREGIDO PARA TEXTO COMPLETO"""
     
     def __init__(self):
         self.pdf_available = PDF_AVAILABLE
@@ -56,15 +56,15 @@ class PDFGenerator:
             # Obtener datos del indicador
             datos = indicador_data.iloc[0]
             
-            # Crear documento PDF
+            # Crear documento PDF con márgenes ajustados
             buffer = BytesIO()
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=A4,
-                rightMargin=72,
-                leftMargin=72,
-                topMargin=72,
-                bottomMargin=18
+                rightMargin=50,
+                leftMargin=50,
+                topMargin=60,
+                bottomMargin=60
             )
             
             # Crear estilos
@@ -87,8 +87,8 @@ class PDFGenerator:
             return None
     
     def _build_pdf_content(self, datos, codigo):
-        """Construir contenido del PDF"""
-        # Crear estilos
+        """Construir contenido del PDF con mejor manejo de texto largo"""
+        # Crear estilos mejorados
         styles = getSampleStyleSheet()
         
         title_style = ParagraphStyle(
@@ -104,16 +104,31 @@ class PDFGenerator:
             'CustomSubtitle',
             parent=styles['Heading2'],
             fontSize=14,
-            spaceAfter=12,
-            textColor=colors.HexColor('#4472C4')
+            spaceAfter=15,
+            spaceBefore=20,
+            textColor=colors.HexColor('#4472C4'),
+            borderWidth=1,
+            borderColor=colors.HexColor('#4472C4'),
+            borderPadding=8,
+            backColor=colors.HexColor('#F8F9FA')
         )
         
         normal_style = ParagraphStyle(
             'CustomNormal',
             parent=styles['Normal'],
-            fontSize=11,
+            fontSize=10,
             spaceAfter=8,
-            alignment=TA_JUSTIFY
+            alignment=TA_JUSTIFY,
+            leading=12
+        )
+        
+        label_style = ParagraphStyle(
+            'CustomLabel',
+            parent=styles['Normal'],
+            fontSize=10,
+            spaceAfter=6,
+            textColor=colors.HexColor('#2C3E50'),
+            fontName='Helvetica-Bold'
         )
         
         # Construir contenido del documento
@@ -125,23 +140,15 @@ class PDFGenerator:
         story.append(Spacer(1, 20))
         
         # Información institucional
+        story.append(Paragraph("INFORMACIÓN DEL DOCUMENTO", subtitle_style))
+        
         institucion_data = [
             ['Sistema:', 'Dashboard ICE - Infraestructura de Conocimiento Espacial'],
             ['Fecha de generación:', datetime.now().strftime('%d/%m/%Y %H:%M:%S')],
             ['Código del indicador:', codigo]
         ]
         
-        institucion_table = Table(institucion_data, colWidths=[2*inch, 4*inch])
-        institucion_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#4472C4')),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        
+        institucion_table = self._create_simple_table(institucion_data)
         story.append(institucion_table)
         story.append(Spacer(1, 20))
         
@@ -158,20 +165,25 @@ class PDFGenerator:
             ['Dependencia:', self._safe_get(datos, 'Dependencia', 'N/A')]
         ]
         
-        basic_table = self._create_table(basic_data)
+        basic_table = self._create_flexible_table(basic_data)
         story.append(basic_table)
         story.append(Spacer(1, 15))
         
         # 2. DEFINICIÓN Y OBJETIVO
         story.append(Paragraph("2. DEFINICIÓN Y OBJETIVO", subtitle_style))
         
-        story.append(Paragraph("<b>Definición:</b>", normal_style))
-        story.append(Paragraph(self._safe_get(datos, 'Definicion', 'No disponible'), normal_style))
-        story.append(Spacer(1, 8))
+        definicion = self._safe_get(datos, 'Definicion', 'No disponible')
+        objetivo = self._safe_get(datos, 'Objetivo', 'No disponible')
         
-        story.append(Paragraph("<b>Objetivo:</b>", normal_style))
-        story.append(Paragraph(self._safe_get(datos, 'Objetivo', 'No disponible'), normal_style))
-        story.append(Spacer(1, 15))
+        if definicion != 'No disponible':
+            story.append(Paragraph("<b>Definición:</b>", label_style))
+            story.append(Paragraph(definicion, normal_style))
+            story.append(Spacer(1, 10))
+        
+        if objetivo != 'No disponible':
+            story.append(Paragraph("<b>Objetivo:</b>", label_style))
+            story.append(Paragraph(objetivo, normal_style))
+            story.append(Spacer(1, 15))
         
         # 3. METODOLOGÍA DE CÁLCULO
         story.append(Paragraph("3. METODOLOGÍA DE CÁLCULO", subtitle_style))
@@ -184,7 +196,7 @@ class PDFGenerator:
             ['Tipo de acumulación:', self._safe_get(datos, 'Tipo_Acumulacion', 'N/A')]
         ]
         
-        methodology_table = self._create_table(methodology_data)
+        methodology_table = self._create_flexible_table(methodology_data)
         story.append(methodology_table)
         story.append(Spacer(1, 15))
         
@@ -201,7 +213,7 @@ class PDFGenerator:
             ['Clasificación según intervención:', self._safe_get(datos, 'Clasificacion_Intervencion', 'N/A')]
         ]
         
-        technical_table = self._create_table(technical_data)
+        technical_table = self._create_flexible_table(technical_data)
         story.append(technical_table)
         story.append(Spacer(1, 15))
         
@@ -210,21 +222,21 @@ class PDFGenerator:
         limitaciones = self._safe_get(datos, 'Limitaciones', '')
         interpretacion = self._safe_get(datos, 'Interpretacion', '')
         
-        if observaciones or limitaciones or interpretacion:
+        if observaciones != 'N/A' or limitaciones != 'N/A' or interpretacion != 'N/A':
             story.append(Paragraph("5. OBSERVACIONES Y LIMITACIONES", subtitle_style))
             
-            if observaciones:
-                story.append(Paragraph("<b>Observaciones:</b>", normal_style))
+            if observaciones != 'N/A':
+                story.append(Paragraph("<b>Observaciones:</b>", label_style))
                 story.append(Paragraph(observaciones, normal_style))
-                story.append(Spacer(1, 8))
+                story.append(Spacer(1, 10))
             
-            if limitaciones:
-                story.append(Paragraph("<b>Limitaciones:</b>", normal_style))
+            if limitaciones != 'N/A':
+                story.append(Paragraph("<b>Limitaciones:</b>", label_style))
                 story.append(Paragraph(limitaciones, normal_style))
-                story.append(Spacer(1, 8))
+                story.append(Spacer(1, 10))
             
-            if interpretacion:
-                story.append(Paragraph("<b>Interpretación:</b>", normal_style))
+            if interpretacion != 'N/A':
+                story.append(Paragraph("<b>Interpretación:</b>", label_style))
                 story.append(Paragraph(interpretacion, normal_style))
                 story.append(Spacer(1, 15))
         
@@ -237,19 +249,19 @@ class PDFGenerator:
             ['Teléfono de contacto:', self._safe_get(datos, 'Telefono_Contacto', 'N/A')]
         ]
         
-        contact_table = self._create_table(contact_data)
+        contact_table = self._create_flexible_table(contact_data)
         story.append(contact_table)
         
         # 7. ENLACES Y SOPORTE LEGAL
         enlaces = self._safe_get(datos, 'Enlaces_Web', '')
         soporte = self._safe_get(datos, 'Soporte_Legal', '')
         
-        if enlaces:
+        if enlaces != 'N/A':
             story.append(Spacer(1, 15))
             story.append(Paragraph("7. ENLACES RELACIONADOS", subtitle_style))
             story.append(Paragraph(enlaces, normal_style))
         
-        if soporte:
+        if soporte != 'N/A':
             story.append(Spacer(1, 15))
             story.append(Paragraph("8. SOPORTE LEGAL", subtitle_style))
             story.append(Paragraph(soporte, normal_style))
@@ -257,27 +269,89 @@ class PDFGenerator:
         return story
     
     def _safe_get(self, datos, campo, default='N/A'):
-        """Obtener valor de forma segura manejando NaN"""
+        """Obtener valor de forma segura manejando NaN y preservando texto completo"""
         try:
             valor = datos.get(campo, default)
             if pd.isna(valor) or valor == '' or str(valor).strip() == '':
                 return default
-            return str(valor).strip()
-        except:
+            
+            texto = str(valor).strip()
+            
+            # Limpiar el texto pero preservarlo completo
+            # Reemplazar caracteres problemáticos
+            texto = texto.replace('\r\n', '\n').replace('\r', '\n')
+            
+            # Escapar caracteres especiales de HTML/XML
+            texto = texto.replace('&', '&amp;')
+            texto = texto.replace('<', '&lt;')
+            texto = texto.replace('>', '&gt;')
+            
+            return texto if texto else default
+            
+        except Exception as e:
             return default
     
-    def _create_table(self, data):
-        """Crear tabla con estilo consistente"""
-        table = Table(data, colWidths=[2*inch, 4*inch])
+    def _create_simple_table(self, data):
+        """Crear tabla simple para información institucional"""
+        table = Table(data, colWidths=[2.5*inch, 4*inch])
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E7F3FF')),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#4472C4')),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('VALIGN', (0, 0), (-1, -1), 'TOP')
         ]))
+        return table
+    
+    def _create_flexible_table(self, data):
+        """Crear tabla flexible que se adapta al contenido largo"""
+        # Preparar datos con Paragraphs para texto largo
+        processed_data = []
+        
+        for row in data:
+            if len(row) >= 2:
+                label = row[0]
+                content = row[1]
+                
+                # Crear paragraph para contenido largo
+                if len(str(content)) > 80:
+                    # Usar Paragraph para texto largo
+                    content_paragraph = Paragraph(str(content), getSampleStyleSheet()['Normal'])
+                    processed_data.append([label, content_paragraph])
+                else:
+                    processed_data.append([label, str(content)])
+            else:
+                processed_data.append(row)
+        
+        # Determinar anchos de columna dinámicamente
+        max_content_length = max([len(str(row[1])) for row in data if len(row) >= 2] + [0])
+        
+        if max_content_length > 200:
+            col_widths = [2*inch, 4.5*inch]
+        elif max_content_length > 100:
+            col_widths = [2.2*inch, 4.3*inch]
+        else:
+            col_widths = [2.5*inch, 4*inch]
+        
+        table = Table(processed_data, colWidths=col_widths, repeatRows=0)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E7F3FF')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')])
+        ]))
+        
         return table
     
     def is_available(self):
