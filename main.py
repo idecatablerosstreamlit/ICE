@@ -33,7 +33,7 @@ def main():
                 border-radius: 10px; margin-bottom: 2rem; color: white;">
         <h1 style="color: white; margin: 0;">Dashboard ICE</h1>
         <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.1rem;">
-            Sistema de Monitoreo - Infraestructura de Conocimiento Espacial
+            Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA
         </p>
         
     </div>
