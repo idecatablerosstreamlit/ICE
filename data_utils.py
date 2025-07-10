@@ -185,30 +185,55 @@ class DataLoader:
                 st.error("❌ **Google Sheets Manager no inicializado.** Verifica la configuración.")
                 return self._create_empty_dataframe()
             
-            st.info("🔄 Cargando datos desde Google Sheets...")
+            # Usar una lista para acumular mensajes de estado
+            status_messages = []
             
-            # Cargar desde Google Sheets
-            df = self.sheets_manager.load_data()
-            
-            if df is None:
-                st.error("❌ **Error al conectar con Google Sheets.** Verifica tu configuración.")
-                return self._create_empty_dataframe()
-            
-            if df.empty:
-                st.warning("📋 **Google Sheets está vacío.** Puedes agregar datos desde la pestaña 'Gestión de Datos'.")
-                return self._create_empty_dataframe()
-            
-            # Procesar datos
-            self._process_dataframe(df)
-            
-            # Verificar y limpiar
-            if self._verify_and_clean_dataframe(df):
-                self.df = df
-                st.success(f"✅ **Datos cargados desde Google Sheets:** {len(df)} registros")
-                return df
-            else:
-                st.error("❌ **Datos inválidos en Google Sheets.** Verifica la estructura.")
-                return self._create_empty_dataframe()
+            with st.status("🔄 Cargando datos desde Google Sheets...", expanded=False) as status:
+                status_messages.append("🔄 Iniciando carga desde Google Sheets...")
+                
+                # Cargar desde Google Sheets
+                df = self.sheets_manager.load_data()
+                
+                if df is None:
+                    status_messages.append("❌ Error al conectar con Google Sheets")
+                    status.update(label="❌ Error en conexión", state="error", expanded=True)
+                    for msg in status_messages:
+                        st.write(msg)
+                    st.error("❌ **Error al conectar con Google Sheets.** Verifica tu configuración.")
+                    return self._create_empty_dataframe()
+                
+                if df.empty:
+                    status_messages.append("📋 Google Sheets está vacío")
+                    status.update(label="📋 Google Sheets vacío", state="complete", expanded=False)
+                    for msg in status_messages:
+                        st.write(msg)
+                    st.warning("📋 **Google Sheets está vacío.** Puedes agregar datos desde la pestaña 'Gestión de Datos'.")
+                    return self._create_empty_dataframe()
+                
+                status_messages.append(f"📥 Datos básicos cargados: {len(df)} registros")
+                
+                # Procesar datos
+                status_messages.append("🔧 Procesando estructura de datos...")
+                self._process_dataframe(df, status_messages)
+                
+                # Verificar y limpiar
+                if self._verify_and_clean_dataframe(df, status_messages):
+                    self.df = df
+                    status_messages.append(f"✅ **Datos cargados desde Google Sheets:** {len(df)} registros")
+                    status.update(label="✅ Datos cargados correctamente", state="complete", expanded=False)
+                    
+                    # Mostrar todos los mensajes en el status
+                    for msg in status_messages:
+                        st.write(msg)
+                    
+                    return df
+                else:
+                    status_messages.append("❌ Datos inválidos en estructura")
+                    status.update(label="❌ Error en validación", state="error", expanded=True)
+                    for msg in status_messages:
+                        st.write(msg)
+                    st.error("❌ **Datos inválidos en Google Sheets.** Verifica la estructura.")
+                    return self._create_empty_dataframe()
                 
         except Exception as e:
             st.error(f"❌ **Error crítico al cargar desde Google Sheets:** {e}")
@@ -229,33 +254,44 @@ class DataLoader:
         
         return empty_df
     
-    def _process_dataframe(self, df):
+    def _process_dataframe(self, df, status_messages=None):
         """Procesar DataFrame de Google Sheets"""
         try:
             if df.empty:
                 return
             
+            if status_messages is None:
+                status_messages = []
+            
             # Renombrar columnas de Google Sheets a formato interno
+            status_messages.append("🔄 Renombrando columnas...")
             for original, nuevo in COLUMN_MAPPING.items():
                 if original in df.columns:
                     df.rename(columns={original: nuevo}, inplace=True)
             
             # Procesar fechas
-            self._process_dates(df)
+            status_messages.append("📅 Procesando fechas...")
+            self._process_dates(df, status_messages)
             
             # Procesar valores
-            self._process_values(df)
+            status_messages.append("🔢 Procesando valores numéricos...")
+            self._process_values(df, status_messages)
             
             # Añadir columnas por defecto
+            status_messages.append("➕ Añadiendo columnas por defecto...")
             self._add_default_columns(df)
             
             # NUEVA NORMALIZACIÓN AVANZADA SIN METAS
-            self._normalize_values_advanced(df)
+            status_messages.append("🔧 Aplicando normalización avanzada sin metas...")
+            self._normalize_values_advanced(df, status_messages)
             
         except Exception as e:
-            st.error(f"Error al procesar datos de Google Sheets: {e}")
+            if status_messages:
+                status_messages.append(f"❌ Error en procesamiento: {e}")
+            else:
+                st.error(f"Error al procesar datos de Google Sheets: {e}")
     
-    def _normalize_values_advanced(self, df):
+    def _normalize_values_advanced(self, df, status_messages=None):
         """
         NUEVA NORMALIZACIÓN AVANZADA SIN METAS ESPECÍFICAS
         Utiliza estrategias robustas basadas en datos históricos
@@ -264,7 +300,8 @@ class DataLoader:
             if df.empty or 'Valor' not in df.columns:
                 return
             
-            st.info("🔧 Aplicando normalización avanzada sin metas...")
+            if status_messages is None:
+                status_messages = []
             
             # Inicializar columna de valores normalizados
             df['Valor_Normalizado'] = 0.5  # Valor por defecto
@@ -272,10 +309,13 @@ class DataLoader:
             # Si no hay columna tipo, inferir tipo básico
             if 'Tipo' not in df.columns:
                 df['Tipo'] = 'numero'  # Valor por defecto más genérico
-                st.info("ℹ️ No se encontró columna 'Tipo', asumiendo tipo 'numero' para todos los indicadores")
+                status_messages.append("ℹ️ No se encontró columna 'Tipo', asumiendo tipo 'numero' para todos los indicadores")
             
             # Procesar cada indicador individualmente
             indicadores_unicos = df['Codigo'].unique()
+            status_messages.append(f"📊 Procesando {len(indicadores_unicos)} indicadores únicos...")
+            
+            valores_procesados = 0
             
             for codigo in indicadores_unicos:
                 if pd.isna(codigo):
@@ -302,6 +342,7 @@ class DataLoader:
                     valores_norm = valores_norm.apply(lambda x: x if x <= 1 else x / 100)
                     valores_norm = valores_norm.clip(0, 1)
                     df.loc[mask_indicador, 'Valor_Normalizado'] = valores_norm
+                    valores_procesados += len(valores_norm)
                     continue
                 
                 # NORMALIZACIÓN AVANZADA PARA OTROS TIPOS
@@ -330,6 +371,7 @@ class DataLoader:
                                     valor_normalizado = max(valor_normalizado * 0.9, 0.0)
                     
                     valores_normalizados.append(valor_normalizado)
+                    valores_procesados += 1
                 
                 # Asignar valores normalizados al DataFrame
                 indices_indicador = datos_indicador.index
@@ -342,20 +384,27 @@ class DataLoader:
             # Estadísticas de normalización
             valores_norm = df['Valor_Normalizado'].dropna()
             if len(valores_norm) > 0:
-                st.success(f"✅ Normalización completada: {len(valores_norm)} valores procesados")
-                st.info(f"📊 Rango normalizado: {valores_norm.min():.3f} - {valores_norm.max():.3f}, Promedio: {valores_norm.mean():.3f}")
+                status_messages.append(f"✅ Normalización completada: {valores_procesados} valores procesados")
+                status_messages.append(f"📊 Rango normalizado: {valores_norm.min():.3f} - {valores_norm.max():.3f}, Promedio: {valores_norm.mean():.3f}")
             
         except Exception as e:
-            st.error(f"❌ Error en normalización avanzada: {e}")
+            error_msg = f"❌ Error en normalización avanzada: {e}"
+            if status_messages:
+                status_messages.append(error_msg)
+            else:
+                st.error(error_msg)
             # Fallback: usar valores originales clip a 0-1
             if 'Valor' in df.columns:
                 df['Valor_Normalizado'] = df['Valor'].clip(0, 1)
     
-    def _process_dates(self, df):
+    def _process_dates(self, df, status_messages=None):
         """Procesar fechas de Google Sheets"""
         try:
             if df.empty or 'Fecha' not in df.columns:
                 return
+            
+            if status_messages is None:
+                status_messages = []
             
             # Google Sheets puede devolver fechas en diferentes formatos
             date_formats = [
@@ -370,6 +419,7 @@ class DataLoader:
                     fechas_convertidas = pd.to_datetime(df['Fecha'], format=formato, errors='coerce')
                     # Si se convirtieron más del 50% de las fechas, usar este formato
                     if fechas_convertidas.notna().sum() / len(fechas_convertidas) >= 0.5:
+                        status_messages.append(f"📅 Formato de fecha detectado: {formato}")
                         break
                 except:
                     continue
@@ -377,22 +427,30 @@ class DataLoader:
             # Si ningún formato específico funcionó, usar conversión automática
             if fechas_convertidas is None or fechas_convertidas.notna().sum() == 0:
                 fechas_convertidas = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
+                status_messages.append("📅 Usando conversión automática de fechas")
             
             df['Fecha'] = fechas_convertidas
             
             # Reportar fechas inválidas
             fechas_invalidas = df['Fecha'].isna().sum()
             if fechas_invalidas > 0:
-                st.warning(f"⚠️ {fechas_invalidas} fechas no se pudieron convertir en Google Sheets")
+                status_messages.append(f"⚠️ {fechas_invalidas} fechas no se pudieron convertir en Google Sheets")
                 
         except Exception as e:
-            st.warning(f"Error al procesar fechas desde Google Sheets: {e}")
+            error_msg = f"❌ Error al procesar fechas desde Google Sheets: {e}"
+            if status_messages:
+                status_messages.append(error_msg)
+            else:
+                st.warning(error_msg)
     
-    def _process_values(self, df):
+    def _process_values(self, df, status_messages=None):
         """Procesar valores numéricos de Google Sheets"""
         try:
             if df.empty or 'Valor' not in df.columns:
                 return
+            
+            if status_messages is None:
+                status_messages = []
             
             # Google Sheets puede devolver valores como strings
             if df['Valor'].dtype == 'object':
@@ -405,14 +463,19 @@ class DataLoader:
                 
                 # Convertir a numérico
                 df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce')
+                status_messages.append("🔢 Valores convertidos de texto a numérico")
             
             # Reportar valores inválidos
             valores_invalidos = df['Valor'].isna().sum()
             if valores_invalidos > 0:
-                st.warning(f"⚠️ {valores_invalidos} valores no se pudieron convertir desde Google Sheets")
+                status_messages.append(f"⚠️ {valores_invalidos} valores no se pudieron convertir desde Google Sheets")
                 
         except Exception as e:
-            st.warning(f"Error al procesar valores desde Google Sheets: {e}")
+            error_msg = f"❌ Error al procesar valores desde Google Sheets: {e}"
+            if status_messages:
+                status_messages.append(error_msg)
+            else:
+                st.warning(error_msg)
     
     def _add_default_columns(self, df):
         """Añadir columnas por defecto si no existen"""
@@ -427,20 +490,24 @@ class DataLoader:
         df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce').fillna(DEFAULT_META)
         df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
     
-    def _verify_and_clean_dataframe(self, df):
+    def _verify_and_clean_dataframe(self, df, status_messages=None):
         """Verificar y limpiar DataFrame de Google Sheets"""
         try:
             if df.empty:
                 return True  # DataFrame vacío pero válido
+            
+            if status_messages is None:
+                status_messages = []
             
             # Verificar columnas esenciales
             required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
             missing_columns = [col for col in required_columns if col not in df.columns]
             
             if missing_columns:
-                st.error(f"❌ **Faltan columnas en Google Sheets:** {missing_columns}")
-                st.error("**Columnas requeridas:** LINEA DE ACCIÓN, COMPONENTE PROPUESTO, CATEGORÍA, COD, Nombre de indicador, Valor, Fecha")
-                st.write("**Columnas encontradas:**", list(df.columns))
+                error_msg = f"❌ **Faltan columnas en Google Sheets:** {missing_columns}"
+                status_messages.append(error_msg)
+                status_messages.append("**Columnas requeridas:** LINEA DE ACCIÓN, COMPONENTE PROPUESTO, CATEGORÍA, COD, Nombre de indicador, Valor, Fecha")
+                status_messages.append(f"**Columnas encontradas:** {list(df.columns)}")
                 return False
             
             # Limpiar registros con datos faltantes solo en columnas críticas
@@ -449,12 +516,17 @@ class DataLoader:
             final_count = len(df)
             
             if initial_count != final_count:
-                st.info(f"🧹 Limpiados {initial_count - final_count} registros sin código desde Google Sheets")
+                status_messages.append(f"🧹 Limpiados {initial_count - final_count} registros sin código desde Google Sheets")
             
+            status_messages.append("✅ Validación de estructura completada")
             return True
             
         except Exception as e:
-            st.error(f"Error en verificación de datos de Google Sheets: {e}")
+            error_msg = f"❌ Error en verificación de datos de Google Sheets: {e}"
+            if status_messages:
+                status_messages.append(error_msg)
+            else:
+                st.error(error_msg)
             return False
     
     def get_data_source_info(self):
@@ -833,7 +905,11 @@ class ExcelDataLoader:
             df_metodologicas = df_metodologicas.dropna(subset=['Codigo'])
             
             self.metodologicas_data = df_metodologicas
-            st.success(f"✅ Datos del Excel cargados: {len(df_metodologicas)} indicadores metodológicos")
+            
+            # Agregar mensaje de estado en lugar de mostrar directamente
+            if hasattr(st.session_state, 'system_status_messages'):
+                st.session_state.system_status_messages.append(f"✅ Datos del Excel cargados: {len(df_metodologicas)} indicadores metodológicos")
+            
             return df_metodologicas
             
         except Exception as e:
@@ -859,6 +935,9 @@ class ExcelDataLoader:
             else:
                 return None
                 
+        except Exception as e:
+            st.error(f"Error al obtener datos del indicador {codigo}: {e}")
+            return None
         except Exception as e:
             st.error(f"Error al obtener datos del indicador {codigo}: {e}")
             return None
