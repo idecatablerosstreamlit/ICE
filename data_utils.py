@@ -1,8 +1,9 @@
 """
-Utilidades para el manejo de datos del Dashboard ICE - ACTUALIZADO CON NORMALIZACIÓN
+Utilidades para el manejo de datos del Dashboard ICE - ACTUALIZADO CON NORMALIZACIÓN ROBUSTA SIN METAS
 """
 
 import pandas as pd
+import numpy as np
 import streamlit as st
 from config import COLUMN_MAPPING, DEFAULT_META, EXCEL_FILENAME
 import openpyxl  # Para leer archivos Excel
@@ -15,8 +16,146 @@ except ImportError:
     GOOGLE_SHEETS_AVAILABLE = False
     st.error("❌ **ERROR CRÍTICO:** No se puede importar GoogleSheetsManager. Instala las dependencias: `pip install gspread google-auth`")
 
+class AdvancedNormalizer:
+    """Clase para normalización avanzada sin metas específicas"""
+    
+    @staticmethod
+    def normalizar_sin_meta_expansion(valor_actual, valor_inicial, factor_expansion=3.0):
+        """
+        Normalización usando valor inicial como referencia y expandiendo el rango esperado
+        """
+        if valor_inicial == 0:
+            return 0.5
+        
+        if valor_inicial > 0:  # Indicador "mientras más, mejor"
+            min_esperado = valor_inicial * 0.5
+            max_esperado = valor_inicial * factor_expansion
+        else:  # Indicador "mientras menos, mejor"
+            max_esperado = valor_inicial * 1.5
+            min_esperado = valor_inicial * (1/factor_expansion)
+        
+        if max_esperado == min_esperado:
+            return 0.5
+            
+        normalized = (valor_actual - min_esperado) / (max_esperado - min_esperado)
+        return max(0, min(1, normalized))
+    
+    @staticmethod
+    def normalizar_por_tendencia(valor_actual, historial):
+        """
+        Normalización basada en la tendencia histórica del indicador
+        """
+        if len(historial) < 2:
+            return 0.5
+        
+        # Calcular cambios porcentuales
+        cambios = []
+        for i in range(1, len(historial)):
+            if historial[i-1] != 0:
+                cambio = (historial[i] - historial[i-1]) / abs(historial[i-1])
+                cambios.append(cambio)
+        
+        if not cambios:
+            return 0.5
+        
+        tendencia_promedio = sum(cambios) / len(cambios)
+        valor_base = historial[0]
+        periodos = len(historial)
+        
+        if tendencia_promedio > 0:
+            min_proyectado = valor_base
+            max_proyectado = valor_base * (1 + tendencia_promedio * periodos)
+        else:
+            max_proyectado = valor_base
+            min_proyectado = valor_base * (1 + tendencia_promedio * periodos)
+            min_proyectado = max(min_proyectado, valor_base * 0.1)
+        
+        if max_proyectado == min_proyectado:
+            return 0.5
+            
+        normalized = (valor_actual - min_proyectado) / (max_proyectado - min_proyectado)
+        return max(0, min(1, normalized))
+    
+    @staticmethod
+    def normalizar_por_cuartiles(valor_actual, historial):
+        """
+        Normalización usando cuartiles de la distribución histórica
+        """
+        if len(historial) < 4:
+            return 0.5
+        
+        try:
+            q1 = np.percentile(historial, 25)
+            q3 = np.percentile(historial, 75)
+            iqr = q3 - q1
+            
+            min_expandido = q1 - 1.5 * iqr
+            max_expandido = q3 + 1.5 * iqr
+            
+            if max_expandido == min_expandido:
+                return 0.5
+            
+            normalized = (valor_actual - min_expandido) / (max_expandido - min_expandido)
+            return max(0, min(1, normalized))
+            
+        except Exception:
+            return 0.5
+    
+    @staticmethod
+    def normalizar_desempeno_relativo(valor_actual, historial):
+        """
+        Normalización basada en desempeño relativo histórico
+        """
+        if len(historial) == 0:
+            return 0.5
+        
+        promedio_historico = sum(historial) / len(historial)
+        
+        if len(historial) == 1:
+            if historial[0] == 0:
+                return 0.75 if valor_actual > 0 else 0.25
+            ratio = valor_actual / historial[0] if historial[0] != 0 else 1
+            return min(ratio / 2.0, 1.0)
+        
+        # Calcular desviación histórica
+        varianzas = [(x - promedio_historico) ** 2 for x in historial]
+        desviacion = (sum(varianzas) / len(varianzas)) ** 0.5
+        
+        if desviacion == 0:
+            return AdvancedNormalizer.normalizar_sin_meta_expansion(valor_actual, promedio_historico)
+        
+        # Z-score modificado
+        z_score = (valor_actual - promedio_historico) / desviacion
+        return max(0, min(1, (z_score + 2) / 4))
+    
+    @staticmethod
+    def normalizar_multienfoque(valor_actual, historial, tipo_indicador):
+        """
+        Enfoque robusto que combina múltiples estrategias según disponibilidad de datos
+        """
+        n_datos = len(historial)
+        
+        if n_datos == 0:
+            return 0.5
+        
+        elif n_datos == 1:
+            return AdvancedNormalizer.normalizar_sin_meta_expansion(valor_actual, historial[0])
+        
+        elif n_datos < 5:
+            # Combinar expansión y desempeño relativo para datos limitados
+            norm1 = AdvancedNormalizer.normalizar_sin_meta_expansion(valor_actual, historial[0])
+            norm2 = AdvancedNormalizer.normalizar_desempeno_relativo(valor_actual, historial)
+            return (norm1 + norm2) / 2
+        
+        else:
+            # Suficientes datos: usar mejor método según tipo
+            if tipo_indicador.lower() in ['numero', 'number', 'cantidad', 'count', 'moneda', 'currency']:
+                return AdvancedNormalizer.normalizar_por_cuartiles(valor_actual, historial)
+            else:
+                return AdvancedNormalizer.normalizar_por_tendencia(valor_actual, historial)
+
 class DataLoader:
-    """Clase para cargar y procesar datos - SOLO GOOGLE SHEETS"""
+    """Clase para cargar y procesar datos - SOLO GOOGLE SHEETS CON NORMALIZACIÓN AVANZADA"""
     
     def __init__(self):
         self.df = None
@@ -110,89 +249,107 @@ class DataLoader:
             # Añadir columnas por defecto
             self._add_default_columns(df)
             
-            # NUEVO: Normalizar valores según tipo
-            self._normalize_values(df)
+            # NUEVA NORMALIZACIÓN AVANZADA SIN METAS
+            self._normalize_values_advanced(df)
             
         except Exception as e:
             st.error(f"Error al procesar datos de Google Sheets: {e}")
     
-    def _normalize_values(self, df):
-        """Normalizar valores según el tipo de indicador - NUEVO"""
+    def _normalize_values_advanced(self, df):
+        """
+        NUEVA NORMALIZACIÓN AVANZADA SIN METAS ESPECÍFICAS
+        Utiliza estrategias robustas basadas en datos históricos
+        """
         try:
             if df.empty or 'Valor' not in df.columns:
                 return
             
+            st.info("🔧 Aplicando normalización avanzada sin metas...")
+            
             # Inicializar columna de valores normalizados
-            df['Valor_Normalizado'] = df['Valor'].copy()
+            df['Valor_Normalizado'] = 0.5  # Valor por defecto
             
-            # Si no hay columna tipo, asumir que todos son tipo "porcentaje" (0-1)
+            # Si no hay columna tipo, inferir tipo básico
             if 'Tipo' not in df.columns:
-                df['Tipo'] = 'porcentaje'
-                st.info("ℹ️ No se encontró columna 'Tipo', asumiendo todos como porcentajes (0-1)")
+                df['Tipo'] = 'numero'  # Valor por defecto más genérico
+                st.info("ℹ️ No se encontró columna 'Tipo', asumiendo tipo 'numero' para todos los indicadores")
             
-            # Normalizar por tipo de indicador
-            for tipo in df['Tipo'].unique():
-                if pd.isna(tipo):
-                    continue
-                    
-                mask = df['Tipo'] == tipo
-                valores = df.loc[mask, 'Valor']
-                
-                if len(valores) == 0:
+            # Procesar cada indicador individualmente
+            indicadores_unicos = df['Codigo'].unique()
+            
+            for codigo in indicadores_unicos:
+                if pd.isna(codigo):
                     continue
                 
-                tipo_lower = str(tipo).lower().strip()
+                # Obtener todos los datos de este indicador
+                mask_indicador = df['Codigo'] == codigo
+                datos_indicador = df[mask_indicador].copy()
                 
-                if tipo_lower in ['porcentaje', 'percentage', '%']:
-                    # Porcentajes: ya están entre 0-1 o 0-100
-                    if valores.max() <= 1:
-                        df.loc[mask, 'Valor_Normalizado'] = valores.clip(0, 1)
-                    else:
-                        df.loc[mask, 'Valor_Normalizado'] = (valores / 100).clip(0, 1)
-                        
-                elif tipo_lower in ['numero', 'number', 'cantidad', 'count']:
-                    # Números: normalizar por el máximo valor del grupo
-                    max_val = valores.max()
-                    if max_val > 0:
-                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
-                    else:
-                        df.loc[mask, 'Valor_Normalizado'] = 0
-                        
-                elif tipo_lower in ['moneda', 'currency', 'dinero', 'money', 'pesos', 'dolares']:
-                    # Moneda: normalizar por el máximo valor del grupo
-                    max_val = valores.max()
-                    if max_val > 0:
-                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
-                    else:
-                        df.loc[mask, 'Valor_Normalizado'] = 0
-                        
-                elif tipo_lower in ['indice', 'index', 'ratio']:
-                    # Índices: normalizar por el máximo valor del grupo
-                    max_val = valores.max()
-                    if max_val > 0:
-                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
-                    else:
-                        df.loc[mask, 'Valor_Normalizado'] = 0
-                        
-                else:
-                    # Tipo desconocido: normalizar por el máximo valor del grupo
-                    max_val = valores.max()
-                    if max_val > 0:
-                        df.loc[mask, 'Valor_Normalizado'] = (valores / max_val).clip(0, 1)
-                    else:
-                        df.loc[mask, 'Valor_Normalizado'] = 0
+                if len(datos_indicador) == 0:
+                    continue
+                
+                # Ordenar por fecha para mantener cronología
+                datos_indicador = datos_indicador.sort_values('Fecha')
+                
+                # Obtener tipo del indicador
+                tipo_indicador = datos_indicador['Tipo'].iloc[0] if 'Tipo' in datos_indicador.columns else 'numero'
+                
+                # CASO ESPECIAL: Porcentajes
+                if str(tipo_indicador).lower() in ['porcentaje', 'percentage', '%']:
+                    # Los porcentajes ya están normalizados
+                    valores_norm = datos_indicador['Valor'].copy()
+                    # Convertir a 0-1 si están en 0-100
+                    valores_norm = valores_norm.apply(lambda x: x if x <= 1 else x / 100)
+                    valores_norm = valores_norm.clip(0, 1)
+                    df.loc[mask_indicador, 'Valor_Normalizado'] = valores_norm
+                    continue
+                
+                # NORMALIZACIÓN AVANZADA PARA OTROS TIPOS
+                valores = datos_indicador['Valor'].tolist()
+                valores_normalizados = []
+                
+                for i, valor_actual in enumerate(valores):
+                    # Historial hasta el punto actual (sin incluir el valor actual)
+                    historial = valores[:i]  # Valores anteriores
                     
-                    st.warning(f"⚠️ Tipo de indicador desconocido '{tipo}', normalizando por máximo del grupo")
+                    # Aplicar normalización multienfoque
+                    valor_normalizado = AdvancedNormalizer.normalizar_multienfoque(
+                        valor_actual, historial, tipo_indicador
+                    )
+                    
+                    # AJUSTES ESPECIALES POR TIPO
+                    if str(tipo_indicador).lower() in ['moneda', 'currency', 'dinero', 'pesos']:
+                        # Para valores monetarios, aplicar suavizado adicional
+                        if len(historial) > 0:
+                            promedio_hist = sum(historial) / len(historial)
+                            if promedio_hist > 0:
+                                ratio = valor_actual / promedio_hist
+                                if ratio > 5:  # Crecimiento muy alto
+                                    valor_normalizado = min(valor_normalizado * 1.1, 1.0)
+                                elif ratio < 0.2:  # Decrecimiento muy alto
+                                    valor_normalizado = max(valor_normalizado * 0.9, 0.0)
+                    
+                    valores_normalizados.append(valor_normalizado)
+                
+                # Asignar valores normalizados al DataFrame
+                indices_indicador = datos_indicador.index
+                for idx, valor_norm in zip(indices_indicador, valores_normalizados):
+                    df.loc[idx, 'Valor_Normalizado'] = valor_norm
             
-            # Asegurar que todos los valores normalizados estén entre 0 y 1
+            # Verificación final: asegurar que todos los valores están entre 0 y 1
             df['Valor_Normalizado'] = df['Valor_Normalizado'].clip(0, 1)
             
-            
+            # Estadísticas de normalización
+            valores_norm = df['Valor_Normalizado'].dropna()
+            if len(valores_norm) > 0:
+                st.success(f"✅ Normalización completada: {len(valores_norm)} valores procesados")
+                st.info(f"📊 Rango normalizado: {valores_norm.min():.3f} - {valores_norm.max():.3f}, Promedio: {valores_norm.mean():.3f}")
             
         except Exception as e:
-            st.error(f"Error al normalizar valores: {e}")
-            # Fallback: usar valores originales (asumiendo que están entre 0-1)
-            df['Valor_Normalizado'] = df['Valor'].clip(0, 1)
+            st.error(f"❌ Error en normalización avanzada: {e}")
+            # Fallback: usar valores originales clip a 0-1
+            if 'Valor' in df.columns:
+                df['Valor_Normalizado'] = df['Valor'].clip(0, 1)
     
     def _process_dates(self, df):
         """Procesar fechas de Google Sheets"""
@@ -264,7 +421,7 @@ class DataLoader:
         if 'Peso' not in df.columns:
             df['Peso'] = 1.0
         if 'Tipo' not in df.columns:
-            df['Tipo'] = 'porcentaje'  # Valor por defecto
+            df['Tipo'] = 'numero'  # Valor por defecto más genérico
         
         # Asegurar tipos correctos
         df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce').fillna(DEFAULT_META)
@@ -318,7 +475,7 @@ class DataProcessor:
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """Calcular puntajes usando valores normalizados."""
+        """Calcular puntajes usando valores normalizados avanzados."""
         try:
             if df.empty:
                 st.info("📋 No hay datos disponibles para calcular puntajes")
@@ -546,7 +703,7 @@ class DataEditor:
                 'Nombre de indicador': indicador_base.get('Indicador', ''),
                 'Valor': valor,
                 'Fecha': fecha_formateada,
-                'Tipo': indicador_base.get('Tipo', 'porcentaje')  # Incluir tipo
+                'Tipo': indicador_base.get('Tipo', 'numero')  # Incluir tipo
             }
             
             # Agregar a Google Sheets
