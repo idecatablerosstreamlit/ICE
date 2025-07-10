@@ -49,11 +49,10 @@ def main():
         
         st.stop()
     
-    # CARGA DE DATOS SIMPLIFICADA - SIN CACHÉ PROBLEMÁTICO
+    # CARGA DE DATOS SIMPLIFICADA - SIN INFORMACIÓN EN ENCABEZADO
     try:
-        # Mostrar spinner mientras carga
-        with st.spinner("🔄 Cargando datos desde Google Sheets..."):
-            df, source_info, excel_data = load_data_simple()
+        # Cargar datos sin mostrar información en el encabezado
+        df, source_info, excel_data = load_data_simple()
         
         # Verificar si la carga fue exitosa
         if df is None:
@@ -61,22 +60,23 @@ def main():
             show_error_message()
             return
         
-        # Verificar estructura de datos
+        # Verificar estructura de datos (sin mostrar información técnica)
         if not verify_data_structure(df):
             return
         
-        # Crear filtros simples
+        # Crear filtros simples (sin información técnica)
         filters = create_simple_filters(df)
         
         # Renderizar pestañas
         tab_manager = TabManager(df, None, excel_data)
         tab_manager.render_tabs(df, filters)
         
-        # INFORMACIÓN DE ESTADO AL FINAL
+        # INFORMACIÓN DE ESTADO AL FINAL - EN EXPANDER
         st.markdown("---")
-        st.markdown("### 📊 Información del Sistema")
         
-        show_system_info_footer(df, source_info)
+        # Información del sistema en expander (colapsado por defecto)
+        with st.expander("Información del Sistema", expanded=False):
+            show_system_info_footer(df, source_info)
         
     except Exception as e:
         st.error(f"❌ Error crítico: {e}")
@@ -94,13 +94,13 @@ def main():
             st.rerun()
 
 def load_data_simple():
-    """Cargar datos SIN caché problemático"""
+    """Cargar datos silenciosamente para evitar información en encabezado"""
     try:
-        # Cargar desde Google Sheets
+        # Cargar desde Google Sheets sin mostrar información
         data_loader = DataLoader()
         df_loaded = data_loader.load_data()
         
-        # Cargar datos del Excel
+        # Cargar datos del Excel silenciosamente
         excel_loader = ExcelDataLoader()
         excel_data = excel_loader.load_excel_data()
         
@@ -110,8 +110,7 @@ def load_data_simple():
         return df_loaded, source_info, excel_data
         
     except Exception as e:
-        st.error(f"❌ Error al cargar datos: {e}")
-        # Retornar datos vacíos válidos
+        # Error silencioso, se mostrará en el footer
         empty_df = pd.DataFrame(columns=[
             'Linea_Accion', 'Componente', 'Categoria', 
             'Codigo', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado'
@@ -119,41 +118,103 @@ def load_data_simple():
         return empty_df, {'source': 'Google Sheets (Error)', 'connection_info': {'connected': False}}, None
 
 def show_system_info_footer(df, source_info):
-    """Mostrar información del sistema al final del dashboard"""
+    """Mostrar información del sistema sin iconos en expander"""
+    
+    # Mostrar información que antes estaba en encabezado
+    if not df.empty:
+        st.success(f"Cargados {len(df)} registros desde Google Sheets")
+        st.success("Datos procesados y listos para usar")
+    
+    # Información detallada en expandible (lo que antes se mostraba en "Detalles del procesamiento")
+    with st.expander("Detalles del procesamiento de datos", expanded=False):
+        if not df.empty:
+            st.write("**Procesamiento completado:**")
+            st.success("Columnas renombradas correctamente")
+            
+            # Información de fechas
+            if 'Fecha' in df.columns:
+                fechas_validas = df['Fecha'].notna().sum()
+                fechas_invalidas = df['Fecha'].isna().sum()
+                if fechas_validas > 0:
+                    st.success(f"{fechas_validas} fechas procesadas correctamente")
+                if fechas_invalidas > 0:
+                    st.warning(f"{fechas_invalidas} fechas no convertidas")
+            
+            # Información de valores
+            if 'Valor' in df.columns:
+                valores_validos = df['Valor'].notna().sum()
+                valores_invalidos = df['Valor'].isna().sum()
+                if valores_validos > 0:
+                    st.success(f"{valores_validos} valores procesados")
+                if valores_invalidos > 0:
+                    st.warning(f"{valores_invalidos} valores no válidos")
+            
+            # Información de normalización
+            if 'Valor_Normalizado' in df.columns:
+                # Contar indicadores con y sin historial
+                indicadores_sin_historico = 0
+                indicadores_con_historico = 0
+                
+                for codigo in df['Codigo'].unique():
+                    if pd.isna(codigo):
+                        continue
+                    valores = df[df['Codigo'] == codigo]['Valor'].dropna()
+                    if len(valores) == 1:
+                        indicadores_sin_historico += 1
+                    elif len(valores) > 1:
+                        indicadores_con_historico += 1
+                
+                norm_min = df['Valor_Normalizado'].min()
+                norm_max = df['Valor_Normalizado'].max()
+                norm_promedio = df['Valor_Normalizado'].mean()
+                
+                st.success("Normalización completada")
+                st.info(f"Rango normalizado: {norm_min:.3f} - {norm_max:.3f}")
+                st.info(f"Promedio normalizado: {norm_promedio:.3f}")
+                
+                if indicadores_sin_historico > 0:
+                    st.info(f"{indicadores_sin_historico} indicadores sin historial: valores numéricos = 0.7, porcentajes = valor original")
+                
+                if indicadores_con_historico > 0:
+                    st.info(f"{indicadores_con_historico} indicadores con historial: normalizados por máximo")
+        else:
+            st.info("Google Sheets está vacío")
+    
+    # Estadísticas principales
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("#### 📈 Estadísticas de Datos")
+        st.markdown("#### Estadísticas de Datos")
         
-        # Información básica
-        st.info(f"📊 **Total registros:** {len(df)}")
+        # Información básica sin iconos
+        st.info(f"**Total registros:** {len(df)}")
         
         indicadores_unicos = df['Codigo'].nunique() if not df.empty else 0
-        st.info(f"🔢 **Indicadores únicos:** {indicadores_unicos}")
+        st.info(f"**Indicadores únicos:** {indicadores_unicos}")
         
         if not df.empty and 'Fecha' in df.columns:
             fechas_disponibles = df['Fecha'].nunique()
-            st.info(f"📅 **Fechas diferentes:** {fechas_disponibles}")
+            st.info(f"**Fechas diferentes:** {fechas_disponibles}")
         else:
-            st.info("📅 **Fechas diferentes:** 0")
+            st.info("**Fechas diferentes:** 0")
         
         # Información de tipos si existe la columna
         if not df.empty and 'Tipo' in df.columns:
             tipos_count = df['Tipo'].value_counts()
-            st.info(f"📝 **Tipos de indicadores:** {dict(tipos_count)}")
+            st.info(f"**Tipos de indicadores:** {dict(tipos_count)}")
     
     with col2:
-        st.markdown("#### 🔗 Estado de Conexión")
+        st.markdown("#### Estado de Conexión")
         
-        # Estado de conexión
+        # Estado de conexión sin iconos
         connection_info = source_info.get('connection_info', {})
         if connection_info.get('connected', False):
-            st.success("🌐 **Google Sheets:** Conectado")
+            st.success("**Google Sheets:** Conectado")
         else:
-            st.error("❌ **Google Sheets:** Desconectado")
+            st.error("**Google Sheets:** Desconectado")
         
         # Botón de actualización
-        if st.button("🔄 Actualizar desde Google Sheets", 
+        if st.button("Actualizar desde Google Sheets", 
                     help="Recarga los datos desde Google Sheets",
                     key="footer_refresh"):
             current_tab = st.session_state.get('active_tab_index', 0)
@@ -162,16 +223,22 @@ def show_system_info_footer(df, source_info):
             st.rerun()
         
         # Información técnica
-        with st.expander("🔧 Información Técnica", expanded=False):
+        with st.expander("Información Técnica", expanded=False):
             st.write("**Fuente de datos:**", source_info.get('source', 'Desconocida'))
-            if 'timeout' in connection_info:
+            if connection_info and 'timeout' in connection_info:
                 st.write("**Timeout configurado:**", f"{connection_info['timeout']}s")
             
             # Timestamp de última carga
-            if 'last_load_time' in st.session_state:
+            if 'last_load_time' in st.session_state and st.session_state.last_load_time > 0:
                 import datetime
                 last_time = datetime.datetime.fromtimestamp(st.session_state.last_load_time)
                 st.write("**Última actualización:**", last_time.strftime('%H:%M:%S'))
+            
+            # Información sobre normalización
+            st.markdown("**Reglas de normalización:**")
+            st.write("• Porcentajes: valor original")
+            st.write("• Números sin historial: 0.7 (70%)")
+            st.write("• Números con historial: normalizado por máximo")
 
 def verify_data_structure(df):
     """Verificar estructura de datos"""
@@ -214,33 +281,26 @@ def verify_data_structure(df):
     return True
 
 def create_simple_filters(df):
-    """Crear filtros simples"""
-    st.markdown("### 📅 Fecha de Referencia")
-    
-    st.info("""
-    ℹ️ **Nota:** Los cálculos siempre usan el **valor más reciente** de cada indicador.
-    """)
+    """Crear filtros simples SIN información técnica en encabezado"""
+    st.markdown("### 📅 Filtros")
     
     try:
         if df.empty or 'Fecha' not in df.columns:
-            st.warning("No hay fechas disponibles en Google Sheets")
             return {'fecha': None}
             
         fechas_validas = df['Fecha'].dropna().unique()
         if len(fechas_validas) > 0:
             fechas = sorted(fechas_validas)
             fecha_seleccionada = st.selectbox(
-                "Seleccionar fecha (para visualizaciones específicas)", 
+                "Fecha de referencia", 
                 fechas, 
                 index=len(fechas) - 1,
-                help="Esta fecha se usa solo en algunas visualizaciones"
+                help="Los cálculos usan siempre el valor más reciente de cada indicador"
             )
             return {'fecha': fecha_seleccionada}
         else:
-            st.warning("No se encontraron fechas válidas")
             return {'fecha': None}
     except Exception as e:
-        st.warning(f"Error al procesar fechas: {e}")
         return {'fecha': None}
 
 def show_error_message():
