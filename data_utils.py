@@ -6,37 +6,6 @@ CORRECCIÓN: Normalización simplificada y eliminación de bucles infinitos
 import pandas as pd
 import numpy as np
 import streamlit as st
-from config import COLUMN_MAPPING, DEFAULT_META, EXCEL_FILENAME
-import openpyxl
-
-# Importación de Google Sheets
-try:
-    from google_sheets_manager import GoogleSheetsManager
-    GOOGLE_SHEETS_AVAILABLE = True
-except ImportError:
-    GOOGLE_SHEETS_AVAILABLE = False
-
-class DataLoader:
-    """Clase para cargar datos - VERSIÓN SIMPLIFICADA"""
-    
-    def __init__(self):
-        self.df = None
-        self.sheets_manager = None
-        
-        if not GOOGLE_SHEETS_AVAILABLE:
-            st.error("❌ **Google Sheets no disponible.** Instala: `pip install gspread google-auth`")
-            return
-        
-        try:
-            self.sheets_manager = GoogleSheetsManager()
-        except Exception as e:"""
-Utilidades para el manejo de datos del Dashboard ICE - VERSIÓN CORREGIDA
-CORRECCIÓN: Normalización simplificada y eliminación de bucles infinitos
-"""
-
-import pandas as pd
-import numpy as np
-import streamlit as st
 import os
 from config import COLUMN_MAPPING, DEFAULT_META, EXCEL_FILENAME
 import openpyxl
@@ -234,12 +203,12 @@ class DataLoader:
         df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
     
     def _normalize_values_simple(self, df):
-        """Normalización SIMPLIFICADA y ROBUSTA"""
+        """Normalización CORREGIDA - Manejo adecuado de valores únicos"""
         try:
             if df.empty or 'Valor' not in df.columns:
                 return
             
-            # Inicializar valores normalizados
+            # Inicializar valores normalizados con valor neutro
             df['Valor_Normalizado'] = 0.5
             
             # Verificar que tenemos datos válidos
@@ -261,44 +230,73 @@ class DataLoader:
                 if valores.empty:
                     continue
                 
-                # Normalización por tipo
+                # CORRECCIÓN: Manejo especial para valores únicos
+                if len(valores) == 1:
+                    # Si solo hay un valor, asignar normalización basada en el tipo
+                    valor_unico = valores.iloc[0]
+                    
+                    if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
+                        # Porcentajes: normalizar directamente
+                        if valor_unico <= 1:
+                            valor_norm = valor_unico  # Ya está en 0-1
+                        else:
+                            valor_norm = valor_unico / 100  # Convertir de 0-100 a 0-1
+                        valor_norm = max(0, min(1, valor_norm))
+                    else:
+                        # Para otros tipos con un solo valor, asumir que es un valor "bueno"
+                        # Asignar un valor normalizado neutral-alto (0.7) en lugar de 0
+                        valor_norm = 0.7
+                    
+                    df.loc[mask, 'Valor_Normalizado'] = valor_norm
+                    continue
+                
+                # Normalización para múltiples valores
                 if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
-                    # Porcentajes: asumir que están en 0-100 o 0-1
-                    valores_norm = valores.copy()
-                    # Si los valores son mayores a 1, convertir de 0-100 a 0-1
-                    valores_norm = valores_norm.apply(lambda x: x/100 if x > 1 else x)
+                    # Porcentajes: convertir a 0-1 si están en 0-100
+                    valores_norm = valores.apply(lambda x: x/100 if x > 1 else x)
                     valores_norm = valores_norm.clip(0, 1)
                     
                 elif str(tipo).lower() in ['moneda', 'currency', 'dinero', 'pesos']:
                     # Valores monetarios: normalizar por máximo
-                    if valores.max() > 0:
-                        valores_norm = valores / valores.max()
+                    max_val = valores.max()
+                    if max_val > 0:
+                        valores_norm = valores / max_val
                     else:
                         valores_norm = pd.Series([0.5] * len(valores), index=valores.index)
                     
                 elif str(tipo).lower() in ['numero', 'number', 'cantidad', 'count']:
                     # Números: normalizar por máximo
-                    if valores.max() > 0:
-                        valores_norm = valores / valores.max()
+                    max_val = valores.max()
+                    if max_val > 0:
+                        valores_norm = valores / max_val
                     else:
                         valores_norm = pd.Series([0.5] * len(valores), index=valores.index)
                     
                 elif str(tipo).lower() in ['indice', 'index', 'ratio']:
-                    # Índices: normalizar por máximo o asumir que ya están normalizados
-                    if valores.max() > 2:  # Si son valores grandes, normalizar
-                        valores_norm = valores / valores.max()
-                    else:  # Si son valores pequeños, asumir que están normalizados
+                    # Índices: manejo especial
+                    max_val = valores.max()
+                    if max_val > 2:  # Valores grandes, normalizar
+                        valores_norm = valores / max_val
+                    else:  # Valores pequeños, asumir normalizados
                         valores_norm = valores.clip(0, 1)
                         
                 else:
-                    # Tipo desconocido: normalización básica
-                    if valores.max() > 1:
-                        valores_norm = valores / valores.max()
+                    # Tipo desconocido: normalización segura
+                    max_val = valores.max()
+                    if max_val > 1:
+                        valores_norm = valores / max_val
                     else:
                         valores_norm = valores.clip(0, 1)
                 
                 # Asignar valores normalizados
                 df.loc[mask & valores_validos, 'Valor_Normalizado'] = valores_norm.clip(0, 1)
+            
+            # Verificar que no hay valores extremadamente bajos por error
+            valores_muy_bajos = (df['Valor_Normalizado'] < 0.01) & (df['Valor_Normalizado'] > 0)
+            if valores_muy_bajos.any():
+                st.warning(f"⚠️ {valores_muy_bajos.sum()} valores normalizados muy bajos detectados")
+                # Corregir valores muy bajos asignándoles un mínimo razonable
+                df.loc[valores_muy_bajos, 'Valor_Normalizado'] = 0.1
             
             # Verificar resultados
             norm_validos = df['Valor_Normalizado'].notna().sum()
@@ -311,11 +309,10 @@ class DataLoader:
             
         except Exception as e:
             st.error(f"Error en normalización: {e}")
-            # Fallback: usar valores originales limitados a 0-1
+            # Fallback seguro: asignar valores neutros
             try:
-                if 'Valor' in df.columns:
-                    df['Valor_Normalizado'] = df['Valor'].clip(0, 1)
-                    st.warning("⚠️ Usando normalización básica como fallback")
+                df['Valor_Normalizado'] = 0.6  # Valor neutral-positivo
+                st.warning("⚠️ Usando normalización de fallback (0.6)")
             except:
                 df['Valor_Normalizado'] = 0.5
     
