@@ -1,6 +1,6 @@
 """
 Dashboard ICE - Archivo Principal - VERSIÓN CORREGIDA
-CORRECCIÓN: Eliminación de bucles infinitos en caché y optimización de carga
+CORRECCIÓN: Información de estado movida al final del dashboard
 """
 
 import streamlit as st
@@ -61,19 +61,9 @@ def main():
             show_error_message()
             return
         
-        # Mostrar información del sistema
-        show_system_info(df, source_info)
-        
         # Verificar estructura de datos
         if not verify_data_structure(df):
             return
-            
-        # Botón de recarga SIMPLIFICADO
-        if st.button("🔄 Actualizar desde Google Sheets", help="Recarga los datos desde Google Sheets"):
-            current_tab = st.session_state.get('active_tab_index', 0)
-            st.session_state.last_load_time = time.time()
-            st.session_state.active_tab_index = current_tab
-            st.rerun()
         
         # Crear filtros simples
         filters = create_simple_filters(df)
@@ -81,6 +71,12 @@ def main():
         # Renderizar pestañas
         tab_manager = TabManager(df, None, excel_data)
         tab_manager.render_tabs(df, filters)
+        
+        # INFORMACIÓN DE ESTADO AL FINAL
+        st.markdown("---")
+        st.markdown("### 📊 Información del Sistema")
+        
+        show_system_info_footer(df, source_info)
         
     except Exception as e:
         st.error(f"❌ Error crítico: {e}")
@@ -122,32 +118,60 @@ def load_data_simple():
         ])
         return empty_df, {'source': 'Google Sheets (Error)', 'connection_info': {'connected': False}}, None
 
-def show_system_info(df, source_info):
-    """Mostrar información del sistema"""
-    # Mostrar información de estado
-    col1, col2, col3, col4 = st.columns(4)
+def show_system_info_footer(df, source_info):
+    """Mostrar información del sistema al final del dashboard"""
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.info(f"📊 **{len(df)}** registros")
-    
-    with col2:
+        st.markdown("#### 📈 Estadísticas de Datos")
+        
+        # Información básica
+        st.info(f"📊 **Total registros:** {len(df)}")
+        
         indicadores_unicos = df['Codigo'].nunique() if not df.empty else 0
-        st.info(f"🔢 **{indicadores_unicos}** indicadores")
-    
-    with col3:
+        st.info(f"🔢 **Indicadores únicos:** {indicadores_unicos}")
+        
         if not df.empty and 'Fecha' in df.columns:
             fechas_disponibles = df['Fecha'].nunique()
-            st.info(f"📅 **{fechas_disponibles}** fechas")
+            st.info(f"📅 **Fechas diferentes:** {fechas_disponibles}")
         else:
-            st.info("📅 **0** fechas")
+            st.info("📅 **Fechas diferentes:** 0")
+        
+        # Información de tipos si existe la columna
+        if not df.empty and 'Tipo' in df.columns:
+            tipos_count = df['Tipo'].value_counts()
+            st.info(f"📝 **Tipos de indicadores:** {dict(tipos_count)}")
     
-    with col4:
-        # Mostrar estado de conexión
+    with col2:
+        st.markdown("#### 🔗 Estado de Conexión")
+        
+        # Estado de conexión
         connection_info = source_info.get('connection_info', {})
         if connection_info.get('connected', False):
-            st.success("🌐 **Conectado**")
+            st.success("🌐 **Google Sheets:** Conectado")
         else:
-            st.error("❌ **Desconectado**")
+            st.error("❌ **Google Sheets:** Desconectado")
+        
+        # Botón de actualización
+        if st.button("🔄 Actualizar desde Google Sheets", 
+                    help="Recarga los datos desde Google Sheets",
+                    key="footer_refresh"):
+            current_tab = st.session_state.get('active_tab_index', 0)
+            st.session_state.last_load_time = time.time()
+            st.session_state.active_tab_index = current_tab
+            st.rerun()
+        
+        # Información técnica
+        with st.expander("🔧 Información Técnica", expanded=False):
+            st.write("**Fuente de datos:**", source_info.get('source', 'Desconocida'))
+            if 'timeout' in connection_info:
+                st.write("**Timeout configurado:**", f"{connection_info['timeout']}s")
+            
+            # Timestamp de última carga
+            if 'last_load_time' in st.session_state:
+                import datetime
+                last_time = datetime.datetime.fromtimestamp(st.session_state.last_load_time)
+                st.write("**Última actualización:**", last_time.strftime('%H:%M:%S'))
 
 def verify_data_structure(df):
     """Verificar estructura de datos"""
