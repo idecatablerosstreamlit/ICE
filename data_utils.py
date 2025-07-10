@@ -938,6 +938,3 @@ class ExcelDataLoader:
         except Exception as e:
             st.error(f"Error al obtener datos del indicador {codigo}: {e}")
             return None
-        except Exception as e:
-            st.error(f"Error al obtener datos del indicador {codigo}: {e}")
-            return None
