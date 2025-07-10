@@ -1,6 +1,6 @@
 """
 Utilidades para el manejo de datos del Dashboard ICE - VERSIÓN CORREGIDA
-CORRECCIÓN: Normalización simplificada y eliminación de bucles infinitos
+CORRECCIÓN: Normalización que preserva valores originales cuando no hay histórico
 """
 
 import pandas as pd
@@ -95,8 +95,8 @@ class DataLoader:
             # Añadir columnas por defecto
             self._add_default_columns(df)
             
-            # Normalización SIMPLIFICADA
-            self._normalize_values_simple(df)
+            # Normalización CORREGIDA
+            self._normalize_values_fixed(df)
             
         except Exception as e:
             st.error(f"Error en procesamiento: {e}")
@@ -155,11 +155,6 @@ class DataLoader:
             if fechas_invalidas > 0:
                 st.warning(f"⚠️ {fechas_invalidas} fechas no se pudieron convertir")
                 
-                # Mostrar ejemplos de fechas problemáticas
-                fechas_problematicas = df[df['Fecha'].isna()]['Fecha'].head(3).tolist()
-                if fechas_problematicas:
-                    st.info(f"Ejemplos de fechas problemáticas: {fechas_problematicas}")
-                
         except Exception as e:
             st.error(f"Error al procesar fechas: {e}")
             # Intentar conversión básica como fallback
@@ -202,14 +197,14 @@ class DataLoader:
         df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce').fillna(DEFAULT_META)
         df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
     
-    def _normalize_values_simple(self, df):
-        """Normalización CORREGIDA - Manejo adecuado de valores únicos"""
+    def _normalize_values_fixed(self, df):
+        """Normalización CORREGIDA - Preservar valores originales cuando no hay histórico"""
         try:
             if df.empty or 'Valor' not in df.columns:
                 return
             
-            # Inicializar valores normalizados con valor neutro
-            df['Valor_Normalizado'] = 0.5
+            # Inicializar valores normalizados copiando valores originales
+            df['Valor_Normalizado'] = df['Valor'].copy()
             
             # Verificar que tenemos datos válidos
             valores_validos = df['Valor'].notna()
@@ -217,71 +212,78 @@ class DataLoader:
                 st.warning("⚠️ No hay valores válidos para normalizar")
                 return
             
-            # Procesar cada tipo de indicador
-            tipos_unicos = df['Tipo'].unique()
-            
-            for tipo in tipos_unicos:
-                if pd.isna(tipo):
+            # Procesar cada INDICADOR individualmente (no por tipo)
+            for codigo in df['Codigo'].unique():
+                if pd.isna(codigo):
                     continue
                     
-                mask = df['Tipo'] == tipo
+                mask = df['Codigo'] == codigo
                 valores = df.loc[mask, 'Valor'].dropna()
                 
                 if valores.empty:
                     continue
                 
-                # CORRECCIÓN: Manejo especial para valores únicos
+                # Obtener información del indicador
+                indicador_info = df[mask].iloc[0]
+                tipo = indicador_info.get('Tipo', 'porcentaje')
+                
+                # REGLA PRINCIPAL: Si solo hay UN valor por indicador, NO normalizar
+                # Solo usar el valor original ajustado por tipo
                 if len(valores) == 1:
-                    # Si solo hay un valor, asignar normalización basada en el tipo
-                    valor_unico = valores.iloc[0]
+                    valor_original = valores.iloc[0]
                     
                     if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
-                        # Porcentajes: normalizar directamente
-                        if valor_unico <= 1:
-                            valor_norm = valor_unico  # Ya está en 0-1
+                        # Porcentajes: convertir a 0-1 si están en 0-100
+                        if valor_original <= 1:
+                            valor_norm = valor_original  # Ya está en 0-1
                         else:
-                            valor_norm = valor_unico / 100  # Convertir de 0-100 a 0-1
+                            valor_norm = valor_original / 100  # Convertir de 0-100 a 0-1
                         valor_norm = max(0, min(1, valor_norm))
                     else:
-                        # Para otros tipos con un solo valor, asumir que es un valor "bueno"
-                        # Asignar un valor normalizado neutral-alto (0.7) en lugar de 0
-                        valor_norm = 0.7
+                        # Para otros tipos: MANTENER el valor original sin normalizar
+                        # Solo asegurar que esté en un rango razonable
+                        if valor_original < 0:
+                            valor_norm = 0
+                        elif valor_original > 1 and str(tipo).lower() not in ['moneda', 'numero', 'cantidad']:
+                            valor_norm = 1
+                        else:
+                            valor_norm = valor_original
                     
                     df.loc[mask, 'Valor_Normalizado'] = valor_norm
                     continue
                 
-                # Normalización para múltiples valores
+                # Si hay MÚLTIPLES valores para el mismo indicador, sí normalizar
                 if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
                     # Porcentajes: convertir a 0-1 si están en 0-100
                     valores_norm = valores.apply(lambda x: x/100 if x > 1 else x)
                     valores_norm = valores_norm.clip(0, 1)
                     
                 elif str(tipo).lower() in ['moneda', 'currency', 'dinero', 'pesos']:
-                    # Valores monetarios: normalizar por máximo
+                    # Valores monetarios: normalizar por máximo del indicador
                     max_val = valores.max()
                     if max_val > 0:
                         valores_norm = valores / max_val
                     else:
-                        valores_norm = pd.Series([0.5] * len(valores), index=valores.index)
+                        valores_norm = valores  # Mantener originales si max es 0
                     
                 elif str(tipo).lower() in ['numero', 'number', 'cantidad', 'count']:
-                    # Números: normalizar por máximo
+                    # Números: normalizar por máximo del indicador
                     max_val = valores.max()
                     if max_val > 0:
                         valores_norm = valores / max_val
                     else:
-                        valores_norm = pd.Series([0.5] * len(valores), index=valores.index)
+                        valores_norm = valores  # Mantener originales si max es 0
                     
                 elif str(tipo).lower() in ['indice', 'index', 'ratio']:
                     # Índices: manejo especial
                     max_val = valores.max()
                     if max_val > 2:  # Valores grandes, normalizar
                         valores_norm = valores / max_val
-                    else:  # Valores pequeños, asumir normalizados
+                    else:  # Valores pequeños, mantener como están
                         valores_norm = valores.clip(0, 1)
                         
                 else:
-                    # Tipo desconocido: normalización segura
+                    # Tipo desconocido: normalización conservadora
                     max_val = valores.max()
                     if max_val > 1:
                         valores_norm = valores / max_val
@@ -291,28 +293,32 @@ class DataLoader:
                 # Asignar valores normalizados
                 df.loc[mask & valores_validos, 'Valor_Normalizado'] = valores_norm.clip(0, 1)
             
-            # Verificar que no hay valores extremadamente bajos por error
-            valores_muy_bajos = (df['Valor_Normalizado'] < 0.01) & (df['Valor_Normalizado'] > 0)
-            if valores_muy_bajos.any():
-                st.warning(f"⚠️ {valores_muy_bajos.sum()} valores normalizados muy bajos detectados")
-                # Corregir valores muy bajos asignándoles un mínimo razonable
-                df.loc[valores_muy_bajos, 'Valor_Normalizado'] = 0.1
-            
             # Verificar resultados
             norm_validos = df['Valor_Normalizado'].notna().sum()
             norm_min = df['Valor_Normalizado'].min()
             norm_max = df['Valor_Normalizado'].max()
             norm_promedio = df['Valor_Normalizado'].mean()
             
+            # Contar indicadores con un solo valor
+            indicadores_sin_historico = 0
+            for codigo in df['Codigo'].unique():
+                if pd.notna(codigo):
+                    valores_codigo = df[df['Codigo'] == codigo]['Valor'].dropna()
+                    if len(valores_codigo) == 1:
+                        indicadores_sin_historico += 1
+            
             st.success(f"✅ Normalización completada: {norm_validos} valores")
             st.info(f"Rango normalizado: {norm_min:.3f} - {norm_max:.3f}, Promedio: {norm_promedio:.3f}")
             
+            if indicadores_sin_historico > 0:
+                st.info(f"📊 {indicadores_sin_historico} indicadores sin histórico mantuvieron sus valores originales")
+            
         except Exception as e:
             st.error(f"Error en normalización: {e}")
-            # Fallback seguro: asignar valores neutros
+            # Fallback seguro: usar valores originales
             try:
-                df['Valor_Normalizado'] = 0.6  # Valor neutral-positivo
-                st.warning("⚠️ Usando normalización de fallback (0.6)")
+                df['Valor_Normalizado'] = df['Valor'].copy()
+                st.warning("⚠️ Usando valores originales como fallback")
             except:
                 df['Valor_Normalizado'] = 0.5
     
