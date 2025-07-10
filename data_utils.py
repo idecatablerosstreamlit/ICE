@@ -35,15 +35,15 @@ class DataLoader:
             self.sheets_manager = None
     
     def load_data(self):
-        """Cargar datos desde Google Sheets - SIMPLIFICADO"""
+        """Cargar datos desde Google Sheets - CON MENSAJES ORGANIZADOS"""
         try:
             if not GOOGLE_SHEETS_AVAILABLE or not self.sheets_manager:
                 st.error("❌ Google Sheets no disponible")
                 return self._create_empty_dataframe()
             
-            # Cargar datos básicos
-            st.write("📥 Conectando con Google Sheets...")
-            df = self.sheets_manager.load_data()
+            # Usar un spinner para la conexión
+            with st.spinner("🔄 Conectando con Google Sheets..."):
+                df = self.sheets_manager.load_data()
             
             if df is None:
                 st.error("❌ Error al conectar con Google Sheets")
@@ -53,15 +53,15 @@ class DataLoader:
                 st.warning("📋 Google Sheets está vacío")
                 return self._create_empty_dataframe()
             
-            st.write(f"📊 Cargados {len(df)} registros")
+            # Mostrar resumen de carga
+            st.success(f"📊 Cargados {len(df)} registros desde Google Sheets")
             
-            # Procesar datos
-            st.write("🔧 Procesando datos...")
+            # Procesar datos (esto incluye el expander con detalles)
             self._process_dataframe_simple(df)
             
             # Verificar y limpiar
             if self._verify_dataframe_simple(df):
-                st.success("✅ Datos cargados correctamente")
+                st.success("✅ Datos procesados y listos para usar")
                 return df
             else:
                 st.error("❌ Datos inválidos")
@@ -79,32 +79,45 @@ class DataLoader:
         ])
     
     def _process_dataframe_simple(self, df):
-        """Procesar DataFrame - VERSIÓN SIMPLIFICADA"""
+        """Procesar DataFrame - VERSIÓN SIMPLIFICADA CON EXPANDER"""
         try:
-            # Renombrar columnas
-            for original, nuevo in COLUMN_MAPPING.items():
-                if original in df.columns:
-                    df.rename(columns={original: nuevo}, inplace=True)
-            
-            # Procesar fechas
-            self._process_dates_simple(df)
-            
-            # Procesar valores
-            self._process_values_simple(df)
-            
-            # Añadir columnas por defecto
-            self._add_default_columns(df)
-            
-            # Normalización CORREGIDA
-            self._normalize_values_fixed(df)
+            with st.expander("🔧 Detalles del procesamiento de datos", expanded=False):
+                st.write("📝 **Procesando datos desde Google Sheets...**")
+                
+                # Renombrar columnas
+                st.write("1️⃣ Renombrando columnas...")
+                for original, nuevo in COLUMN_MAPPING.items():
+                    if original in df.columns:
+                        df.rename(columns={original: nuevo}, inplace=True)
+                st.success("✅ Columnas renombradas correctamente")
+                
+                # Procesar fechas
+                st.write("2️⃣ Procesando fechas...")
+                self._process_dates_simple(df)
+                
+                # Procesar valores
+                st.write("3️⃣ Procesando valores...")
+                self._process_values_simple(df)
+                
+                # Añadir columnas por defecto
+                st.write("4️⃣ Añadiendo columnas por defecto...")
+                self._add_default_columns(df)
+                st.success("✅ Columnas por defecto añadidas")
+                
+                # Normalización CORREGIDA
+                st.write("5️⃣ Aplicando normalización inteligente...")
+                self._normalize_values_fixed(df)
+                
+                st.success("🎉 **Procesamiento completado exitosamente**")
             
         except Exception as e:
             st.error(f"Error en procesamiento: {e}")
     
     def _process_dates_simple(self, df):
-        """Procesar fechas - MEJORADO"""
+        """Procesar fechas - MEJORADO CON MENSAJES ORGANIZADOS"""
         try:
             if 'Fecha' not in df.columns:
+                st.info("No hay columna 'Fecha' para procesar")
                 return
             
             # Formatos de fecha comunes de Google Sheets
@@ -160,13 +173,15 @@ class DataLoader:
             # Intentar conversión básica como fallback
             try:
                 df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+                st.info("Usando conversión de fechas básica como fallback")
             except:
-                pass
+                st.error("No se pudieron procesar las fechas")
     
     def _process_values_simple(self, df):
-        """Procesar valores - SIMPLIFICADO"""
+        """Procesar valores - SIMPLIFICADO CON MENSAJES ORGANIZADOS"""
         try:
             if 'Valor' not in df.columns:
+                st.info("No hay columna 'Valor' para procesar")
                 return
             
             # Convertir valores a numérico
@@ -178,11 +193,16 @@ class DataLoader:
                 df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce')
             
             valores_invalidos = df['Valor'].isna().sum()
+            valores_validos = df['Valor'].notna().sum()
+            
+            if valores_validos > 0:
+                st.success(f"✅ {valores_validos} valores procesados correctamente")
+            
             if valores_invalidos > 0:
-                st.warning(f"⚠️ {valores_invalidos} valores no válidos")
+                st.warning(f"⚠️ {valores_invalidos} valores no válidos encontrados")
                 
         except Exception as e:
-            st.warning(f"Error al procesar valores: {e}")
+            st.error(f"Error al procesar valores: {e}")
     
     def _add_default_columns(self, df):
         """Añadir columnas por defecto"""
@@ -201,6 +221,7 @@ class DataLoader:
         """Normalización CORREGIDA - Preservar valores originales cuando no hay histórico"""
         try:
             if df.empty or 'Valor' not in df.columns:
+                st.info("No hay valores para normalizar")
                 return
             
             # Inicializar valores normalizados copiando valores originales
@@ -211,6 +232,10 @@ class DataLoader:
             if not valores_validos.any():
                 st.warning("⚠️ No hay valores válidos para normalizar")
                 return
+            
+            # Contar indicadores con un solo valor ANTES del procesamiento
+            indicadores_sin_historico = 0
+            indicadores_con_historico = 0
             
             # Procesar cada INDICADOR individualmente (no por tipo)
             for codigo in df['Codigo'].unique():
@@ -230,6 +255,7 @@ class DataLoader:
                 # REGLA PRINCIPAL: Si solo hay UN valor por indicador, NO normalizar
                 # Solo usar el valor original ajustado por tipo
                 if len(valores) == 1:
+                    indicadores_sin_historico += 1
                     valor_original = valores.iloc[0]
                     
                     if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
@@ -241,7 +267,6 @@ class DataLoader:
                         valor_norm = max(0, min(1, valor_norm))
                     else:
                         # Para otros tipos: MANTENER el valor original sin normalizar
-                        # Solo asegurar que esté en un rango razonable
                         if valor_original < 0:
                             valor_norm = 0
                         elif valor_original > 1 and str(tipo).lower() not in ['moneda', 'numero', 'cantidad']:
@@ -253,6 +278,8 @@ class DataLoader:
                     continue
                 
                 # Si hay MÚLTIPLES valores para el mismo indicador, sí normalizar
+                indicadores_con_historico += 1
+                
                 if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
                     # Porcentajes: convertir a 0-1 si están en 0-100
                     valores_norm = valores.apply(lambda x: x/100 if x > 1 else x)
@@ -299,19 +326,15 @@ class DataLoader:
             norm_max = df['Valor_Normalizado'].max()
             norm_promedio = df['Valor_Normalizado'].mean()
             
-            # Contar indicadores con un solo valor
-            indicadores_sin_historico = 0
-            for codigo in df['Codigo'].unique():
-                if pd.notna(codigo):
-                    valores_codigo = df[df['Codigo'] == codigo]['Valor'].dropna()
-                    if len(valores_codigo) == 1:
-                        indicadores_sin_historico += 1
-            
+            # Mostrar resultados organizados
             st.success(f"✅ Normalización completada: {norm_validos} valores")
             st.info(f"Rango normalizado: {norm_min:.3f} - {norm_max:.3f}, Promedio: {norm_promedio:.3f}")
             
             if indicadores_sin_historico > 0:
                 st.info(f"📊 {indicadores_sin_historico} indicadores sin histórico mantuvieron sus valores originales")
+            
+            if indicadores_con_historico > 0:
+                st.info(f"📈 {indicadores_con_historico} indicadores con histórico fueron normalizados")
             
         except Exception as e:
             st.error(f"Error en normalización: {e}")
@@ -321,6 +344,7 @@ class DataLoader:
                 st.warning("⚠️ Usando valores originales como fallback")
             except:
                 df['Valor_Normalizado'] = 0.5
+                st.warning("⚠️ Usando valores por defecto (0.5) como fallback")
     
     def _verify_dataframe_simple(self, df):
         """Verificar DataFrame - SIMPLIFICADO"""
