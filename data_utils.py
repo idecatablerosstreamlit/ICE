@@ -1,13 +1,13 @@
 """
 Utilidades para el manejo de datos del Dashboard ICE - VERSIÓN CORREGIDA
-CORRECCIÓN: Normalización que preserva valores originales cuando no hay histórico
+CORRECCIÓN: Normalización basada en metas específicas por indicador
 """
 
 import pandas as pd
 import numpy as np
 import streamlit as st
 import os
-from config import COLUMN_MAPPING, DEFAULT_META, EXCEL_FILENAME
+from config import COLUMN_MAPPING, DEFAULT_META, EXCEL_FILENAME, INDICATOR_TYPES
 import openpyxl
 
 # Importación de Google Sheets
@@ -18,7 +18,7 @@ except ImportError:
     GOOGLE_SHEETS_AVAILABLE = False
 
 class DataLoader:
-    """Clase para cargar datos - VERSIÓN SIMPLIFICADA"""
+    """Clase para cargar datos - VERSIÓN CORREGIDA"""
     
     def __init__(self):
         self.df = None
@@ -35,7 +35,7 @@ class DataLoader:
             self.sheets_manager = None
     
     def load_data(self):
-        """Cargar datos desde Google Sheets - CON MENSAJES ORGANIZADOS"""
+        """Cargar datos desde Google Sheets"""
         try:
             if not GOOGLE_SHEETS_AVAILABLE or not self.sheets_manager:
                 st.error("❌ Google Sheets no disponible")
@@ -56,8 +56,8 @@ class DataLoader:
             # Mostrar resumen de carga
             st.success(f"📊 Cargados {len(df)} registros desde Google Sheets")
             
-            # Procesar datos (esto incluye el expander con detalles)
-            self._process_dataframe_simple(df)
+            # Procesar datos
+            self._process_dataframe_corrected(df)
             
             # Verificar y limpiar
             if self._verify_dataframe_simple(df):
@@ -78,8 +78,8 @@ class DataLoader:
             'Codigo', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado'
         ])
     
-    def _process_dataframe_simple(self, df):
-        """Procesar DataFrame - VERSIÓN SIMPLIFICADA CON EXPANDER"""
+    def _process_dataframe_corrected(self, df):
+        """Procesar DataFrame - VERSIÓN CORREGIDA CON NORMALIZACIÓN MEJORADA"""
         try:
             with st.expander("🔧 Detalles del procesamiento de datos", expanded=False):
                 st.write("📝 **Procesando datos desde Google Sheets...**")
@@ -101,12 +101,11 @@ class DataLoader:
                 
                 # Añadir columnas por defecto
                 st.write("4️⃣ Añadiendo columnas por defecto...")
-                self._add_default_columns(df)
-                st.success("✅ Columnas por defecto añadidas")
+                self._add_default_columns_corrected(df)
                 
-                # Normalización CORREGIDA
-                st.write("5️⃣ Aplicando normalización inteligente...")
-                self._normalize_values_fixed(df)
+                # NUEVA NORMALIZACIÓN SIMPLE
+                st.write("5️⃣ Aplicando normalización simple...")
+                self._normalize_values_corrected(df)
                 
                 st.success("🎉 **Procesamiento completado exitosamente**")
             
@@ -114,26 +113,21 @@ class DataLoader:
             st.error(f"Error en procesamiento: {e}")
     
     def _process_dates_simple(self, df):
-        """Procesar fechas - MEJORADO CON MENSAJES ORGANIZADOS"""
+        """Procesar fechas"""
         try:
             if 'Fecha' not in df.columns:
                 st.info("No hay columna 'Fecha' para procesar")
                 return
             
-            # Formatos de fecha comunes de Google Sheets
+            # Formatos de fecha comunes
             date_formats = [
-                '%d/%m/%Y',   # 01/12/2025
-                '%d-%m-%Y',   # 01-12-2025
-                '%Y-%m-%d',   # 2025-12-01
-                '%Y/%m/%d',   # 2025/12/01
-                '%m/%d/%Y',   # 12/01/2025
-                '%d.%m.%Y'    # 01.12.2025
+                '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', 
+                '%Y/%m/%d', '%m/%d/%Y', '%d.%m.%Y'
             ]
             
             fechas_convertidas = None
             mejor_formato = None
             
-            # Probar cada formato
             for formato in date_formats:
                 try:
                     temp_fechas = pd.to_datetime(df['Fecha'], format=formato, errors='coerce')
@@ -146,7 +140,6 @@ class DataLoader:
                 except:
                     continue
             
-            # Si ningún formato específico funcionó, usar conversión automática
             if fechas_convertidas is None or fechas_convertidas.notna().sum() == 0:
                 try:
                     fechas_convertidas = pd.to_datetime(df['Fecha'], errors='coerce', dayfirst=True)
@@ -155,30 +148,22 @@ class DataLoader:
                     fechas_convertidas = pd.to_datetime(df['Fecha'], errors='coerce')
                     mejor_formato = "automático (US)"
             
-            # Asignar fechas convertidas
             df['Fecha'] = fechas_convertidas
             
-            # Reportar resultados
             fechas_validas = df['Fecha'].notna().sum()
             fechas_invalidas = df['Fecha'].isna().sum()
             
             if fechas_validas > 0:
-                st.success(f"✅ {fechas_validas} fechas procesadas correctamente (formato: {mejor_formato})")
+                st.success(f"✅ {fechas_validas} fechas procesadas (formato: {mejor_formato})")
             
             if fechas_invalidas > 0:
-                st.warning(f"⚠️ {fechas_invalidas} fechas no se pudieron convertir")
+                st.warning(f"⚠️ {fechas_invalidas} fechas no convertidas")
                 
         except Exception as e:
             st.error(f"Error al procesar fechas: {e}")
-            # Intentar conversión básica como fallback
-            try:
-                df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
-                st.info("Usando conversión de fechas básica como fallback")
-            except:
-                st.error("No se pudieron procesar las fechas")
     
     def _process_values_simple(self, df):
-        """Procesar valores - SIMPLIFICADO CON MENSAJES ORGANIZADOS"""
+        """Procesar valores"""
         try:
             if 'Valor' not in df.columns:
                 st.info("No hay columna 'Valor' para procesar")
@@ -192,40 +177,51 @@ class DataLoader:
                               .str.strip())
                 df['Valor'] = pd.to_numeric(df['Valor'], errors='coerce')
             
-            valores_invalidos = df['Valor'].isna().sum()
             valores_validos = df['Valor'].notna().sum()
+            valores_invalidos = df['Valor'].isna().sum()
             
             if valores_validos > 0:
-                st.success(f"✅ {valores_validos} valores procesados correctamente")
+                st.success(f"✅ {valores_validos} valores procesados")
             
             if valores_invalidos > 0:
-                st.warning(f"⚠️ {valores_invalidos} valores no válidos encontrados")
+                st.warning(f"⚠️ {valores_invalidos} valores no válidos")
                 
         except Exception as e:
             st.error(f"Error al procesar valores: {e}")
     
-    def _add_default_columns(self, df):
-        """Añadir columnas por defecto"""
-        if 'Meta' not in df.columns:
-            df['Meta'] = DEFAULT_META
-        if 'Peso' not in df.columns:
-            df['Peso'] = 1.0
-        if 'Tipo' not in df.columns:
-            df['Tipo'] = 'porcentaje'
-        
-        # Convertir tipos
-        df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce').fillna(DEFAULT_META)
-        df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
+    def _add_default_columns_corrected(self, df):
+        """Añadir columnas por defecto - VERSIÓN SIMPLIFICADA"""
+        try:
+            # Meta por defecto
+            if 'Meta' not in df.columns:
+                df['Meta'] = DEFAULT_META
+            
+            # Peso por defecto
+            if 'Peso' not in df.columns:
+                df['Peso'] = 1.0
+            
+            # Tipo por defecto
+            if 'Tipo' not in df.columns:
+                df['Tipo'] = 'porcentaje'
+            
+            # Convertir tipos
+            df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce').fillna(DEFAULT_META)
+            df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
+            
+            st.success("✅ Columnas por defecto añadidas")
+            
+        except Exception as e:
+            st.error(f"Error al añadir columnas por defecto: {e}")
     
-    def _normalize_values_fixed(self, df):
-        """Normalización CORREGIDA - Preservar valores originales cuando no hay histórico"""
+    def _normalize_values_corrected(self, df):
+        """Normalización CORREGIDA - Asignar 0.7 a valores numéricos sin historial"""
         try:
             if df.empty or 'Valor' not in df.columns:
                 st.info("No hay valores para normalizar")
                 return
             
-            # Inicializar valores normalizados copiando valores originales
-            df['Valor_Normalizado'] = df['Valor'].copy()
+            # Inicializar valores normalizados
+            df['Valor_Normalizado'] = 0.0
             
             # Verificar que tenemos datos válidos
             valores_validos = df['Valor'].notna()
@@ -233,121 +229,120 @@ class DataLoader:
                 st.warning("⚠️ No hay valores válidos para normalizar")
                 return
             
-            # Contar indicadores con un solo valor ANTES del procesamiento
+            # Contadores para seguimiento
+            indicadores_normalizados = 0
             indicadores_sin_historico = 0
             indicadores_con_historico = 0
+            tipos_procesados = {}
             
-            # Procesar cada INDICADOR individualmente (no por tipo)
+            # Agrupar por indicador para detectar si tiene historial
             for codigo in df['Codigo'].unique():
                 if pd.isna(codigo):
                     continue
                     
                 mask = df['Codigo'] == codigo
-                valores = df.loc[mask, 'Valor'].dropna()
+                datos_indicador = df[mask]
+                valores = datos_indicador['Valor'].dropna()
                 
                 if valores.empty:
                     continue
                 
                 # Obtener información del indicador
-                indicador_info = df[mask].iloc[0]
-                tipo = indicador_info.get('Tipo', 'porcentaje')
+                indicador_info = datos_indicador.iloc[0]
+                tipo = str(indicador_info.get('Tipo', 'porcentaje')).lower()
                 
-                # REGLA PRINCIPAL: Si solo hay UN valor por indicador, NO normalizar
-                # Solo usar el valor original ajustado por tipo
-                if len(valores) == 1:
+                # Verificar si tiene historial (más de un registro)
+                tiene_historico = len(valores) > 1
+                
+                if not tiene_historico:
+                    # SIN HISTORIAL: Asignar valores fijos según tipo
                     indicadores_sin_historico += 1
-                    valor_original = valores.iloc[0]
                     
-                    if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
-                        # Porcentajes: convertir a 0-1 si están en 0-100
-                        if valor_original <= 1:
-                            valor_norm = valor_original  # Ya está en 0-1
-                        else:
-                            valor_norm = valor_original / 100  # Convertir de 0-100 a 0-1
-                        valor_norm = max(0, min(1, valor_norm))
+                    if tipo in ['porcentaje', 'percentage', '%']:
+                        # Porcentajes: usar valor original normalizado
+                        for index in datos_indicador.index:
+                            valor = datos_indicador.loc[index, 'Valor']
+                            if pd.notna(valor):
+                                if valor <= 1:
+                                    valor_norm = valor  # Ya está en 0-1
+                                else:
+                                    valor_norm = valor / 100  # Convertir de 0-100 a 0-1
+                                df.at[index, 'Valor_Normalizado'] = max(0, min(1, valor_norm))
                     else:
-                        # Para otros tipos: MANTENER el valor original sin normalizar
-                        if valor_original < 0:
-                            valor_norm = 0
-                        elif valor_original > 1 and str(tipo).lower() not in ['moneda', 'numero', 'cantidad']:
-                            valor_norm = 1
-                        else:
-                            valor_norm = valor_original
+                        # VALORES NUMÉRICOS SIN HISTORIAL: Asignar 0.7 (70%)
+                        for index in datos_indicador.index:
+                            df.at[index, 'Valor_Normalizado'] = 0.7
                     
-                    df.loc[mask, 'Valor_Normalizado'] = valor_norm
-                    continue
-                
-                # Si hay MÚLTIPLES valores para el mismo indicador, sí normalizar
-                indicadores_con_historico += 1
-                
-                if str(tipo).lower() in ['porcentaje', 'percentage', '%']:
-                    # Porcentajes: convertir a 0-1 si están en 0-100
-                    valores_norm = valores.apply(lambda x: x/100 if x > 1 else x)
-                    valores_norm = valores_norm.clip(0, 1)
-                    
-                elif str(tipo).lower() in ['moneda', 'currency', 'dinero', 'pesos']:
-                    # Valores monetarios: normalizar por máximo del indicador
-                    max_val = valores.max()
-                    if max_val > 0:
-                        valores_norm = valores / max_val
-                    else:
-                        valores_norm = valores  # Mantener originales si max es 0
-                    
-                elif str(tipo).lower() in ['numero', 'number', 'cantidad', 'count']:
-                    # Números: normalizar por máximo del indicador
-                    max_val = valores.max()
-                    if max_val > 0:
-                        valores_norm = valores / max_val
-                    else:
-                        valores_norm = valores  # Mantener originales si max es 0
-                    
-                elif str(tipo).lower() in ['indice', 'index', 'ratio']:
-                    # Índices: manejo especial
-                    max_val = valores.max()
-                    if max_val > 2:  # Valores grandes, normalizar
-                        valores_norm = valores / max_val
-                    else:  # Valores pequeños, mantener como están
-                        valores_norm = valores.clip(0, 1)
-                        
                 else:
-                    # Tipo desconocido: normalización conservadora
-                    max_val = valores.max()
-                    if max_val > 1:
-                        valores_norm = valores / max_val
+                    # CON HISTORIAL: Normalizar por el máximo del indicador
+                    indicadores_con_historico += 1
+                    
+                    if tipo in ['porcentaje', 'percentage', '%']:
+                        # Porcentajes: convertir a 0-1 si es necesario
+                        for index in datos_indicador.index:
+                            valor = datos_indicador.loc[index, 'Valor']
+                            if pd.notna(valor):
+                                if valor <= 1:
+                                    valor_norm = valor
+                                else:
+                                    valor_norm = valor / 100
+                                df.at[index, 'Valor_Normalizado'] = max(0, min(1, valor_norm))
                     else:
-                        valores_norm = valores.clip(0, 1)
+                        # Valores numéricos: normalizar por el máximo del indicador
+                        max_valor = valores.max()
+                        if max_valor > 0:
+                            for index in datos_indicador.index:
+                                valor = datos_indicador.loc[index, 'Valor']
+                                if pd.notna(valor):
+                                    valor_norm = valor / max_valor
+                                    df.at[index, 'Valor_Normalizado'] = max(0, valor_norm)
+                        else:
+                            # Si todos los valores son 0, asignar 0.7
+                            for index in datos_indicador.index:
+                                df.at[index, 'Valor_Normalizado'] = 0.7
                 
-                # Asignar valores normalizados
-                df.loc[mask & valores_validos, 'Valor_Normalizado'] = valores_norm.clip(0, 1)
+                # Seguimiento
+                indicadores_normalizados += 1
+                tipos_procesados[tipo] = tipos_procesados.get(tipo, 0) + 1
             
             # Verificar resultados
-            norm_validos = df['Valor_Normalizado'].notna().sum()
-            norm_min = df['Valor_Normalizado'].min()
-            norm_max = df['Valor_Normalizado'].max()
-            norm_promedio = df['Valor_Normalizado'].mean()
-            
-            # Mostrar resultados organizados
-            st.success(f"✅ Normalización completada: {norm_validos} valores")
-            st.info(f"Rango normalizado: {norm_min:.3f} - {norm_max:.3f}, Promedio: {norm_promedio:.3f}")
-            
-            if indicadores_sin_historico > 0:
-                st.info(f"📊 {indicadores_sin_historico} indicadores sin histórico mantuvieron sus valores originales")
-            
-            if indicadores_con_historico > 0:
-                st.info(f"📈 {indicadores_con_historico} indicadores con histórico fueron normalizados")
-            
+            if indicadores_normalizados > 0:
+                norm_min = df['Valor_Normalizado'].min()
+                norm_max = df['Valor_Normalizado'].max()
+                norm_promedio = df['Valor_Normalizado'].mean()
+                
+                # Mostrar resultados
+                st.success(f"✅ {indicadores_normalizados} indicadores normalizados")
+                st.info(f"📊 Rango normalizado: {norm_min:.3f} - {norm_max:.3f}")
+                st.info(f"📈 Promedio normalizado: {norm_promedio:.3f}")
+                
+                # Mostrar distribución por tipo
+                tipos_info = []
+                for tipo, count in tipos_procesados.items():
+                    tipos_info.append(f"{tipo}: {count}")
+                st.info(f"📝 Tipos procesados: {', '.join(tipos_info)}")
+                
+                # Mostrar información específica
+                if indicadores_sin_historico > 0:
+                    st.info(f"🎯 {indicadores_sin_historico} indicadores sin historial: valores numéricos = 0.7, porcentajes = valor original")
+                
+                if indicadores_con_historico > 0:
+                    st.info(f"📈 {indicadores_con_historico} indicadores con historial: normalizados por máximo")
+                
+            else:
+                st.warning("⚠️ No se pudieron normalizar los indicadores")
+                
         except Exception as e:
-            st.error(f"Error en normalización: {e}")
-            # Fallback seguro: usar valores originales
+            st.error(f"Error en normalización corregida: {e}")
+            # Fallback seguro
             try:
-                df['Valor_Normalizado'] = df['Valor'].copy()
-                st.warning("⚠️ Usando valores originales como fallback")
+                df['Valor_Normalizado'] = 0.7
+                st.warning("⚠️ Usando valores por defecto (0.7) como fallback")
             except:
-                df['Valor_Normalizado'] = 0.5
-                st.warning("⚠️ Usando valores por defecto (0.5) como fallback")
+                pass
     
     def _verify_dataframe_simple(self, df):
-        """Verificar DataFrame - SIMPLIFICADO"""
+        """Verificar DataFrame"""
         try:
             if df.empty:
                 return True
@@ -388,11 +383,11 @@ class DataLoader:
             }
 
 class DataProcessor:
-    """Clase para procesar datos - SIMPLIFICADA"""
+    """Clase para procesar datos - VERSIÓN CORREGIDA"""
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """Calcular puntajes - SIMPLIFICADO"""
+        """Calcular puntajes usando normalización simple"""
         try:
             if df.empty:
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
@@ -439,7 +434,7 @@ class DataProcessor:
     
     @staticmethod
     def _get_latest_values_by_indicator(df):
-        """Obtener valores más recientes - SIMPLIFICADO"""
+        """Obtener valores más recientes por indicador"""
         try:
             if df.empty:
                 return df
@@ -468,7 +463,7 @@ class DataProcessor:
             return df
 
 class DataEditor:
-    """Clase para editar datos - SIMPLIFICADA"""
+    """Clase para editar datos - VERSIÓN CORREGIDA"""
     
     @staticmethod
     def add_new_record(df, codigo, fecha, valor, csv_path=None):
