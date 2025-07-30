@@ -282,7 +282,7 @@ def verify_data_structure(df):
 
 def create_simple_filters(df):
     """Crear filtros simples SIN información técnica en encabezado"""
-    st.markdown("### 📅 Filtros")
+    
     
     try:
         if df.empty or 'Fecha' not in df.columns:
