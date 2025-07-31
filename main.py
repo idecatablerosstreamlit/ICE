@@ -16,18 +16,140 @@ from tabs import TabManager
 def main():
     configure_page()
     
-    # BANNER SIMPLE - FUNCIONA GARANTIZADO
-    st.markdown('<div style="background: #4A6CF7; color: white; padding: 15px; text-align: center;"><h3 style="color: white; margin: 0;">🏛️ GOV.CO - <a href="https://www.gov.co/" target="_blank" style="color: white;">Ir a Gov.co</a></h3></div>', unsafe_allow_html=True)
+    # BANNER EXACTO COMO DATOS ABIERTOS BOGOTÁ - REEMPLAZAR EN main.py
+
+    # Sección azul superior - Color y tipografía correctos
+    st.markdown("""
+    <div style="
+        background: #4A6CF7;
+        padding: 10px 0;
+        margin: -1rem -1rem 0 -1rem;
+    ">
+        <div style="
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        ">
+            <div style="display: flex; align-items: center;">
+                <div style="
+                    width: 24px;
+                    height: 24px;
+                    background: white;
+                    border-radius: 4px;
+                    margin-right: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 12px;
+                    color: #4A6CF7;
+                    font-weight: bold;
+                ">🏛</div>
+                <span style="
+                    color: white;
+                    font-size: 18px;
+                    font-weight: 500;
+                    font-family: 'Source Sans Pro', sans-serif;
+                ">GOV.CO</span>
+            </div>
+            <a href="https://www.gov.co/" target="_blank" style="
+                color: white;
+                text-decoration: underline;
+                font-size: 13px;
+                font-family: 'Source Sans Pro', sans-serif;
+            ">Ir a Govco</a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col1:
-        st.markdown("### 🏢")
-    with col2:
-        st.markdown("# Dashboard ICE")
-        st.caption("Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA")
-    with col3:
-        st.markdown("### 🏛️ BOGOTÁ")
-    st.divider()
+    # Sección blanca principal - Layout exacto
+    st.markdown("""
+    <div style="
+        background: white;
+        padding: 20px 0;
+        margin: 0 -1rem 30px -1rem;
+        border-bottom: 1px solid #e0e0e0;
+    ">
+        <div style="
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 20px;
+        ">
+            <!-- Logo ICE -->
+            <div style="
+                width: 80px;
+                height: 80px;
+                background: #4472C4;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            ">
+                <span style="color: white; font-size: 32px;">🏢</span>
+            </div>
+            
+            <!-- Título y descripción -->
+            <div style="flex: 1;">
+                <h1 style="
+                    color: #4472C4;
+                    font-size: 48px;
+                    font-weight: 300;
+                    margin: 0 0 8px 0;
+                    font-family: 'Source Sans Pro', sans-serif;
+                    letter-spacing: -1px;
+                ">DATOS<span style="font-weight: 700;">ABIERTOS</span></h1>
+                <h2 style="
+                    color: #4472C4;
+                    font-size: 48px;
+                    font-weight: 700;
+                    margin: 0 0 12px 0;
+                    font-family: 'Source Sans Pro', sans-serif;
+                    letter-spacing: -1px;
+                ">DASHBOARD ICE</h2>
+                <p style="
+                    color: #666;
+                    font-size: 16px;
+                    margin: 0;
+                    font-family: 'Source Sans Pro', sans-serif;
+                ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
+            </div>
+            
+            <!-- Logos de Bogotá -->
+            <div style="display: flex; align-items: center; gap: 15px; flex-shrink: 0;">
+                <!-- Escudo Alcaldía -->
+                <div style="
+                    width: 60px;
+                    height: 60px;
+                    background: #003366;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">
+                    <span style="color: white; font-size: 24px;">🏛</span>
+                </div>
+                
+                <!-- Logo Bogotá -->
+                <div style="
+                    background: #E31E24;
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-family: 'Source Sans Pro', sans-serif;
+                    font-weight: 700;
+                    font-size: 20px;
+                    letter-spacing: 2px;
+                ">BOGOTÁ</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     apply_dark_theme()  # ← Esta línea ya existía
     
