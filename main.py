@@ -16,143 +16,179 @@ from tabs import TabManager
 def main():
     configure_page()
     
-    # BANNER EXACTO COMO DATOS ABIERTOS BOGOTÁ - REEMPLAZAR EN main.py
+    # BANNER COMPLETO CON COLORES Y ESTILOS
+    st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&display=swap');
+        
+        .gov-header {
+            background: #4A6CF7 !important;
+            color: white !important;
+            padding: 12px 20px !important;
+            margin: -1rem -1rem 0 -1rem !important;
+            font-family: 'Source Sans Pro', sans-serif !important;
+        }
+        
+        .gov-content {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            max-width: 1200px !important;
+            margin: 0 auto !important;
+        }
+        
+        .gov-left {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+        }
+        
+        .gov-logo {
+            width: 28px !important;
+            height: 28px !important;
+            background: white !important;
+            border-radius: 4px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: #4A6CF7 !important;
+            font-weight: bold !important;
+            font-size: 14px !important;
+        }
+        
+        .gov-text {
+            color: white !important;
+            font-size: 20px !important;
+            font-weight: 600 !important;
+            font-family: 'Source Sans Pro', sans-serif !important;
+        }
+        
+        .gov-link {
+            color: white !important;
+            text-decoration: underline !important;
+            font-size: 14px !important;
+            font-family: 'Source Sans Pro', sans-serif !important;
+        }
+        
+        .dashboard-section {
+            background: white !important;
+            padding: 25px 20px !important;
+            margin: 0 -1rem 25px -1rem !important;
+            border-bottom: 1px solid #e0e0e0 !important;
+            font-family: 'Source Sans Pro', sans-serif !important;
+        }
+        
+        .dashboard-content {
+            display: flex !important;
+            align-items: center !important;
+            max-width: 1200px !important;
+            margin: 0 auto !important;
+            gap: 25px !important;
+        }
+        
+        .ice-logo {
+            width: 80px !important;
+            height: 80px !important;
+            background: #4472C4 !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 36px !important;
+            flex-shrink: 0 !important;
+        }
+        
+        .dashboard-info {
+            flex: 1 !important;
+        }
+        
+        .dashboard-title-main {
+            color: #4472C4 !important;
+            font-size: 42px !important;
+            font-weight: 300 !important;
+            margin: 0 !important;
+            font-family: 'Source Sans Pro', sans-serif !important;
+            line-height: 1.1 !important;
+        }
+        
+        .dashboard-title-bold {
+            font-weight: 700 !important;
+        }
+        
+        .dashboard-subtitle {
+            color: #666 !important;
+            font-size: 16px !important;
+            margin: 8px 0 0 0 !important;
+            font-family: 'Source Sans Pro', sans-serif !important;
+        }
+        
+        .bogota-logos {
+            display: flex !important;
+            align-items: center !important;
+            gap: 20px !important;
+            flex-shrink: 0 !important;
+        }
+        
+        .alcaldia-logo {
+            width: 60px !important;
+            height: 60px !important;
+            background: #003366 !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 24px !important;
+        }
+        
+        .bogota-brand {
+            background: #E31E24 !important;
+            color: white !important;
+            padding: 10px 18px !important;
+            border-radius: 20px !important;
+            font-family: 'Source Sans Pro', sans-serif !important;
+            font-weight: 700 !important;
+            font-size: 18px !important;
+            letter-spacing: 1.5px !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
-    # Sección azul superior - Color y tipografía correctos
     st.markdown("""
-    <div style="
-        background: #4A6CF7;
-        padding: 10px 0;
-        margin: -1rem -1rem 0 -1rem;
-    ">
-        <div style="
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-        ">
-            <div style="display: flex; align-items: center;">
-                <div style="
-                    width: 24px;
-                    height: 24px;
-                    background: white;
-                    border-radius: 4px;
-                    margin-right: 8px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 12px;
-                    color: #4A6CF7;
-                    font-weight: bold;
-                ">🏛</div>
-                <span style="
-                    color: white;
-                    font-size: 18px;
-                    font-weight: 500;
-                    font-family: 'Source Sans Pro', sans-serif;
-                ">GOV.CO</span>
+    <div class="gov-header">
+        <div class="gov-content">
+            <div class="gov-left">
+                <div class="gov-logo">🏛</div>
+                <span class="gov-text">GOV.CO</span>
             </div>
-            <a href="https://www.gov.co/" target="_blank" style="
-                color: white;
-                text-decoration: underline;
-                font-size: 13px;
-                font-family: 'Source Sans Pro', sans-serif;
-            ">Ir a Govco</a>
+            <a href="https://www.gov.co/" target="_blank" class="gov-link">Ir a Govco</a>
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Sección blanca principal - Layout exacto
+
     st.markdown("""
-    <div style="
-        background: white;
-        padding: 20px 0;
-        margin: 0 -1rem 30px -1rem;
-        border-bottom: 1px solid #e0e0e0;
-    ">
-        <div style="
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            gap: 20px;
-        ">
-            <!-- Logo ICE -->
-            <div style="
-                width: 80px;
-                height: 80px;
-                background: #4472C4;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-            ">
-                <span style="color: white; font-size: 32px;">🏢</span>
+    <div class="dashboard-section">
+        <div class="dashboard-content">
+            <div class="ice-logo">🏢</div>
+            
+            <div class="dashboard-info">
+                <h1 class="dashboard-title-main">
+                    DATOS<span class="dashboard-title-bold">ABIERTOS</span><br>
+                    <span class="dashboard-title-bold">DASHBOARD ICE</span>
+                </h1>
+                <p class="dashboard-subtitle">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
             </div>
             
-            <!-- Título y descripción -->
-            <div style="flex: 1;">
-                <h1 style="
-                    color: #4472C4;
-                    font-size: 48px;
-                    font-weight: 300;
-                    margin: 0 0 8px 0;
-                    font-family: 'Source Sans Pro', sans-serif;
-                    letter-spacing: -1px;
-                ">DATOS<span style="font-weight: 700;">ABIERTOS</span></h1>
-                <h2 style="
-                    color: #4472C4;
-                    font-size: 48px;
-                    font-weight: 700;
-                    margin: 0 0 12px 0;
-                    font-family: 'Source Sans Pro', sans-serif;
-                    letter-spacing: -1px;
-                ">DASHBOARD ICE</h2>
-                <p style="
-                    color: #666;
-                    font-size: 16px;
-                    margin: 0;
-                    font-family: 'Source Sans Pro', sans-serif;
-                ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
-            </div>
-            
-            <!-- Logos de Bogotá -->
-            <div style="display: flex; align-items: center; gap: 15px; flex-shrink: 0;">
-                <!-- Escudo Alcaldía -->
-                <div style="
-                    width: 60px;
-                    height: 60px;
-                    background: #003366;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                ">
-                    <span style="color: white; font-size: 24px;">🏛</span>
-                </div>
-                
-                <!-- Logo Bogotá -->
-                <div style="
-                    background: #E31E24;
-                    color: white;
-                    padding: 8px 16px;
-                    border-radius: 20px;
-                    font-family: 'Source Sans Pro', sans-serif;
-                    font-weight: 700;
-                    font-size: 20px;
-                    letter-spacing: 2px;
-                ">BOGOTÁ</div>
+            <div class="bogota-logos">
+                <div class="alcaldia-logo">🏛</div>
+                <div class="bogota-brand">BOGOTÁ</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    apply_dark_theme()  # ← Esta línea ya existía
+    apply_dark_theme()
     
+    # resto de tu código...    
     # resto de tu código existente sin cambios...
     # Inicializar session state - SIMPLIFICADO
     if 'active_tab_index' not in st.session_state:
