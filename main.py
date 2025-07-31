@@ -14,18 +14,16 @@ from data_utils import DataLoader, ExcelDataLoader
 from tabs import TabManager
 
 def main():
-    # Configurar página
     configure_page()
     
-    # BANNER USANDO COMPONENTE HTML COMPLETO
+    # BANNER CORREGIDO con hipervínculos funcionales
     try:
+        from banner import create_banner_with_local_images  # Esta función usa tus imágenes locales
+        create_banner_with_local_images()
+    except Exception as e:
+        # Fallback: banner con JavaScript funcional
         from banner import create_government_banner_with_real_logos
         create_government_banner_with_real_logos()
-    except Exception as e:
-        # Fallback: banner simple
-        st.error(f"Error cargando banner: {e}")
-        from banner import create_simple_banner
-        create_simple_banner()
     
     apply_dark_theme()
     
