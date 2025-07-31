@@ -21,7 +21,7 @@ def main():
     
     
     
-    apply_dark_theme()
+    #apply_dark_theme()
     
     # Inicializar session state - SIMPLIFICADO
     if 'active_tab_index' not in st.session_state:
