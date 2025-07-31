@@ -17,7 +17,7 @@ def configure_page():
 
 
 def create_banner():
-    """Crear banner superior del dashboard - ARREGLADO Y FUNCIONAL"""
+    """Crear banner superior + título centrado fuera"""
     
     # Función auxiliar para convertir imagen a base64
     def img_to_base64(img_path):
@@ -36,7 +36,7 @@ def create_banner():
     
     # Sección azul GOV.CO (sin cambios)
     if logo_gov:
-        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 140px; height: 32px; margin-right: 12px;" alt="GOV.CO">'
+        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 32px; height: 32px; margin-right: 12px;" alt="GOV.CO">'
     else:
         gov_logo_html = '''<div style="
             width: 32px; height: 32px; background: white; border-radius: 6px; margin-right: 12px;
@@ -64,7 +64,7 @@ def create_banner():
                     font-size: 22px;
                     font-weight: 600;
                     letter-spacing: 0.5px;
-                "></span>
+                ">GOV.CO</span>
             </div>
             <a href="https://www.gov.co/" target="_blank" style="
                 color: white;
@@ -75,56 +75,61 @@ def create_banner():
     </div>
     """, unsafe_allow_html=True)
     
-    # SECCIÓN BLANCA - USANDO COLUMNAS DE STREAMLIT
-    # Nueva distribución: Alcaldía + Bogotá a la izquierda, Título a la derecha
-    
-    col1, col2 = st.columns([1, 2])
+    # SECCIÓN BLANCA - SOLO LOGOS (SIN TÍTULO)
+    col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        # Logos en una fila horizontal
-        logo_col1, logo_col2 = st.columns([1, 1])
-        
-        with logo_col1:
-            # Logo Alcaldía PRIMERO
-            if logo_alcaldia:
-                st.markdown(f'''
-                <div style="text-align: center;">
-                    <img src="data:image/png;base64,{logo_alcaldia}" 
-                         style="width: 150px; height: auto;" 
-                         alt="Alcaldía Mayor">
-                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
-                </div>
-                ''', unsafe_allow_html=True)
-            else:
-                st.markdown("### 🏛️")
-                st.caption("ALCALDÍA")
-        
-        with logo_col2:
-            # Logo Bogotá SEGUNDO
-            if logo_bogota:
-                st.markdown(f'''
-                <div style="text-align: center;">
-                    <img src="data:image/png;base64,{logo_bogota}" 
-                         style="width: 2000px; height: auto;" 
-                         alt="Datos Abiertos Bogotá">
-                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
-                </div>
-                ''', unsafe_allow_html=True)
-            else:
-                st.markdown("### 🏢")
-                st.caption("BOGOTÁ")
+        # Logo Alcaldía PRIMERO
+        if logo_alcaldia:
+            st.markdown(f'''
+            <div style="text-align: center;">
+                <img src="data:image/png;base64,{logo_alcaldia}" 
+                     style="width: 60px; height: auto;" 
+                     alt="Alcaldía Mayor">
+                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">ALCALDÍA MAYOR</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        else:
+            st.markdown("### 🏛️")
+            st.caption("ALCALDÍA MAYOR")
     
     with col2:
-        # Título y subtítulo a la DERECHA
-        st.markdown("# Dashboard ICE")
-        st.markdown("""
+        # Logo Bogotá SEGUNDO
+        if logo_bogota:
+            st.markdown(f'''
+            <div style="text-align: center;">
+                <img src="data:image/png;base64,{logo_bogota}" 
+                     style="width: 80px; height: auto;" 
+                     alt="Datos Abiertos Bogotá">
+                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">BOGOTÁ</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        else:
+            st.markdown("### 🏢")
+            st.caption("BOGOTÁ")
+    
+    with col3:
+        # Columna vacía para balancear
+        st.write("")
+    
+    # TÍTULO CENTRADO FUERA DEL BANNER EN AZUL OSCURO
+    st.markdown("""
+    <div style="text-align: center; margin: 20px 0;">
+        <h1 style="
+            color: #1e3a8a;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.2;
+        ">Dashboard ICE</h1>
         <p style="
-            color: #1e3a8a; 
-            font-size: 0.9rem; 
+            color: #1e3a8a;
+            font-size: 1rem;
             font-weight: 500;
-            margin-top: -10px;
+            margin: 10px 0 0 0;
         ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
 
