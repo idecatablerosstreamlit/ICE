@@ -36,7 +36,7 @@ def create_banner():
     
     # Sección azul GOV.CO (sin cambios)
     if logo_gov:
-        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 32px; height: 32px; margin-right: 12px;" alt="GOV.CO">'
+        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 140px; height: 32px; margin-right: 12px;" alt="GOV.CO">'
     else:
         gov_logo_html = '''<div style="
             width: 32px; height: 32px; background: white; border-radius: 6px; margin-right: 12px;
@@ -84,9 +84,9 @@ def create_banner():
             st.markdown(f'''
             <div style="text-align: center;">
                 <img src="data:image/png;base64,{logo_alcaldia}" 
-                     style="width: 60px; height: auto;" 
+                     style="width: 150px; height: auto;" 
                      alt="Alcaldía Mayor">
-                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">ALCALDÍA MAYOR</div>
+                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
             </div>
             ''', unsafe_allow_html=True)
         else:
@@ -99,9 +99,9 @@ def create_banner():
             st.markdown(f'''
             <div style="text-align: center;">
                 <img src="data:image/png;base64,{logo_bogota}" 
-                     style="width: 80px; height: auto;" 
+                     style="width: 500px; height: auto;" 
                      alt="Datos Abiertos Bogotá">
-                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">BOGOTÁ</div>
+                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
             </div>
             ''', unsafe_allow_html=True)
         else:
