@@ -13,13 +13,17 @@ from config import (
 )
 from data_utils import DataLoader, ExcelDataLoader
 from tabs import TabManager
+from banner import create_dashboard_banner_with_images
 
 def main():
-    """Función principal del dashboard - CORREGIDA"""
+    
+
     
     # Configurar página
     configure_page()
+    create_dashboard_banner_with_images()  # ← Usar esta versión
     apply_dark_theme()
+    
     
     # Inicializar session state - SIMPLIFICADO
     if 'active_tab_index' not in st.session_state:
