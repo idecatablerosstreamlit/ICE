@@ -90,9 +90,9 @@ def create_banner():
                 st.markdown(f'''
                 <div style="text-align: center;">
                     <img src="data:image/png;base64,{logo_alcaldia}" 
-                         style="width: 60px; height: auto;" 
+                         style="width: 300px; height: auto;" 
                          alt="Alcaldía Mayor">
-                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">ALCALDÍA</div>
+                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
                 </div>
                 ''', unsafe_allow_html=True)
             else:
@@ -105,9 +105,9 @@ def create_banner():
                 st.markdown(f'''
                 <div style="text-align: center;">
                     <img src="data:image/png;base64,{logo_bogota}" 
-                         style="width: 80px; height: auto;" 
+                         style="width: 300px; height: auto;" 
                          alt="Datos Abiertos Bogotá">
-                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">BOGOTÁ</div>
+                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
                 </div>
                 ''', unsafe_allow_html=True)
             else:
