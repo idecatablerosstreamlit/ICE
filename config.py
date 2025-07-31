@@ -76,60 +76,61 @@ def create_banner():
     """, unsafe_allow_html=True)
     
     # SECCIÓN BLANCA - SOLO LOGOS (SIN TÍTULO)
-     # SECCIÓN BLANCA - LOGOS ALINEADOS A LA IZQUIERDA
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # SECCIÓN BLANCA - LOGOS JUNTOS A LA IZQUIERDA
+    # Construir HTML dinámicamente según disponibilidad de imágenes
+    logos_html = ""
     
-    with col1:
-        # Logo Alcaldía CLICKEABLE
-        if logo_alcaldia:
-            st.markdown(f'''
-            <div style="text-align: left;">
-                <a href="https://www.ideca.gov.co/" target="_blank" style="text-decoration: none;">
-                    <img src="data:image/png;base64,{logo_alcaldia}" 
-                         style="width: 150px; height: auto; transition: opacity 0.3s ease;" 
-                         alt="Alcaldía Mayor - IDECA"
-                         onmouseover="this.style.opacity='0.8'"
-                         onmouseout="this.style.opacity='1'">
-                </a>
-            </div>
-            ''', unsafe_allow_html=True)
-        else:
-            st.markdown('''
-            <div style="text-align: left;">
-                <a href="https://www.ideca.gov.co/" target="_blank" style="text-decoration: none;">
-                    <div style="
-                        width: 150px; height: 80px; background: #f0f0f0; border-radius: 8px;
-                        display: flex; align-items: center; justify-content: center;
-                        font-size: 24px; color: #666; transition: opacity 0.3s ease;
-                    " onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">🏛️</div>
-                </a>
-            </div>
-            ''', unsafe_allow_html=True)
+    # Logo Alcaldía CLICKEABLE
+    if logo_alcaldia:
+        logos_html += f'''
+        <a href="https://www.ideca.gov.co/" target="_blank" style="text-decoration: none;">
+            <img src="data:image/png;base64,{logo_alcaldia}" 
+                 style="width: 150px; height: auto; transition: opacity 0.3s ease;" 
+                 alt="Alcaldía Mayor - IDECA"
+                 onmouseover="this.style.opacity='0.8'"
+                 onmouseout="this.style.opacity='1'">
+        </a>
+        '''
+    else:
+        logos_html += '''
+        <a href="https://www.ideca.gov.co/" target="_blank" style="text-decoration: none;">
+            <div style="
+                width: 150px; height: 80px; background: #f0f0f0; border-radius: 8px;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 24px; color: #666; transition: opacity 0.3s ease;
+            " onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">🏛️</div>
+        </a>
+        '''
     
-    with col2:
-        # Logo Bogotá (no clickeable, alineado a la izquierda)
-        if logo_bogota:
-            st.markdown(f'''
-            <div style="text-align: left;">
-                <img src="data:image/png;base64,{logo_bogota}" 
-                     style="width: 300px; height: auto;" 
-                     alt="Datos Abiertos Bogotá">
-            </div>
-            ''', unsafe_allow_html=True)
-        else:
-            st.markdown('''
-            <div style="text-align: left;">
-                <div style="
-                    width: 300px; height: 80px; background: #f0f0f0; border-radius: 8px;
-                    display: flex; align-items: center; justify-content: center;
-                    font-size: 24px; color: #666;
-                ">🏢</div>
-            </div>
-            ''', unsafe_allow_html=True)
+    # Logo Bogotá (no clickeable)
+    if logo_bogota:
+        logos_html += f'''
+        <img src="data:image/png;base64,{logo_bogota}" 
+             style="width: 300px; height: auto;" 
+             alt="Datos Abiertos Bogotá">
+        '''
+    else:
+        logos_html += '''
+        <div style="
+            width: 300px; height: 80px; background: #f0f0f0; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: #666;
+        ">🏢</div>
+        '''
     
-    with col3:
-        # Columna vacía para balancear
-        st.write("")
+    # Contenedor principal con ambos logos juntos a la izquierda
+    st.markdown(f'''
+    <div style="
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 20px 0;
+        margin-bottom: 10px;
+        gap: 20px;
+    ">
+        {logos_html}
+    </div>
+    ''', unsafe_allow_html=True)
     
     # TÍTULO CENTRADO FUERA DEL BANNER EN AZUL OSCURO
     st.markdown("""
