@@ -947,14 +947,14 @@ class TabManager:
         
         # Nombres de las pestañas
         tab_names = [
-            "📊 Resumen General", 
-            "🏗️ Resumen por Componente", 
-            "📈 Evolución", 
-            "⚙️ Gestión de Datos"
+            "Resumen General", 
+            "Resumen por Componente", 
+            "Evolución", 
+            "Gestión de Datos"
         ]
         
         # Crear navegación principal con botones
-        st.markdown("### 🧭 Navegación Principal")
+        #st.markdown("### 🧭 Navegación Principal")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
