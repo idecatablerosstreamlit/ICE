@@ -83,7 +83,7 @@ def create_banner():
         # Logo Alcaldía CLICKEABLE
         if logo_alcaldia:
             st.markdown(f'''
-            <div style="text-align: right; padding-right: 10px;">
+            <div style="text-align: left; padding-right: 10px;">
                 <a href="https://www.ideca.gov.co/" target="_blank" style="text-decoration: none;">
                     <img src="data:image/png;base64,{logo_alcaldia}" 
                          style="width: 150px; height: auto; transition: opacity 0.3s ease;" 
