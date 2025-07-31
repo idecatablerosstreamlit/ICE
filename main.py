@@ -16,14 +16,107 @@ from tabs import TabManager
 def main():
     configure_page()
     
-    # BANNER CORREGIDO con hipervínculos funcionales
+    # BANNER - VERSIÓN SIN ERRORES
     try:
-        from banner import create_banner_with_local_images  # Esta función usa tus imágenes locales
+        # Intentar cargar la función con imágenes locales
+        from banner import create_banner_with_local_images
         create_banner_with_local_images()
+    except ImportError:
+        # Si no existe, usar banner integrado directamente en main.py
+        import streamlit.components.v1 as components
+        
+        banner_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+                
+                .gov-header {
+                    background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%);
+                    padding: 15px 0; width: 100%;
+                }
+                .gov-content {
+                    display: flex; justify-content: space-between; align-items: center;
+                    max-width: 1200px; margin: 0 auto; padding: 0 20px;
+                }
+                .gov-left { display: flex; align-items: center; cursor: pointer; }
+                .gov-text { color: white; font-size: 22px; font-weight: 600; margin-left: 12px; }
+                .gov-link { color: white; text-decoration: underline; font-size: 14px; cursor: pointer; }
+                .gov-escudo { 
+                    width: 32px; height: 32px; background: white; border-radius: 6px; 
+                    display: flex; align-items: center; justify-content: center; 
+                    font-size: 14px; color: #4A6CF7; font-weight: bold; 
+                }
+                
+                .dashboard-header { background: white; padding: 25px 0; border-bottom: 3px solid #4472C4; }
+                .dashboard-content {
+                    display: flex; align-items: center; max-width: 1200px; 
+                    margin: 0 auto; padding: 0 20px; gap: 25px;
+                }
+                .ice-logo {
+                    width: 60px; height: 60px;
+                    background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
+                    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+                    color: white; font-size: 24px; font-weight: bold;
+                }
+                .dashboard-info { flex: 1; }
+                .dashboard-title { color: #2C3E50; font-size: 32px; font-weight: 700; margin-bottom: 6px; }
+                .dashboard-subtitle { color: #6C757D; font-size: 16px; }
+                .bogota-section { display: flex; align-items: center; gap: 20px; }
+                .alcaldia-shield {
+                    width: 55px; height: 55px; background: linear-gradient(135deg, #003366 0%, #004080 100%);
+                    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                    color: white; font-size: 8px; font-weight: bold; text-align: center; line-height: 1.1;
+                }
+                .bogota-placeholder { 
+                    background: linear-gradient(45deg, #E31E24 0%, #FF6B35 100%);
+                    padding: 12px 20px; border-radius: 25px; color: white; 
+                    font-weight: bold; font-size: 18px; letter-spacing: 1px;
+                }
+            </style>
+            <script>
+                function openGovCo() { 
+                    window.open('https://www.gov.co/', '_blank'); 
+                }
+            </script>
+        </head>
+        <body>
+            <div class="gov-header">
+                <div class="gov-content">
+                    <div class="gov-left" onclick="openGovCo()">
+                        <div class="gov-escudo">🏛️</div>
+                        <span class="gov-text">GOV.CO</span>
+                    </div>
+                    <div class="gov-link" onclick="openGovCo()">Ir a Gov.co</div>
+                </div>
+            </div>
+            
+            <div class="dashboard-header">
+                <div class="dashboard-content">
+                    <div class="ice-logo">🏢</div>
+                    <div class="dashboard-info">
+                        <div class="dashboard-title">Dashboard ICE</div>
+                        <div class="dashboard-subtitle">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</div>
+                    </div>
+                    <div class="bogota-section">
+                        <div class="alcaldia-shield">ALCALDÍA<br>MAYOR<br>DE BOGOTÁ<br>D.C.</div>
+                        <div class="bogota-placeholder">BOGOTÁ</div>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        components.html(banner_html, height=200, scrolling=False)
+    
     except Exception as e:
-        # Fallback: banner con JavaScript funcional
-        from banner import create_government_banner_with_real_logos
-        create_government_banner_with_real_logos()
+        # Fallback final
+        st.error(f"Error cargando banner: {e}")
+        st.markdown("### 🏛️ GOV.CO - Dashboard ICE")
+        st.caption("Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA")
     
     apply_dark_theme()
     
