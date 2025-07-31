@@ -14,11 +14,11 @@ def configure_page():
     )
 
 def create_banner():
-    """Banner híbrido - HTML para azul, Streamlit nativo para blanco"""
-    # Sección azul GOV.CO (que ya funciona)
+    """Crear banner superior del dashboard - VERSIÓN QUE FUNCIONA"""
+    # Sección azul GOV.CO - COLOR CORRECTO #4169E1
     st.markdown("""
     <div style="
-        background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%);
+        background: #4169E1;
         padding: 15px 20px;
         margin: -1rem -1rem 0 -1rem;
         color: white;
@@ -41,7 +41,7 @@ def create_banner():
                     align-items: center;
                     justify-content: center;
                     font-size: 14px;
-                    color: #4A6CF7;
+                    color: #4169E1;
                     font-weight: bold;
                 ">🏛️</div>
                 <span style="
@@ -60,35 +60,130 @@ def create_banner():
     </div>
     """, unsafe_allow_html=True)
     
-    # Sección blanca usando elementos nativos de Streamlit
-    col1, col2, col3 = st.columns([1, 3, 1])
-    
-    with col1:
-        st.markdown("## 🏢")
-    
-    with col2:
-        st.markdown("# Dashboard ICE")
-        st.caption("Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA")
-    
-    with col3:
-        col3a, col3b = st.columns(2)
-        with col3a:
-            st.markdown("### 🏛️")
-            st.caption("ALCALDÍA MAYOR")
-        with col3b:
-            st.markdown("### **BOGOTÁ**")
-    
-    st.markdown("---")
+    # Sección blanca Dashboard - SEPARADA
+    st.markdown("""
+    <div style="
+        background: white;
+        padding: 25px 20px;
+        margin: 0 -1rem 20px -1rem;
+        border-bottom: 3px solid #4472C4;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    ">
+        <div style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+            gap: 20px;
+        ">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="
+                    width: 60px;
+                    height: 60px;
+                    background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 24px;
+                    font-weight: bold;
+                    box-shadow: 0 6px 20px rgba(68, 114, 196, 0.3);
+                ">🏢</div>
+                <div>
+                    <h1 style="
+                        color: #2C3E50;
+                        font-size: 32px;
+                        font-weight: 700;
+                        margin: 0 0 6px 0;
+                        background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        background-clip: text;
+                    ">Dashboard ICE</h1>
+                    <p style="
+                        color: #6C757D;
+                        font-size: 16px;
+                        margin: 0;
+                        font-weight: 400;
+                    ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="
+                    width: 55px;
+                    height: 55px;
+                    background: linear-gradient(135deg, #003366 0%, #004080 100%);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 8px;
+                    font-weight: bold;
+                    text-align: center;
+                    line-height: 1.1;
+                    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.3);
+                ">ALCALDÍA<br>MAYOR<br>DE BOGOTÁ<br>D.C.</div>
+                
+                <div style="
+                    background: linear-gradient(45deg, #E31E24 0%, #FF6B35 100%);
+                    padding: 12px 20px;
+                    border-radius: 25px;
+                    color: white;
+                    font-weight: bold;
+                    font-size: 18px;
+                    letter-spacing: 1.5px;
+                    box-shadow: 0 4px 15px rgba(227, 30, 36, 0.4);
+                ">BOGOTÁ</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def apply_dark_theme():
-    """Aplicar estilos mínimos - SIN INTERFERIR CON EL BANNER"""
+    """Aplicar estilos mínimos - PESTAÑAS GRISES CON ACTIVA EN AZUL #4169E1"""
     st.markdown("""
     <style>
-        /* Solo estilos básicos para pestañas y botones - SIN interferir con banner */
+        /* Pestañas - GRISES por defecto, AZUL #4169E1 cuando activas */
+        .stTabs [data-baseweb="tab-list"] {
+            background: #f0f0f0;
+            border-radius: 10px 10px 0 0;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background: #e0e0e0;
+            color: #666;
+            font-weight: 500;
+            border-radius: 8px;
+            margin: 0 5px;
+            padding: 12px 20px;
+            border: 1px solid #ccc;
+            transition: all 0.3s ease;
+        }
+        
+        .stTabs [data-baseweb="tab"]:hover {
+            background: #d0d0d0;
+            color: #333;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background: #4169E1 !important;
+            color: white !important;
+            border: 1px solid #4169E1 !important;
+            font-weight: 600 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(65, 105, 225, 0.3);
+        }
         
         /* Botones */
         div.stButton > button {
-            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
+            background: #4169E1;
             color: white;
             border: none;
             border-radius: 6px;
@@ -98,31 +193,9 @@ def apply_dark_theme():
         }
         
         div.stButton > button:hover {
+            background: #365cc0;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Pestañas básicas */
-        .stTabs [data-baseweb="tab-list"] {
-            background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%);
-            border-radius: 10px 10px 0 0;
-            padding: 10px;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            color: white;
-            font-weight: 500;
-            border-radius: 5px;
-            margin: 0 5px;
-            padding: 8px 16px;
-        }
-        
-        .stTabs [data-baseweb="tab"]:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-        }
-        
-        .stTabs [aria-selected="true"] {
-            background-color: rgba(255, 255, 255, 0.3) !important;
         }
         
         /* Métricas */
@@ -130,12 +203,12 @@ def apply_dark_theme():
             background: rgba(255, 255, 255, 0.1);
             padding: 1rem;
             border-radius: 8px;
-            border-left: 4px solid #4472C4;
+            border-left: 4px solid #4169E1;
         }
         
-        /* Sidebar básico */
+        /* Sidebar */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #4472C4 0%, #5B9BD5 100%);
+            background: linear-gradient(180deg, #4169E1 0%, #365cc0 100%);
         }
         
         [data-testid="stSidebar"] .stSelectbox label, 
