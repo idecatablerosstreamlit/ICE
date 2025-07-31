@@ -65,7 +65,7 @@ def create_banner():
                     font-size: 22px;
                     font-weight: 600;
                     letter-spacing: 0.5px;
-                ">GOV.CO</span>
+                "></span>
             </div>
             <a href="https://www.gov.co/" target="_blank" style="
                 color: white;
