@@ -36,7 +36,7 @@ def create_banner():
     
     # Sección azul GOV.CO (sin cambios)
     if logo_gov:
-        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 32px; height: 32px; margin-right: 12px;" alt="GOV.CO">'
+        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 140px; height: 32px; margin-right: 12px;" alt="GOV.CO">'
     else:
         gov_logo_html = '''<div style="
             width: 32px; height: 32px; background: white; border-radius: 6px; margin-right: 12px;
