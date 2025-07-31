@@ -16,26 +16,18 @@ from tabs import TabManager
 def main():
     # Configurar página
     configure_page()
-    apply_dark_theme()  # ← MOVER EL TEMA ANTES
     
-    # BANNER DESPUÉS DEL TEMA
-    st.markdown("""
-    <div style="background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%) !important; color: white !important; padding: 20px !important; text-align: center !important; border-radius: 10px !important; margin-bottom: 20px !important; position: relative !important; z-index: 9999 !important;">
-        <h1 style="color: white !important; margin: 0 !important; font-size: 28px !important;">🏛️ GOV.CO</h1>
-        <p style="color: white !important; margin: 5px 0 0 0 !important;">Portal Único del Estado Colombiano</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # BANNER USANDO COMPONENTE HTML COMPLETO
+    try:
+        from banner import create_government_banner_with_real_logos
+        create_government_banner_with_real_logos()
+    except Exception as e:
+        # Fallback: banner simple
+        st.error(f"Error cargando banner: {e}")
+        from banner import create_simple_banner
+        create_simple_banner()
     
-    st.markdown("""
-    <div style="background: white !important; padding: 30px !important; border: 3px solid #4472C4 !important; border-radius: 15px !important; margin-bottom: 30px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; position: relative !important; z-index: 9998 !important;">
-        <div style="text-align: center;">
-            <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%); border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; margin-bottom: 15px;">🏢</div>
-            <h1 style="color: #2C3E50 !important; font-size: 32px !important; font-weight: 700 !important; margin: 0 0 10px 0 !important;">Dashboard ICE</h1>
-            <p style="color: #6C757D !important; font-size: 16px !important; margin: 0 0 15px 0 !important;">Sistema de Monitoreo - IDECA</p>
-            <div style="background: linear-gradient(45deg, #E31E24 0%, #FF6B35 100%); padding: 12px 20px; border-radius: 20px; color: white; font-weight: bold; font-size: 18px; display: inline-block;">BOGOTÁ</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    apply_dark_theme()
     
     # Inicializar session state - SIMPLIFICADO
     if 'active_tab_index' not in st.session_state:
