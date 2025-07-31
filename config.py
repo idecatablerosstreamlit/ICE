@@ -1,5 +1,5 @@
 """"
-Configuración y estilos para el Dashboard ICE - ACTUALIZADO
+Configuración y estilos para el Dashboard ICE - ACTUALIZADO CON BANNER
 """
 
 import streamlit as st
@@ -13,23 +13,157 @@ def configure_page():
         initial_sidebar_state="collapsed"
     )
 
+def create_banner():
+    """Crear banner superior del dashboard"""
+    # Sección azul GOV.CO
+    st.markdown("""
+    <div style="
+        background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%);
+        padding: 15px 20px;
+        margin: -1rem -1rem 0 -1rem;
+        color: white;
+    ">
+        <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        ">
+            <div style="display: flex; align-items: center;">
+                <div style="
+                    width: 32px;
+                    height: 32px;
+                    background: white;
+                    border-radius: 6px;
+                    margin-right: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 14px;
+                    color: #4A6CF7;
+                    font-weight: bold;
+                ">🏛️</div>
+                <span style="
+                    color: white;
+                    font-size: 22px;
+                    font-weight: 600;
+                    letter-spacing: 0.5px;
+                ">GOV.CO</span>
+            </div>
+            <a href="https://www.gov.co/" target="_blank" style="
+                color: white;
+                text-decoration: underline;
+                font-size: 14px;
+            ">Ir a Gov.co</a>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sección blanca Dashboard
+    st.markdown("""
+    <div style="
+        background: white;
+        padding: 25px 20px;
+        margin: 0 -1rem 20px -1rem;
+        border-bottom: 3px solid #4472C4;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    ">
+        <div style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+            gap: 20px;
+        ">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="
+                    width: 60px;
+                    height: 60px;
+                    background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 24px;
+                    font-weight: bold;
+                    box-shadow: 0 6px 20px rgba(68, 114, 196, 0.3);
+                ">🏢</div>
+                <div>
+                    <h1 style="
+                        color: #2C3E50;
+                        font-size: 32px;
+                        font-weight: 700;
+                        margin: 0 0 6px 0;
+                        background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        background-clip: text;
+                    ">Dashboard ICE</h1>
+                    <p style="
+                        color: #6C757D;
+                        font-size: 16px;
+                        margin: 0;
+                        font-weight: 400;
+                    ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div style="
+                    width: 55px;
+                    height: 55px;
+                    background: linear-gradient(135deg, #003366 0%, #004080 100%);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 8px;
+                    font-weight: bold;
+                    text-align: center;
+                    line-height: 1.1;
+                    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.3);
+                ">ALCALDÍA<br>MAYOR<br>DE BOGOTÁ<br>D.C.</div>
+                
+                <div style="
+                    background: linear-gradient(45deg, #E31E24 0%, #FF6B35 100%);
+                    padding: 12px 20px;
+                    border-radius: 25px;
+                    color: white;
+                    font-weight: bold;
+                    font-size: 18px;
+                    letter-spacing: 1.5px;
+                    box-shadow: 0 4px 15px rgba(227, 30, 36, 0.4);
+                ">BOGOTÁ</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 def apply_dark_theme():
-    """Aplicar tema corporativo moderno con colores institucionales azules"""
+    """Aplicar tema corporativo moderno con colores institucionales azules - COMPATIBLE CON BANNER"""
     st.markdown("""
     <style>
+        /* Tema principal sin interferir con el banner */
         .stApp {
             background: white;
             color: #2C3E50;
         }
         
+        /* Contenedor principal */
         .main > div {
-            padding-top: 2rem;
+            padding-top: 1rem;
             background-color: rgba(255, 255, 255, 0.95);
             border-radius: 10px;
             margin: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         
+        /* Pestañas */
         .stTabs [data-baseweb="tab-list"] {
             background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%);
             border-radius: 10px 10px 0 0;
@@ -52,16 +186,14 @@ def apply_dark_theme():
             background-color: rgba(255, 255, 255, 0.3) !important;
         }
         
+        /* Tablas y DataFrames */
         .stDataFrame, .stTable {
             background-color: rgba(255, 255, 255, 0.9);
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
-        div.block-container {
-            padding-top: 1rem;
-        }
-        
+        /* Botones */
         div.stButton > button {
             background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
             color: white;
@@ -77,6 +209,7 @@ def apply_dark_theme():
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         
+        /* Sidebar */
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #4472C4 0%, #5B9BD5 100%);
             border-right: 3px solid #BDC3C7;
@@ -89,15 +222,7 @@ def apply_dark_theme():
             font-weight: 500;
         }
         
-        .metric-card {
-            background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
-            padding: 1rem;
-            border-radius: 10px;
-            color: white;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
+        /* Métricas */
         .stMetric {
             background: rgba(255, 255, 255, 0.1);
             padding: 1rem;
@@ -116,29 +241,33 @@ def apply_dark_theme():
             font-weight: 700;
         }
         
+        /* Títulos */
         h1, h2, h3 {
             color: #2C3E50;
             font-weight: 600;
         }
         
+        /* Expanders */
         .stExpander {
             background-color: rgba(255, 255, 255, 0.8);
             border-radius: 8px;
             border: 1px solid #BDC3C7;
         }
         
+        /* Alertas */
         .stAlert {
             border-radius: 8px;
             border-left: 4px solid #4472C4;
         }
         
+        /* Selectboxes */
         .stSelectbox > div > div {
             background-color: rgba(255, 255, 255, 0.9);
             border-radius: 6px;
             border: 1px solid #BDC3C7;
         }
         
-        /* Indicadores específicos institucionales */
+        /* Indicadores específicos */
         .sheets-indicator {
             background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
             color: white;
@@ -179,7 +308,7 @@ COLUMN_MAPPING = {
     'Nombre de indicador': 'Indicador',
     'Valor': 'Valor',
     'Fecha': 'Fecha',
-    'Tipo': 'Tipo'  # NUEVO: Mapeo para columna tipo
+    'Tipo': 'Tipo'
 }
 
 # Configuración por defecto
@@ -191,13 +320,13 @@ GOOGLE_SHEETS_CONFIG = {
     'worksheet_name': 'IndicadoresICE',
     'required_columns': [
         'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA', 
-        'COD', 'Nombre de indicador', 'Valor', 'Fecha', 'Tipo'  # NUEVO: Incluir Tipo
+        'COD', 'Nombre de indicador', 'Valor', 'Fecha', 'Tipo'
     ],
     'cache_ttl_seconds': 30,
     'max_retries': 3
 }
 
-# NUEVO: Tipos de indicadores soportados
+# Tipos de indicadores soportados
 INDICATOR_TYPES = {
     'porcentaje': {
         'description': 'Valores entre 0-1 o 0-100%',
@@ -221,7 +350,7 @@ INDICATOR_TYPES = {
     }
 }
 
-# Mensajes de ayuda para configuración - ACTUALIZADO
+# Mensajes de ayuda para configuración
 GOOGLE_SHEETS_SETUP_GUIDE = """
 ## 🔧 Configuración de Google Sheets para Dashboard ICE
 
@@ -259,7 +388,7 @@ spreadsheet_url = "https://docs.google.com/spreadsheets/d/TU_SPREADSHEET_ID/edit
 3. Comparte con el email del Service Account (`tu-service-account@proyecto.iam.gserviceaccount.com`)
 4. Dale permisos de **"Editor"**
 
-### 4. Estructura de la hoja - ACTUALIZADA:
+### 4. Estructura de la hoja:
 La hoja debe tener estas columnas en la **primera fila**:
 - `LINEA DE ACCIÓN`
 - `COMPONENTE PROPUESTO`  
@@ -268,7 +397,7 @@ La hoja debe tener estas columnas en la **primera fila**:
 - `Nombre de indicador`
 - `Valor`
 - `Fecha`
-- `Tipo` **(NUEVA COLUMNA)**
+- `Tipo`
 
 ### 5. Tipos de indicadores soportados:
 - **porcentaje**: Valores entre 0-1 o 0-100%
@@ -276,7 +405,7 @@ La hoja debe tener estas columnas en la **primera fila**:
 - **moneda**: Valores monetarios (se normaliza por el máximo)
 - **indice**: Índices y ratios (se normaliza por el máximo)
 
-### 6. Installar dependencias:
+### 6. Instalar dependencias:
 ```bash
 pip install gspread google-auth
 ```
@@ -322,7 +451,7 @@ def show_setup_instructions():
     """Mostrar instrucciones de configuración"""
     st.markdown(GOOGLE_SHEETS_SETUP_GUIDE)
     
-    # Mostrar ejemplo de estructura - ACTUALIZADO CON TIPO
+    # Mostrar ejemplo de estructura
     st.subheader("📊 Ejemplo de estructura de Google Sheets:")
     
     example_data = {
@@ -337,13 +466,14 @@ def show_setup_instructions():
         ],
         'Valor': [0.5, 0.75, 1250],
         'Fecha': ['1/01/2025', '1/01/2025', '1/01/2025'],
-        'Tipo': ['porcentaje', 'porcentaje', 'moneda']  # NUEVO
+        'Tipo': ['porcentaje', 'porcentaje', 'moneda']
     }
     
+    import pandas as pd
     example_df = pd.DataFrame(example_data)
     st.dataframe(example_df, use_container_width=True)
     
-    st.info("💡 **Tip:** Nota la nueva columna 'Tipo' que define cómo normalizar cada indicador.")
+    st.info("💡 **Tip:** Nota la columna 'Tipo' que define cómo normalizar cada indicador.")
 
 def get_connection_status():
     """Obtener estado de conexión de Google Sheets"""
