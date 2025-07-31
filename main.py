@@ -1,6 +1,5 @@
 """
-Dashboard ICE - Archivo Principal - VERSIÓN CORREGIDA
-CORRECCIÓN: Información de estado movida al final del dashboard
+Dashboard ICE - Archivo Principal - VERSIÓN CORREGIDA CON BANNER
 """
 
 import streamlit as st
@@ -13,18 +12,16 @@ from config import (
 )
 from data_utils import DataLoader, ExcelDataLoader
 from tabs import TabManager
-from banner import create_government_banner_with_real_logos
-
 
 def main():
-    
-
-    
     # Configurar página
     configure_page()
-    create_government_banner_with_real_logos()  
-    apply_dark_theme()
     
+    # BANNER DEBE IR ANTES DEL TEMA
+    from banner import create_government_banner_with_real_logos
+    create_government_banner_with_real_logos()
+    
+    apply_dark_theme()
     
     # Inicializar session state - SIMPLIFICADO
     if 'active_tab_index' not in st.session_state:
@@ -32,16 +29,7 @@ def main():
     if 'last_load_time' not in st.session_state:
         st.session_state.last_load_time = 0
     
-    # Título principal
-    st.markdown(f"""
-    <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%); 
-                border-radius: 10px; margin-bottom: 2rem; color: white;">
-        <h1 style="color: white; margin: 0;">Dashboard ICE</h1>
-        <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 1.1rem;">
-            Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # NO AGREGAR MÁS TÍTULOS AQUÍ - EL BANNER YA LOS INCLUYE
     
     # Verificar configuración de Google Sheets
     config_valid, config_message = validate_google_sheets_config()
@@ -287,7 +275,6 @@ def verify_data_structure(df):
 
 def create_simple_filters(df):
     """Crear filtros simples SIN información técnica en encabezado"""
-    
     
     try:
         if df.empty or 'Fecha' not in df.columns:
