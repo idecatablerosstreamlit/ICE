@@ -99,7 +99,7 @@ def create_banner():
             st.markdown(f'''
             <div style="text-align: center;">
                 <img src="data:image/png;base64,{logo_bogota}" 
-                     style="width: 500px; height: auto;" 
+                     style="width: 300px; height: auto;" 
                      alt="Datos Abiertos Bogotá">
                 <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
             </div>
