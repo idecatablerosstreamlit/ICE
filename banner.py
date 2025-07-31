@@ -1,4 +1,9 @@
-"""
+# Funciones de compatibilidad
+def create_dashboard_banner():
+    create_government_banner_with_real_logos()
+
+def create_dashboard_banner_with_images():
+    create_banner_with_local_images()  # Usa la versión con imágenes locales"""
 Banner superior para Dashboard ICE - COMPONENTE HTML COMPLETO
 Esta versión usa st.components.v1.html() para control total del diseño
 """
@@ -30,7 +35,7 @@ def create_government_banner_with_real_logos():
             /* Sección azul GOV.CO */
             .gov-header {
                 background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%);
-                padding: 12px 0;
+                padding: 15px 0;
                 width: 100%;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
@@ -54,6 +59,7 @@ def create_government_banner_with_real_logos():
                 align-items: center;
                 text-decoration: none;
                 transition: opacity 0.3s ease;
+                cursor: pointer;
             }
 
             .gov-logo-link:hover {
@@ -95,6 +101,7 @@ def create_government_banner_with_real_logos():
                 font-size: 14px;
                 font-weight: 400;
                 transition: color 0.3s ease;
+                cursor: pointer;
             }
 
             .gov-link:hover {
@@ -105,7 +112,7 @@ def create_government_banner_with_real_logos():
             /* Sección blanca Dashboard */
             .dashboard-header {
                 background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
-                padding: 20px 0;
+                padding: 25px 0;
                 border-bottom: 3px solid #4472C4;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             }
@@ -116,7 +123,7 @@ def create_government_banner_with_real_logos():
                 max-width: 1200px;
                 margin: 0 auto;
                 padding: 0 20px;
-                gap: 20px;
+                gap: 25px;
             }
 
             .ice-logo {
@@ -215,19 +222,23 @@ def create_government_banner_with_real_logos():
                 }
             }
         </style>
+        <script>
+            function openGovCo() {
+                window.open('https://www.gov.co/', '_blank');
+            }
+        </script>
     </head>
     <body>
         <!-- Sección azul GOV.CO -->
         <div class="gov-header">
             <div class="gov-content">
                 <div class="gov-left">
-                    <a href="https://www.gov.co/" class="gov-logo-link" target="_blank">
-                        <img src="gov.png" alt="GOV.CO" class="gov-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <div class="gov-escudo" style="display: none;">🏛️</div>
+                    <div class="gov-logo-link" onclick="openGovCo()">
+                        <div class="gov-escudo">🏛️</div>
                         <span class="gov-text">GOV.CO</span>
-                    </a>
+                    </div>
                 </div>
-                <a href="https://www.gov.co/" class="gov-link" target="_blank">Ir a Gov.co</a>
+                <div class="gov-link" onclick="openGovCo()">Ir a Gov.co</div>
             </div>
         </div>
 
@@ -245,8 +256,7 @@ def create_government_banner_with_real_logos():
                     <div class="alcaldia-shield">
                         ALCALDÍA<br>MAYOR<br>DE BOGOTÁ<br>D.C.
                     </div>
-                    <img src="Bogota.png" alt="Bogotá" class="bogota-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                    <div class="bogota-placeholder" style="display: none;">BOGOTÁ</div>
+                    <div class="bogota-placeholder">BOGOTÁ</div>
                 </div>
             </div>
         </div>
@@ -345,12 +355,124 @@ def create_simple_banner():
     
     components.html(simple_html, height=180, scrolling=False)
 
-# Funciones de compatibilidad
-def create_dashboard_banner():
-    create_government_banner_with_real_logos()
-
-def create_dashboard_banner_with_images():
-    create_government_banner_with_real_logos()
-
-def create_dashboard_banner_with_images():
-    create_government_banner_with_real_logos()
+# Función que usa imágenes locales
+def create_banner_with_local_images():
+    """Banner que usa las imágenes locales gov.png y Bogota.png"""
+    
+    # Primero intentamos cargar las imágenes como base64
+    import base64
+    import os
+    
+    def get_base64_image(image_path):
+        try:
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        except:
+            return None
+    
+    gov_img_b64 = get_base64_image("gov.png")
+    bogota_img_b64 = get_base64_image("Bogota.png")
+    
+    banner_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }}
+            
+            .gov-header {{
+                background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%);
+                padding: 15px 0;
+                width: 100%;
+            }}
+            
+            .gov-content {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 0 20px;
+            }}
+            
+            .gov-left {{ display: flex; align-items: center; cursor: pointer; }}
+            .gov-text {{ color: white; font-size: 22px; font-weight: 600; margin-left: 12px; }}
+            .gov-link {{ color: white; text-decoration: underline; font-size: 14px; cursor: pointer; }}
+            .gov-logo {{ height: 32px; width: auto; }}
+            .gov-escudo {{ width: 32px; height: 32px; background: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #4A6CF7; font-weight: bold; }}
+            
+            .dashboard-header {{
+                background: white;
+                padding: 25px 0;
+                border-bottom: 3px solid #4472C4;
+            }}
+            
+            .dashboard-content {{
+                display: flex;
+                align-items: center;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 0 20px;
+                gap: 25px;
+            }}
+            
+            .ice-logo {{
+                width: 60px; height: 60px;
+                background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
+                border-radius: 12px; display: flex; align-items: center; justify-content: center;
+                color: white; font-size: 24px; font-weight: bold;
+            }}
+            
+            .dashboard-info {{ flex: 1; }}
+            .dashboard-title {{ color: #2C3E50; font-size: 32px; font-weight: 700; margin-bottom: 6px; }}
+            .dashboard-subtitle {{ color: #6C757D; font-size: 16px; }}
+            
+            .bogota-section {{ display: flex; align-items: center; gap: 20px; }}
+            .alcaldia-shield {{
+                width: 55px; height: 55px; background: linear-gradient(135deg, #003366 0%, #004080 100%);
+                border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                color: white; font-size: 8px; font-weight: bold; text-align: center; line-height: 1.1;
+            }}
+            .bogota-logo {{ height: 70px; width: auto; }}
+            .bogota-placeholder {{ 
+                background: linear-gradient(45deg, #E31E24 0%, #FF6B35 100%);
+                padding: 12px 20px; border-radius: 25px; color: white; font-weight: bold; font-size: 18px;
+            }}
+        </style>
+        <script>
+            function openGovCo() {{
+                window.open('https://www.gov.co/', '_blank');
+            }}
+        </script>
+    </head>
+    <body>
+        <div class="gov-header">
+            <div class="gov-content">
+                <div class="gov-left" onclick="openGovCo()">
+                    {"<img src='data:image/png;base64," + gov_img_b64 + "' alt='GOV.CO' class='gov-logo'>" if gov_img_b64 else "<div class='gov-escudo'>🏛️</div>"}
+                    <span class="gov-text">GOV.CO</span>
+                </div>
+                <div class="gov-link" onclick="openGovCo()">Ir a Gov.co</div>
+            </div>
+        </div>
+        
+        <div class="dashboard-header">
+            <div class="dashboard-content">
+                <div class="ice-logo">🏢</div>
+                <div class="dashboard-info">
+                    <div class="dashboard-title">Dashboard ICE</div>
+                    <div class="dashboard-subtitle">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</div>
+                </div>
+                <div class="bogota-section">
+                    <div class="alcaldia-shield">ALCALDÍA<br>MAYOR<br>DE BOGOTÁ<br>D.C.</div>
+                    {"<img src='data:image/png;base64," + bogota_img_b64 + "' alt='Bogotá' class='bogota-logo'>" if bogota_img_b64 else "<div class='bogota-placeholder'>BOGOTÁ</div>"}
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    components.html(banner_html, height=200, scrolling=False)
