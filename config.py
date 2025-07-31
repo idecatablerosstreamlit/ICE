@@ -76,7 +76,7 @@ def create_banner():
     """, unsafe_allow_html=True)
     
     # SECCIÓN BLANCA - SOLO LOGOS (SIN TÍTULO)
-        # SECCIÓN BLANCA - LOGOS ALINEADOS A LA IZQUIERDA
+     # SECCIÓN BLANCA - LOGOS ALINEADOS A LA IZQUIERDA
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
