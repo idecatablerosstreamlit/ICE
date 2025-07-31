@@ -14,8 +14,8 @@ def configure_page():
     )
 
 def create_banner():
-    """Crear banner superior del dashboard - VERSIÓN QUE FUNCIONA"""
-    # Sección azul GOV.CO
+    """Banner híbrido - HTML para azul, Streamlit nativo para blanco"""
+    # Sección azul GOV.CO (que ya funciona)
     st.markdown("""
     <div style="
         background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%);
@@ -60,89 +60,25 @@ def create_banner():
     </div>
     """, unsafe_allow_html=True)
     
-    # Sección blanca Dashboard - SEPARADA
-    st.markdown("""
-    <div style="
-        background: white;
-        padding: 25px 20px;
-        margin: 0 -1rem 20px -1rem;
-        border-bottom: 3px solid #4472C4;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    ">
-        <div style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            max-width: 1200px;
-            margin: 0 auto;
-            flex-wrap: wrap;
-            gap: 20px;
-        ">
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <div style="
-                    width: 60px;
-                    height: 60px;
-                    background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-size: 24px;
-                    font-weight: bold;
-                    box-shadow: 0 6px 20px rgba(68, 114, 196, 0.3);
-                ">🏢</div>
-                <div>
-                    <h1 style="
-                        color: #2C3E50;
-                        font-size: 32px;
-                        font-weight: 700;
-                        margin: 0 0 6px 0;
-                        background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%);
-                        -webkit-background-clip: text;
-                        -webkit-text-fill-color: transparent;
-                        background-clip: text;
-                    ">Dashboard ICE</h1>
-                    <p style="
-                        color: #6C757D;
-                        font-size: 16px;
-                        margin: 0;
-                        font-weight: 400;
-                    ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
-                </div>
-            </div>
-            
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <div style="
-                    width: 55px;
-                    height: 55px;
-                    background: linear-gradient(135deg, #003366 0%, #004080 100%);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-size: 8px;
-                    font-weight: bold;
-                    text-align: center;
-                    line-height: 1.1;
-                    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.3);
-                ">ALCALDÍA<br>MAYOR<br>DE BOGOTÁ<br>D.C.</div>
-                
-                <div style="
-                    background: linear-gradient(45deg, #E31E24 0%, #FF6B35 100%);
-                    padding: 12px 20px;
-                    border-radius: 25px;
-                    color: white;
-                    font-weight: bold;
-                    font-size: 18px;
-                    letter-spacing: 1.5px;
-                    box-shadow: 0 4px 15px rgba(227, 30, 36, 0.4);
-                ">BOGOTÁ</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Sección blanca usando elementos nativos de Streamlit
+    col1, col2, col3 = st.columns([1, 3, 1])
+    
+    with col1:
+        st.markdown("## 🏢")
+    
+    with col2:
+        st.markdown("# Dashboard ICE")
+        st.caption("Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA")
+    
+    with col3:
+        col3a, col3b = st.columns(2)
+        with col3a:
+            st.markdown("### 🏛️")
+            st.caption("ALCALDÍA MAYOR")
+        with col3b:
+            st.markdown("### **BOGOTÁ**")
+    
+    st.markdown("---")
 
 def apply_dark_theme():
     """Aplicar estilos mínimos - SIN INTERFERIR CON EL BANNER"""
