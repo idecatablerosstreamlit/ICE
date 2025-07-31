@@ -7,7 +7,7 @@ import pandas as pd
 import os
 import time
 from config import (
-    configure_page, apply_dark_theme, validate_google_sheets_config,
+    configure_page, create_banner, apply_dark_theme, validate_google_sheets_config,
     show_setup_instructions
 )
 from data_utils import DataLoader, ExcelDataLoader
@@ -15,6 +15,9 @@ from tabs import TabManager
 
 def main():
     configure_page()
+    
+    # AGREGAR SOLO ESTA LÍNEA:
+    create_banner()
     
     # BANNER USANDO SOLO STREAMLIT NATIVO - GARANTIZADO QUE FUNCIONA
     
