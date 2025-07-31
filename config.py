@@ -1,8 +1,9 @@
 """"
 Configuración y estilos para el Dashboard ICE - SIN TEMA OSCURO
 """
-
 import streamlit as st
+import base64
+import os
 
 def configure_page():
     """Configurar la página de Streamlit"""
@@ -13,9 +14,7 @@ def configure_page():
         initial_sidebar_state="collapsed"
     )
 
-import streamlit as st
-import base64
-import os
+
 
 def create_banner():
     """Crear banner superior del dashboard - VERSIÓN SIMPLE CON IMÁGENES"""
