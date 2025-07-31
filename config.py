@@ -76,37 +76,56 @@ def create_banner():
     """, unsafe_allow_html=True)
     
     # SECCIÓN BLANCA - SOLO LOGOS (SIN TÍTULO)
+        # SECCIÓN BLANCA - LOGOS ALINEADOS A LA IZQUIERDA
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        # Logo Alcaldía PRIMERO
+        # Logo Alcaldía CLICKEABLE
         if logo_alcaldia:
             st.markdown(f'''
-            <div style="text-align: center;">
-                <img src="data:image/png;base64,{logo_alcaldia}" 
-                     style="width: 150px; height: auto;" 
-                     alt="Alcaldía Mayor">
-                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
+            <div style="text-align: left;">
+                <a href="https://www.ideca.gov.co/" target="_blank" style="text-decoration: none;">
+                    <img src="data:image/png;base64,{logo_alcaldia}" 
+                         style="width: 150px; height: auto; transition: opacity 0.3s ease;" 
+                         alt="Alcaldía Mayor - IDECA"
+                         onmouseover="this.style.opacity='0.8'"
+                         onmouseout="this.style.opacity='1'">
+                </a>
             </div>
             ''', unsafe_allow_html=True)
         else:
-            st.markdown("### 🏛️")
-            st.caption("ALCALDÍA MAYOR")
+            st.markdown('''
+            <div style="text-align: left;">
+                <a href="https://www.ideca.gov.co/" target="_blank" style="text-decoration: none;">
+                    <div style="
+                        width: 150px; height: 80px; background: #f0f0f0; border-radius: 8px;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 24px; color: #666; transition: opacity 0.3s ease;
+                    " onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">🏛️</div>
+                </a>
+            </div>
+            ''', unsafe_allow_html=True)
     
     with col2:
-        # Logo Bogotá SEGUNDO
+        # Logo Bogotá (no clickeable, alineado a la izquierda)
         if logo_bogota:
             st.markdown(f'''
-            <div style="text-align: center;">
+            <div style="text-align: left;">
                 <img src="data:image/png;base64,{logo_bogota}" 
                      style="width: 300px; height: auto;" 
                      alt="Datos Abiertos Bogotá">
-                <div style="font-size: 10px; font-weight: 500; margin-top: 5px;"></div>
             </div>
             ''', unsafe_allow_html=True)
         else:
-            st.markdown("### 🏢")
-            st.caption("BOGOTÁ")
+            st.markdown('''
+            <div style="text-align: left;">
+                <div style="
+                    width: 300px; height: 80px; background: #f0f0f0; border-radius: 8px;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 24px; color: #666;
+                ">🏢</div>
+            </div>
+            ''', unsafe_allow_html=True)
     
     with col3:
         # Columna vacía para balancear
