@@ -248,7 +248,7 @@ class EvolutionTab:
     @staticmethod
     def render(df, filters):
         """Renderizar la pestaña de evolución"""
-        st.header("📈 Evolución Temporal de Indicadores")
+        st.header("Evolución Temporal de Indicadores")
         
         try:
             if df.empty:
@@ -954,29 +954,29 @@ class TabManager:
         ]
         
         # Crear navegación principal con botones
-        #st.markdown("### 🧭 Navegación Principal")
+        #st.markdown("")
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if st.button("📊 Resumen General", use_container_width=True,
+            if st.button("Resumen General", use_container_width=True,
                         type="primary" if st.session_state.active_tab_index == 0 else "secondary"):
                 st.session_state.active_tab_index = 0
                 st.rerun()
         
         with col2:
-            if st.button("🏗️ Resumen por Componente", use_container_width=True,
+            if st.button("Resumen por Componente", use_container_width=True,
                         type="primary" if st.session_state.active_tab_index == 1 else "secondary"):
                 st.session_state.active_tab_index = 1
                 st.rerun()
         
         with col3:
-            if st.button("📈 Evolución", use_container_width=True,
+            if st.button("Evolución", use_container_width=True,
                         type="primary" if st.session_state.active_tab_index == 2 else "secondary"):
                 st.session_state.active_tab_index = 2
                 st.rerun()
         
         with col4:
-            if st.button("⚙️ Gestión de Datos", use_container_width=True,
+            if st.button("Gestión de Datos", use_container_width=True,
                         type="primary" if st.session_state.active_tab_index == 3 else "secondary"):
                 st.session_state.active_tab_index = 3
                 st.rerun()
