@@ -60,7 +60,7 @@ def create_banner():
     </div>
     """, unsafe_allow_html=True)
     
-    # Sección blanca Dashboard
+    # Sección blanca Dashboard - SEPARADA
     st.markdown("""
     <div style="
         background: white;
