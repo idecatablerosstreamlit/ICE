@@ -36,7 +36,7 @@ def create_banner():
     
     # Sección azul GOV.CO
     if logo_gov:
-        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 120px; height: 32px; margin-right: 12px>'
+        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 140px; height: 32px; margin-right: 12px>'
     else:
         # Fallback con emoji si no hay imagen
         gov_logo_html = '''<div style="
