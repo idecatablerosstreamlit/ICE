@@ -17,7 +17,7 @@ def configure_page():
 
 
 def create_banner():
-    """Crear banner superior del dashboard - NUEVA DISTRIBUCIÓN"""
+    """Crear banner superior del dashboard - ARREGLADO Y FUNCIONAL"""
     
     # Función auxiliar para convertir imagen a base64
     def img_to_base64(img_path):
@@ -75,61 +75,56 @@ def create_banner():
     </div>
     """, unsafe_allow_html=True)
     
-    # NUEVA SECCIÓN BLANCA - DISTRIBUCIÓN MODIFICADA
-    # Logo Alcaldía PRIMERO, Logo Bogotá SEGUNDO, Título a la DERECHA
+    # SECCIÓN BLANCA - USANDO COLUMNAS DE STREAMLIT
+    # Nueva distribución: Alcaldía + Bogotá a la izquierda, Título a la derecha
     
-    # Preparar HTML de los logos
-    logo_alcaldia_html = ""
-    if logo_alcaldia:
-        logo_alcaldia_html = f'<img src="data:image/png;base64,{logo_alcaldia}" style="width: 60px; height: auto; margin-right: 15px;" alt="Alcaldía Mayor">'
-    else:
-        logo_alcaldia_html = '<div style="font-size: 50px; margin-right: 15px;">🏛️</div>'
+    col1, col2 = st.columns([1, 2])
     
-    logo_bogota_html = ""
-    if logo_bogota:
-        logo_bogota_html = f'<img src="data:image/png;base64,{logo_bogota}" style="width: 80px; height: auto; margin-right: 20px;" alt="Datos Abiertos Bogotá">'
-    else:
-        logo_bogota_html = '<div style="font-size: 60px; margin-right: 20px;">🏢</div>'
-    
-    # Banner blanco con nueva distribución
-    st.markdown(f"""
-    <div style="
-        background: white;
-        padding: 20px;
-        margin: 0 -1rem;
-        border-bottom: 1px solid #ddd;
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-    ">
-        <!-- Logo Alcaldía PRIMERO -->
-        <div style="display: flex; align-items: center;">
-            {logo_alcaldia_html}
-        </div>
+    with col1:
+        # Logos en una fila horizontal
+        logo_col1, logo_col2 = st.columns([1, 1])
         
-        <!-- Logo Bogotá SEGUNDO -->
-        <div style="display: flex; align-items: center;">
-            {logo_bogota_html}
-        </div>
+        with logo_col1:
+            # Logo Alcaldía PRIMERO
+            if logo_alcaldia:
+                st.markdown(f'''
+                <div style="text-align: center;">
+                    <img src="data:image/png;base64,{logo_alcaldia}" 
+                         style="width: 60px; height: auto;" 
+                         alt="Alcaldía Mayor">
+                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">ALCALDÍA</div>
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
+                st.markdown("### 🏛️")
+                st.caption("ALCALDÍA")
         
-        <!-- Título y subtítulo a la DERECHA -->
-        <div style="flex: 1; text-align: left;">
-            <h1 style="
-                margin: 0;
-                font-size: 2.5rem;
-                font-weight: 700;
-                color: #1f2937;
-                line-height: 1.2;
-            ">Dashboard ICE</h1>
-            <p style="
-                margin: 5px 0 0 0;
-                font-size: 0.9rem;
-                color: #1e3a8a;
-                font-weight: 500;
-            ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        with logo_col2:
+            # Logo Bogotá SEGUNDO
+            if logo_bogota:
+                st.markdown(f'''
+                <div style="text-align: center;">
+                    <img src="data:image/png;base64,{logo_bogota}" 
+                         style="width: 80px; height: auto;" 
+                         alt="Datos Abiertos Bogotá">
+                    <div style="font-size: 10px; font-weight: 500; margin-top: 5px;">BOGOTÁ</div>
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
+                st.markdown("### 🏢")
+                st.caption("BOGOTÁ")
+    
+    with col2:
+        # Título y subtítulo a la DERECHA
+        st.markdown("# Dashboard ICE")
+        st.markdown("""
+        <p style="
+            color: #1e3a8a; 
+            font-size: 0.9rem; 
+            font-weight: 500;
+            margin-top: -10px;
+        ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
 
