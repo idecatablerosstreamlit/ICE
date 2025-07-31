@@ -13,7 +13,8 @@ from config import (
 )
 from data_utils import DataLoader, ExcelDataLoader
 from tabs import TabManager
-from banner import create_dashboard_banner_with_images
+from banner import create_government_banner_with_real_logos
+
 
 def main():
     
@@ -21,7 +22,7 @@ def main():
     
     # Configurar página
     configure_page()
-    create_dashboard_banner_with_images()  # ← Usar esta versión
+    create_government_banner_with_real_logos()  
     apply_dark_theme()
     
     
