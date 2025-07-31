@@ -81,7 +81,7 @@ def create_banner():
     
     with col1:
         if logo_bogota:
-            st.markdown(f'<img src="data:image/png;base64,{logo_bogota}" style="width: 80px; height: auto;" alt="Bogotá">', unsafe_allow_html=True)
+            st.markdown(f'<img src="data:image/png;base64,{logo_bogota}" style="width: 300px; height: auto;" alt="Bogotá">', unsafe_allow_html=True)
         else:
             st.markdown("## 🏢")
     
