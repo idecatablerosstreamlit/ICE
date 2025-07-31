@@ -16,138 +16,20 @@ from tabs import TabManager
 def main():
     configure_page()
     
-    # BANNER USANDO SOLO STREAMLIT NATIVO - GARANTIZADO QUE FUNCIONA
+    # BANNER SIMPLE - FUNCIONA GARANTIZADO
+    st.markdown('<div style="background: #4A6CF7; color: white; padding: 15px; text-align: center;"><h3 style="color: white; margin: 0;">🏛️ GOV.CO - <a href="https://www.gov.co/" target="_blank" style="color: white;">Ir a Gov.co</a></h3></div>', unsafe_allow_html=True)
     
-    # Sección azul GOV.CO
-    st.markdown("""
-    <div style="
-        background: linear-gradient(90deg, #4A6CF7 0%, #667eea 100%) !important;
-        padding: 15px 20px !important;
-        margin: -1rem -1rem 0 -1rem !important;
-        color: white !important;
-    ">
-        <div style="
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            max-width: 1200px !important;
-            margin: 0 auto !important;
-        ">
-            <div style="display: flex !important; align-items: center !important;">
-                <div style="
-                    width: 32px !important;
-                    height: 32px !important;
-                    background: white !important;
-                    border-radius: 6px !important;
-                    margin-right: 12px !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    font-size: 14px !important;
-                    color: #4A6CF7 !important;
-                    font-weight: bold !important;
-                ">🏛️</div>
-                <span style="
-                    color: white !important;
-                    font-size: 22px !important;
-                    font-weight: 600 !important;
-                    letter-spacing: 0.5px !important;
-                ">GOV.CO</span>
-            </div>
-            <a href="https://www.gov.co/" target="_blank" style="
-                color: white !important;
-                text-decoration: underline !important;
-                font-size: 14px !important;
-            ">Ir a Gov.co</a>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col1:
+        st.markdown("### 🏢")
+    with col2:
+        st.markdown("# Dashboard ICE")
+        st.caption("Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA")
+    with col3:
+        st.markdown("### 🏛️ BOGOTÁ")
+    st.divider()
     
-    # Sección blanca Dashboard
-    st.markdown("""
-    <div style="
-        background: white !important;
-        padding: 25px 20px !important;
-        margin: 0 -1rem 20px -1rem !important;
-        border-bottom: 3px solid #4472C4 !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-    ">
-        <div style="
-            display: flex !important;
-            align-items: center !important;
-            justify-content: space-between !important;
-            max-width: 1200px !important;
-            margin: 0 auto !important;
-            flex-wrap: wrap !important;
-            gap: 20px !important;
-        ">
-            <div style="display: flex !important; align-items: center !important; gap: 20px !important;">
-                <div style="
-                    width: 60px !important;
-                    height: 60px !important;
-                    background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%) !important;
-                    border-radius: 12px !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    color: white !important;
-                    font-size: 24px !important;
-                    font-weight: bold !important;
-                    box-shadow: 0 6px 20px rgba(68, 114, 196, 0.3) !important;
-                ">🏢</div>
-                <div>
-                    <h1 style="
-                        color: #2C3E50 !important;
-                        font-size: 32px !important;
-                        font-weight: 700 !important;
-                        margin: 0 0 6px 0 !important;
-                        background: linear-gradient(135deg, #4472C4 0%, #5B9BD5 100%) !important;
-                        -webkit-background-clip: text !important;
-                        -webkit-text-fill-color: transparent !important;
-                        background-clip: text !important;
-                    ">Dashboard ICE</h1>
-                    <p style="
-                        color: #6C757D !important;
-                        font-size: 16px !important;
-                        margin: 0 !important;
-                        font-weight: 400 !important;
-                    ">Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA</p>
-                </div>
-            </div>
-            
-            <div style="display: flex !important; align-items: center !important; gap: 20px !important;">
-                <div style="
-                    width: 55px !important;
-                    height: 55px !important;
-                    background: linear-gradient(135deg, #003366 0%, #004080 100%) !important;
-                    border-radius: 50% !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    color: white !important;
-                    font-size: 8px !important;
-                    font-weight: bold !important;
-                    text-align: center !important;
-                    line-height: 1.1 !important;
-                    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.3) !important;
-                ">ALCALDÍA<br>MAYOR<br>DE BOGOTÁ<br>D.C.</div>
-                
-                <div style="
-                    background: linear-gradient(45deg, #E31E24 0%, #FF6B35 100%) !important;
-                    padding: 12px 20px !important;
-                    border-radius: 25px !important;
-                    color: white !important;
-                    font-weight: bold !important;
-                    font-size: 18px !important;
-                    letter-spacing: 1.5px !important;
-                    box-shadow: 0 4px 15px rgba(227, 30, 36, 0.4) !important;
-                ">BOGOTÁ</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    apply_dark_theme()
+    apply_dark_theme()  # ← Esta línea ya existía
     
     # resto de tu código existente sin cambios...
     # Inicializar session state - SIMPLIFICADO
