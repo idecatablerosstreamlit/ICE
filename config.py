@@ -13,10 +13,39 @@ def configure_page():
         initial_sidebar_state="collapsed"
     )
 
+import streamlit as st
+import base64
+import os
+
 def create_banner():
-    """Crear banner superior del dashboard - AZUL #4169E1 CORREGIDO"""
-    # Sección azul GOV.CO - COLOR CORRECTO #4169E1
-    st.markdown("""
+    """Crear banner superior del dashboard - VERSIÓN SIMPLE CON IMÁGENES"""
+    
+    # Función auxiliar para convertir imagen a base64
+    def img_to_base64(img_path):
+        try:
+            if os.path.exists(img_path):
+                with open(img_path, "rb") as img_file:
+                    return base64.b64encode(img_file.read()).decode()
+        except:
+            pass
+        return None
+
+    # Intentar cargar las imágenes
+    logo_gov = img_to_base64("images/logo_gov.png")
+    logo_bogota = img_to_base64("images/logo_bogota.png") 
+    logo_alcaldia = img_to_base64("images/logo_alcaldia.png")
+    
+    # Sección azul GOV.CO
+    if logo_gov:
+        gov_logo_html = f'<img src="data:image/png;base64,{logo_gov}" style="width: 32px; height: 32px; margin-right: 12px;" alt="GOV.CO">'
+    else:
+        # Fallback con emoji si no hay imagen
+        gov_logo_html = '''<div style="
+            width: 32px; height: 32px; background: white; border-radius: 6px; margin-right: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; color: #4169E1; font-weight: bold;">🏛️</div>'''
+    
+    st.markdown(f"""
     <div style="
         background: #4169E1;
         padding: 15px 20px;
@@ -31,19 +60,7 @@ def create_banner():
             margin: 0 auto;
         ">
             <div style="display: flex; align-items: center;">
-                <div style="
-                    width: 32px;
-                    height: 32px;
-                    background: white;
-                    border-radius: 6px;
-                    margin-right: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 14px;
-                    color: #4169E1;
-                    font-weight: bold;
-                ">🏛️</div>
+                {gov_logo_html}
                 <span style="
                     color: white;
                     font-size: 22px;
@@ -64,19 +81,31 @@ def create_banner():
     col1, col2, col3 = st.columns([1, 3, 1])
     
     with col1:
-        st.markdown("## 🏢")
+        if logo_bogota:
+            st.markdown(f'<img src="data:image/png;base64,{logo_bogota}" style="width: 80px; height: auto;" alt="Bogotá">', unsafe_allow_html=True)
+        else:
+            st.markdown("## 🏢")
     
     with col2:
         st.markdown("# Dashboard ICE")
         st.caption("Sistema de Monitoreo - Infraestructura de Conocimiento Espacial - IDECA")
     
     with col3:
-        col3a, col3b = st.columns(2)
-        with col3a:
-            st.markdown("### 🏛️")
-            st.caption("ALCALDÍA MAYOR")
-        with col3b:
-            st.markdown("### **BOGOTÁ**")
+        if logo_alcaldia:
+            st.markdown(f'''
+            <div style="text-align: center;">
+                <img src="data:image/png;base64,{logo_alcaldia}" style="width: 60px; height: auto; margin-bottom: 5px;" alt="Alcaldía">
+                <div style="font-size: 12px; font-weight: 500;">ALCALDÍA MAYOR</div>
+                <div style="font-size: 16px; font-weight: bold;">BOGOTÁ</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        else:
+            col3a, col3b = st.columns(2)
+            with col3a:
+                st.markdown("### 🏛️")
+                st.caption("ALCALDÍA MAYOR")
+            with col3b:
+                st.markdown("### **BOGOTÁ**")
     
     st.markdown("---")
 
