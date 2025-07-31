@@ -17,9 +17,19 @@ def main():
     # Configurar página
     configure_page()
     
-    # BANNER DEBE IR ANTES DEL TEMA
-    from banner import create_government_banner_with_real_logos
-    create_government_banner_with_real_logos()
+    # BANNER DEBE IR ANTES DEL TEMA - VERSIÓN CORREGIDA
+    try:
+        from banner import create_government_banner_with_real_logos
+        create_government_banner_with_real_logos()
+    except Exception as e:
+        # Fallback en caso de error
+        st.markdown("""
+        <div style='background: #4A6CF7; color: white; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 20px;'>
+            <h2 style='color: white; margin: 0;'>🏛️ GOV.CO - Dashboard ICE 🏢</h2>
+            <p style='color: white; margin: 5px 0 0 0;'>Sistema de Monitoreo - IDECA</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.error(f"Error cargando banner: {e}")
     
     apply_dark_theme()
     
