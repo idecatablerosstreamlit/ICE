@@ -1,5 +1,5 @@
 """"
-Configuración y estilos para el Dashboard ICE - ACTUALIZADO CON BANNER
+Configuración y estilos para el Dashboard ICE - SIN TEMA OSCURO
 """
 
 import streamlit as st
@@ -14,7 +14,7 @@ def configure_page():
     )
 
 def create_banner():
-    """Crear banner superior del dashboard"""
+    """Crear banner superior del dashboard - VERSIÓN QUE FUNCIONA"""
     # Sección azul GOV.CO
     st.markdown("""
     <div style="
@@ -145,25 +145,28 @@ def create_banner():
     """, unsafe_allow_html=True)
 
 def apply_dark_theme():
-    """Aplicar tema corporativo moderno con colores institucionales azules - COMPATIBLE CON BANNER"""
+    """Aplicar estilos mínimos - SIN INTERFERIR CON EL BANNER"""
     st.markdown("""
     <style>
-        /* Tema principal sin interferir con el banner */
-        .stApp {
-            background: white;
-            color: #2C3E50;
+        /* Solo estilos básicos para pestañas y botones - SIN interferir con banner */
+        
+        /* Botones */
+        div.stButton > button {
+            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
         }
         
-        /* Contenedor principal */
-        .main > div {
-            padding-top: 1rem;
-            background-color: rgba(255, 255, 255, 0.95);
-            border-radius: 10px;
-            margin: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         
-        /* Pestañas */
+        /* Pestañas básicas */
         .stTabs [data-baseweb="tab-list"] {
             background: linear-gradient(90deg, #4472C4 0%, #5B9BD5 100%);
             border-radius: 10px 10px 0 0;
@@ -186,42 +189,6 @@ def apply_dark_theme():
             background-color: rgba(255, 255, 255, 0.3) !important;
         }
         
-        /* Tablas y DataFrames */
-        .stDataFrame, .stTable {
-            background-color: rgba(255, 255, 255, 0.9);
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Botones */
-        div.stButton > button {
-            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        
-        div.stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-        
-        /* Sidebar */
-        [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #4472C4 0%, #5B9BD5 100%);
-            border-right: 3px solid #BDC3C7;
-        }
-        
-        [data-testid="stSidebar"] .stSelectbox label, 
-        [data-testid="stSidebar"] .stMultiselect label,
-        [data-testid="stSidebar"] .stDateInput label {
-            color: white;
-            font-weight: 500;
-        }
-        
         /* Métricas */
         .stMetric {
             background: rgba(255, 255, 255, 0.1);
@@ -230,71 +197,15 @@ def apply_dark_theme():
             border-left: 4px solid #4472C4;
         }
         
-        .stMetric label {
-            color: #2C3E50 !important;
-            font-weight: 600;
+        /* Sidebar básico */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #4472C4 0%, #5B9BD5 100%);
         }
         
-        .stMetric [data-testid="metric-value"] {
-            color: #2C3E50 !important;
-            font-size: 1.8rem !important;
-            font-weight: 700;
-        }
-        
-        /* Títulos */
-        h1, h2, h3 {
-            color: #2C3E50;
-            font-weight: 600;
-        }
-        
-        /* Expanders */
-        .stExpander {
-            background-color: rgba(255, 255, 255, 0.8);
-            border-radius: 8px;
-            border: 1px solid #BDC3C7;
-        }
-        
-        /* Alertas */
-        .stAlert {
-            border-radius: 8px;
-            border-left: 4px solid #4472C4;
-        }
-        
-        /* Selectboxes */
-        .stSelectbox > div > div {
-            background-color: rgba(255, 255, 255, 0.9);
-            border-radius: 6px;
-            border: 1px solid #BDC3C7;
-        }
-        
-        /* Indicadores específicos */
-        .sheets-indicator {
-            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
+        [data-testid="stSidebar"] .stSelectbox label, 
+        [data-testid="stSidebar"] .stMultiselect label {
             color: white;
-            padding: 0.3rem 0.8rem;
-            border-radius: 15px;
-            font-size: 0.8rem;
             font-weight: 500;
-            display: inline-block;
-            margin-left: 0.5rem;
-        }
-        
-        .sheets-connected {
-            background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        
-        .sheets-error {
-            background: linear-gradient(45deg, #F44336 0%, #E57373 100%);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 600;
         }
     </style>
     """, unsafe_allow_html=True)
