@@ -1,5 +1,14 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE - ACTUALIZADO
+Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN RESTAURADA
+RESTAURACIONES:
+1. Navegación principal con st.tabs() nativo para estabilidad
+2. Sub-pestañas simplificadas sin st.rerun() problemático
+3. Session state consolidado y persistente
+4. Formularios estables que no se resetean
+5. Funcionalidades metodológicas y PDF restauradas
+6. Títulos normalizados sin emojis
+7. Manejo de errores específico y detallado
+8. Todas las visualizaciones preservadas
 """
 
 import streamlit as st
@@ -35,7 +44,7 @@ class GeneralSummaryTab:
             required_cols = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria']
             missing_cols = [col for col in required_cols if col not in df.columns]
             if missing_cols:
-                st.error(f"❌ Faltan columnas esenciales en Google Sheets: {missing_cols}")
+                st.error(f"Faltan columnas esenciales en Google Sheets: {missing_cols}")
                 st.write("**Columnas disponibles:**", list(df.columns))
                 return
             
@@ -94,8 +103,14 @@ class GeneralSummaryTab:
             else:
                 st.info("Agrega más datos a Google Sheets para ver puntajes por componente")
         
+        except ValueError as e:
+            st.error(f"Error de valor en cálculos: {e}")
+        except KeyError as e:
+            st.error(f"Columna faltante: {e}")
         except Exception as e:
-            st.error(f"❌ Error al calcular puntajes desde Google Sheets: {e}")
+            st.error(f"Error inesperado al calcular puntajes: {e}")
+            with st.expander("Detalles del error"):
+                st.code(str(e))
         
         # Mostrar tabla de datos más recientes
         with st.expander("Ver datos más recientes por indicador"):
@@ -111,7 +126,7 @@ class GeneralSummaryTab:
                 st.error(f"Error al mostrar datos: {e}")
 
 class ComponentSummaryTab:
-    """Pestaña de resumen por componente - ACTUALIZADA CON BARRAS HORIZONTALES"""
+    """Pestaña de resumen por componente"""
     
     @staticmethod
     def render(df, filters):
@@ -183,7 +198,7 @@ class ComponentSummaryTab:
                 st.plotly_chart(fig_evol, use_container_width=True)
             
             with col_der:
-                # NUEVO: Selector de tipo de visualización
+                # Selector de tipo de visualización
                 ComponentSummaryTab._render_category_visualization(df, componente_analisis)
             
             # Tabla de indicadores del componente
@@ -199,7 +214,7 @@ class ComponentSummaryTab:
     
     @staticmethod
     def _render_category_visualization(df, componente):
-        """Renderizar visualización de categorías - NUEVO"""
+        """Renderizar visualización de categorías"""
         # Contar categorías para determinar mejor visualización
         df_latest = DataProcessor._get_latest_values_by_indicator(df)
         df_componente = df_latest[df_latest['Componente'] == componente]
@@ -208,16 +223,16 @@ class ComponentSummaryTab:
         # Selector de tipo de visualización
         if num_categorias < 3:
             opciones = [
-                "📊 Barras Horizontales",
-                "🎯 Radar (requiere 3+ categorías)"
+                "Barras Horizontales",
+                "Radar (requiere 3+ categorías)"
             ]
-            default_viz = "📊 Barras Horizontales"
+            default_viz = "Barras Horizontales"
         else:
             opciones = [
-                "📊 Barras Horizontales", 
-                "🎯 Radar de Categorías"
+                "Barras Horizontales", 
+                "Radar de Categorías"
             ]
-            default_viz = "🎯 Radar de Categorías"
+            default_viz = "Radar de Categorías"
         
         tipo_viz = st.selectbox(
             f"Visualización para {componente} ({num_categorias} categorías):",
@@ -333,61 +348,38 @@ class EvolutionTab:
                 available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
                 st.dataframe(datos_indicador[available_columns], use_container_width=True)
         
+        except ValueError as e:
+            st.error(f"Error de valor en evolución: {e}")
+        except KeyError as e:
+            st.error(f"Columna faltante en evolución: {e}")
         except Exception as e:
             st.error(f"Error crítico en pestaña de evolución: {e}")
+            with st.expander("Detalles del error"):
+                st.code(str(e))
 
 class EditTab:
-    """Pestaña de edición - ACTUALIZADA CON TIPO"""
+    """Pestaña de edición - VERSIÓN RESTAURADA"""
     
     @staticmethod
     def render(df, csv_path, excel_data=None):
-        """Renderizar la pestaña de edición con Google Sheets"""
+        """Renderizar la pestaña de edición con Google Sheets - USANDO ST.TABS NATIVO"""
         st.header("Gestión de Indicadores")
-        
         
         try:
             # Verificar que Google Sheets esté disponible
             from data_utils import GOOGLE_SHEETS_AVAILABLE
             if not GOOGLE_SHEETS_AVAILABLE:
-                st.error("❌ **Google Sheets no disponible.** Instala las dependencias: `pip install gspread google-auth`")
+                st.error("Google Sheets no disponible. Instala las dependencias: `pip install gspread google-auth`")
                 return
             
             # Inicializar session state para preservar selecciones
             if 'selected_codigo_edit' not in st.session_state:
                 st.session_state.selected_codigo_edit = None
             
-            # Obtener códigos disponibles
-            if df.empty:
-                st.info("📋 Google Sheets está vacío. Puedes crear un nuevo indicador.")
-                codigos_disponibles = []
-            else:
-                codigos_disponibles = sorted(df['Codigo'].dropna().unique())
+            # Selector de código persistente
+            codigo_editar = EditTab._render_codigo_selector(df)
             
-            # Agregar opción para crear nuevo código
-            opciones_codigo = ["➕ Crear nuevo código"] + list(codigos_disponibles)
-            
-            # Seleccionar código (mantener selección si es posible)
-            index_actual = 0
-            if st.session_state.selected_codigo_edit and st.session_state.selected_codigo_edit in codigos_disponibles:
-                try:
-                    index_actual = opciones_codigo.index(st.session_state.selected_codigo_edit)
-                except ValueError:
-                    index_actual = 0
-            
-            codigo_editar = st.selectbox(
-                "Seleccionar Código de Indicador", 
-                opciones_codigo,
-                index=index_actual,
-                key="codigo_editar_main",
-                help="Los datos se guardan automáticamente en Google Sheets"
-            )
-            
-            # Actualizar session state
-            if codigo_editar != "➕ Crear nuevo código":
-                st.session_state.selected_codigo_edit = codigo_editar
-            
-            # Manejar creación de nuevo código
-            if codigo_editar == "➕ Crear nuevo código":
+            if codigo_editar == "CREAR_NUEVO":
                 EditTab._render_new_indicator_form(df)
                 return
             
@@ -399,32 +391,10 @@ class EditTab:
                 return
             elif not df.empty:
                 # Mostrar información del indicador
-                try:
-                    nombre_indicador = datos_indicador['Indicador'].iloc[0]
-                    componente_indicador = datos_indicador['Componente'].iloc[0]
-                    categoria_indicador = datos_indicador['Categoria'].iloc[0]
-                    tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
-                    
-                    # Card con información del indicador
-                    st.markdown(f"""
-                    <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
-                               padding: 1rem; border-radius: 10px; margin: 1rem 0; color: white;">
-                        <h4 style="color: white; margin: 0;">📊 {nombre_indicador}</h4>
-                        <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-                            <strong>Componente:</strong> {componente_indicador}<br>
-                            <strong>Categoría:</strong> {categoria_indicador}<br>
-                            <strong>Código:</strong> {codigo_editar}<br>
-                            <strong>Tipo:</strong> {tipo_indicador}
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                except IndexError:
-                    st.error(f"Error al obtener información del indicador {codigo_editar}")
-                    return
+                EditTab._render_indicator_info_card(datos_indicador, codigo_editar)
             
-            # Botones para funcionalidades metodológicas
-            EditTab._render_metodological_section(codigo_editar, excel_data)
+            # Información metodológica en expander (ESTABLE)
+            EditTab._render_metodological_expander(codigo_editar, excel_data)
             
             # Obtener registros existentes del indicador
             if not df.empty and not datos_indicador.empty:
@@ -432,194 +402,159 @@ class EditTab:
             else:
                 registros_indicador = pd.DataFrame()
             
-            # Renderizar sub-pestañas con contenedores condicionales
-            EditTab._render_conditional_tabs(df, codigo_editar, registros_indicador)
+            # SUB-PESTAÑAS NATIVAS - SIN ST.RERUN
+            EditTab._render_management_tabs(df, codigo_editar, registros_indicador)
         
+        except ImportError as e:
+            st.error(f"Error de importación: {e}")
         except Exception as e:
             st.error(f"Error en la gestión de indicadores: {e}")
+            with st.expander("Detalles del error"):
+                st.code(str(e))
     
     @staticmethod
-    def _render_conditional_tabs(df, codigo_editar, registros_indicador):
-        """Renderizar sub-pestañas usando contenedores condicionales"""
+    def _render_codigo_selector(df):
+        """Selector de código persistente y estable"""
+        # Obtener códigos disponibles
+        if df.empty:
+            st.info("Google Sheets está vacío. Puedes crear un nuevo indicador.")
+            return "CREAR_NUEVO"
         
-        # Inicializar estado de sub-pestaña
-        if 'edit_subtab' not in st.session_state:
-            st.session_state.edit_subtab = 'ver'
+        codigos_disponibles = sorted(df['Codigo'].dropna().unique())
+        opciones_codigo = ["[Crear nuevo código]"] + list(codigos_disponibles)
         
-        # Crear botones de navegación para sub-pestañas
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if st.button("📋 Ver Registros", use_container_width=True, 
-                        type="primary" if st.session_state.edit_subtab == 'ver' else "secondary"):
-                st.session_state.edit_subtab = 'ver'
-                st.rerun()
-        
-        with col2:
-            if st.button("➕ Agregar Nuevo", use_container_width=True,
-                        type="primary" if st.session_state.edit_subtab == 'agregar' else "secondary"):
-                st.session_state.edit_subtab = 'agregar'
-                st.rerun()
-        
-        with col3:
-            if st.button("✏️ Editar Existente", use_container_width=True,
-                        type="primary" if st.session_state.edit_subtab == 'editar' else "secondary"):
-                st.session_state.edit_subtab = 'editar'
-                st.rerun()
-        
-        with col4:
-            if st.button("🗑️ Eliminar Registro", use_container_width=True,
-                        type="primary" if st.session_state.edit_subtab == 'eliminar' else "secondary"):
-                st.session_state.edit_subtab = 'eliminar'
-                st.rerun()
-        
-        st.markdown("---")
-        
-        # Renderizar contenido según sub-pestaña activa
-        if st.session_state.edit_subtab == 'ver':
-            EditTab._render_view_records(registros_indicador)
-        elif st.session_state.edit_subtab == 'agregar':
-            EditTab._render_add_form(df, codigo_editar)
-        elif st.session_state.edit_subtab == 'editar':
-            EditTab._render_edit_form(df, codigo_editar, registros_indicador)
-        elif st.session_state.edit_subtab == 'eliminar':
-            EditTab._render_delete_form(df, codigo_editar, registros_indicador)
-    
-    @staticmethod
-    def _render_metodological_section(codigo_editar, excel_data):
-        """Renderizar sección de información metodológica"""
-        st.subheader("📋 Información Metodológica")
-        
-        col1, col2, col3 = st.columns([2, 1, 1])
-        
-        with col2:
-            if st.button("📋 Ver Ficha", key=f"view_sheet_{codigo_editar}_unique", use_container_width=True):
-                st.session_state.show_ficha = True
-        
-        with col3:
-            # Verificar disponibilidad de PDF
+        # Determinar índice actual basado en session state
+        index_actual = 0
+        if st.session_state.selected_codigo_edit and st.session_state.selected_codigo_edit in codigos_disponibles:
             try:
-                import reportlab
-                reportlab_available = True
-            except ImportError:
-                reportlab_available = False
-            
-            if reportlab_available and excel_data is not None and not excel_data.empty:
-                codigo_existe = codigo_editar in excel_data['Codigo'].values
-                
-                if codigo_existe:
-                    if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}_unique", use_container_width=True):
-                        EditTab._generate_and_download_pdf(codigo_editar, excel_data)
-                else:
-                    st.button("❌ PDF (Sin datos)", key=f"pdf_no_data_{codigo_editar}_unique", disabled=True, use_container_width=True)
-                    st.warning(f"No hay datos metodológicos para {codigo_editar}")
-                        
-            elif not reportlab_available:
-                st.button("❌ Instalar reportlab", key=f"pdf_disabled_{codigo_editar}_unique", disabled=True, use_container_width=True)
-                st.error("`pip install reportlab`")
-            else:
-                st.button("❌ Falta archivo Excel", key=f"pdf_no_excel_{codigo_editar}_unique", disabled=True, use_container_width=True)
-                st.warning("Necesitas 'Batería de indicadores.xlsx'")
+                index_actual = opciones_codigo.index(st.session_state.selected_codigo_edit)
+            except ValueError:
+                index_actual = 0
         
-        # Mostrar ficha si se solicitó
-        if st.session_state.get('show_ficha', False):
-            EditTab._show_metodological_info_display(codigo_editar, excel_data)
-    
-    @staticmethod
-    def _generate_and_download_pdf(codigo_editar, excel_data):
-        """Generar y mostrar botón de descarga de PDF"""
-        try:
-            try:
-                import reportlab
-            except ImportError:
-                st.error("📦 **Instalar reportlab:** `pip install reportlab`")
-                return
-            
-            try:
-                from pdf_generator import PDFGenerator
-            except ImportError:
-                st.error("❌ Archivo pdf_generator.py no encontrado")
-                return
-            
-            pdf_generator = PDFGenerator()
-            
-            if not pdf_generator.is_available():
-                st.error("📦 PDF no disponible. Instala: `pip install reportlab`")
-                return
-            
-            with st.spinner("📄 Generando ficha metodológica en PDF..."):
-                pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
-                
-                if pdf_bytes and len(pdf_bytes) > 0:
-                    st.success("✅ PDF generado correctamente")
-                    st.balloons()
-                    
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"Ficha_Metodologica_{codigo_editar}_{timestamp}.pdf"
-                    
-                    st.download_button(
-                        label="📄 Descargar Ficha Metodológica PDF",
-                        data=pdf_bytes,
-                        file_name=filename,
-                        mime="application/pdf",
-                        key=f"download_pdf_{codigo_editar}_{timestamp}_unique",
-                        use_container_width=True,
-                        help=f"Descargar ficha metodológica de {codigo_editar}"
-                    )
-                else:
-                    st.error("❌ No se pudo generar el PDF. Verifica los datos metodológicos.")
-                    
-        except Exception as e:
-            st.error(f"❌ Error al generar PDF: {e}")
-
-    @staticmethod
-    def _show_metodological_info_display(codigo_editar, excel_data):
-        """Mostrar información metodológica en pantalla"""
-        if excel_data is None or excel_data.empty:
-            st.warning("No hay datos metodológicos disponibles")
-            return
-            
-        # Buscar datos del indicador en Excel
-        indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
+        codigo_seleccionado = st.selectbox(
+            "Seleccionar Código de Indicador", 
+            opciones_codigo,
+            index=index_actual,
+            key="codigo_editar_selector",
+            help="Los datos se guardan automáticamente en Google Sheets"
+        )
         
-        if not indicador_metodologico.empty:
-            st.markdown("---")
-            st.subheader(f"📋 Ficha Metodológica: {codigo_editar}")
-            
-            metodologia = indicador_metodologico.iloc[0]
-            
-            # Función auxiliar para obtener valores seguros
-            def safe_get(campo, default='N/A'):
-                try:
-                    valor = metodologia.get(campo, default)
-                    if pd.isna(valor) or valor == '' or str(valor).strip() == '':
-                        return default
-                    return str(valor).strip()
-                except:
-                    return default
-            
-            # Mostrar información básica
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.write(f"**Nombre:** {safe_get('Nombre_Indicador')}")
-                st.write(f"**Área Temática:** {safe_get('Area_Tematica')}")
-                st.write(f"**Sector:** {safe_get('Sector')}")
-            with col_b:
-                st.write(f"**Entidad:** {safe_get('Entidad')}")
-                st.write(f"**Dependencia:** {safe_get('Dependencia')}")
-                st.write(f"**Tema:** {safe_get('Tema')}")
-            
-            st.write("**Definición:**")
-            st.write(safe_get('Definicion'))
-            
-            # Botón para ocultar ficha
-            if st.button("🔼 Ocultar Ficha", key=f"hide_ficha_{codigo_editar}_unique"):
-                st.session_state.show_ficha = False
-                st.rerun()
-                
+        # Actualizar session state
+        if codigo_seleccionado == "[Crear nuevo código]":
+            return "CREAR_NUEVO"
         else:
-            st.warning(f"No se encontró información metodológica para {codigo_editar}")
-            st.session_state.show_ficha = False
+            st.session_state.selected_codigo_edit = codigo_seleccionado
+            return codigo_seleccionado
+    
+    @staticmethod
+    def _render_indicator_info_card(datos_indicador, codigo_editar):
+        """Mostrar información del indicador en card"""
+        try:
+            nombre_indicador = datos_indicador['Indicador'].iloc[0]
+            componente_indicador = datos_indicador['Componente'].iloc[0]
+            categoria_indicador = datos_indicador['Categoria'].iloc[0]
+            tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
+            
+            # Card con información del indicador
+            st.markdown(f"""
+            <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
+                       padding: 1rem; border-radius: 10px; margin: 1rem 0; color: white;">
+                <h4 style="color: white; margin: 0;">{nombre_indicador}</h4>
+                <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
+                    <strong>Componente:</strong> {componente_indicador}<br>
+                    <strong>Categoría:</strong> {categoria_indicador}<br>
+                    <strong>Código:</strong> {codigo_editar}<br>
+                    <strong>Tipo:</strong> {tipo_indicador}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        except IndexError:
+            st.error(f"Error al obtener información del indicador {codigo_editar}")
+    
+    @staticmethod
+    def _render_metodological_expander(codigo_editar, excel_data):
+        """Renderizar información metodológica en expander estable"""
+        with st.expander("Información Metodológica"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Ficha Metodológica")
+                if excel_data is not None and not excel_data.empty:
+                    indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
+                    
+                    if not indicador_metodologico.empty:
+                        metodologia = indicador_metodologico.iloc[0]
+                        
+                        # Función auxiliar para obtener valores seguros
+                        def safe_get(campo, default='N/A'):
+                            try:
+                                valor = metodologia.get(campo, default)
+                                if pd.isna(valor) or valor == '' or str(valor).strip() == '':
+                                    return default
+                                return str(valor).strip()
+                            except:
+                                return default
+                        
+                        # Mostrar información básica
+                        st.write(f"**Nombre:** {safe_get('Nombre_Indicador')}")
+                        st.write(f"**Área Temática:** {safe_get('Area_Tematica')}")
+                        st.write(f"**Sector:** {safe_get('Sector')}")
+                        st.write(f"**Entidad:** {safe_get('Entidad')}")
+                        
+                        st.write("**Definición:**")
+                        st.write(safe_get('Definicion'))
+                    else:
+                        st.warning(f"No se encontró información metodológica para {codigo_editar}")
+                else:
+                    st.warning("No hay datos metodológicos disponibles (falta archivo Excel)")
+            
+            with col2:
+                st.subheader("Generar PDF")
+                # Verificar disponibilidad de PDF
+                try:
+                    import reportlab
+                    reportlab_available = True
+                except ImportError:
+                    reportlab_available = False
+                
+                if reportlab_available and excel_data is not None and not excel_data.empty:
+                    codigo_existe = codigo_editar in excel_data['Codigo'].values
+                    
+                    if codigo_existe:
+                        if st.button("Generar PDF", key=f"generate_pdf_{codigo_editar}"):
+                            EditTab._generate_and_download_pdf(codigo_editar, excel_data)
+                    else:
+                        st.warning(f"No hay datos metodológicos para {codigo_editar}")
+                        
+                elif not reportlab_available:
+                    st.error("Para generar PDFs instala: `pip install reportlab`")
+                else:
+                    st.warning("Necesitas el archivo 'Batería de indicadores.xlsx'")
+    
+    @staticmethod
+    def _render_management_tabs(df, codigo_editar, registros_indicador):
+        """Renderizar sub-pestañas de gestión usando st.tabs nativo"""
+        
+        # SUB-PESTAÑAS NATIVAS - SIN PROBLEMAS DE ESTADO
+        sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
+            "Ver Registros",
+            "Agregar Nuevo", 
+            "Editar Existente",
+            "Eliminar Registro"
+        ])
+        
+        with sub_tab1:
+            EditTab._render_view_records(registros_indicador)
+        
+        with sub_tab2:
+            EditTab._render_add_form(df, codigo_editar)
+        
+        with sub_tab3:
+            EditTab._render_edit_form(df, codigo_editar, registros_indicador)
+        
+        with sub_tab4:
+            EditTab._render_delete_form(df, codigo_editar, registros_indicador)
     
     @staticmethod
     def _render_view_records(registros_indicador):
@@ -634,12 +569,12 @@ class EditTab:
     
     @staticmethod
     def _render_new_indicator_form(df):
-        """Formulario para crear nuevo indicador en Google Sheets - ACTUALIZADO CON TIPO"""
-        st.subheader("➕ Crear Nuevo Indicador en Google Sheets")
+        """Formulario para crear nuevo indicador en Google Sheets"""
+        st.subheader("Crear Nuevo Indicador en Google Sheets")
         
         from config import INDICATOR_TYPES
         
-        with st.form("form_nuevo_indicador_unique"):
+        with st.form("form_nuevo_indicador"):
             col1, col2 = st.columns(2)
             
             with col1:
@@ -662,7 +597,7 @@ class EditTab:
                     help="Componente al que pertenece el indicador"
                 )
                 
-                # NUEVO: Selector de tipo
+                # Selector de tipo
                 nuevo_tipo = st.selectbox(
                     "Tipo de Indicador",
                     list(INDICATOR_TYPES.keys()),
@@ -699,25 +634,25 @@ class EditTab:
                     help="Fecha del primer registro"
                 )
             
-            submitted = st.form_submit_button("➕ Crear Indicador en Google Sheets", use_container_width=True)
+            submitted = st.form_submit_button("Crear Indicador en Google Sheets", use_container_width=True)
             
             if submitted:
                 # Validaciones
                 if not nuevo_codigo.strip():
-                    st.error("❌ El código es obligatorio")
+                    st.error("El código es obligatorio")
                     return
                 
                 if not nuevo_indicador.strip():
-                    st.error("❌ El nombre del indicador es obligatorio")
+                    st.error("El nombre del indicador es obligatorio")
                     return
                 
                 if not nueva_categoria.strip():
-                    st.error("❌ La categoría es obligatoria")
+                    st.error("La categoría es obligatoria")
                     return
                 
                 # Verificar que el código no exista
                 if not df.empty and nuevo_codigo in df['Codigo'].values:
-                    st.error(f"❌ El código '{nuevo_codigo}' ya existe en Google Sheets")
+                    st.error(f"El código '{nuevo_codigo}' ya existe en Google Sheets")
                     return
                 
                 # Crear el nuevo registro en Google Sheets
@@ -734,42 +669,42 @@ class EditTab:
                         'Nombre de indicador': nuevo_indicador.strip(),
                         'Valor': primer_valor,
                         'Fecha': primera_fecha.strftime('%d/%m/%Y'),
-                        'Tipo': nuevo_tipo  # NUEVO
+                        'Tipo': nuevo_tipo
                     }
                     
                     success = sheets_manager.add_record(data_dict)
                     
                     if success:
-                        st.success(f"✅ Indicador '{nuevo_codigo}' creado correctamente en Google Sheets")
+                        st.success(f"Indicador '{nuevo_codigo}' creado correctamente en Google Sheets")
                         # Actualizar session state para seleccionar el nuevo código
                         st.session_state.selected_codigo_edit = nuevo_codigo
                         # Limpiar cache
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
-                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
+                        st.info("Los datos se actualizarán automáticamente desde Google Sheets")
                         
-                        # Botón manual de actualización
-                        if st.button("🔄 Actualizar ahora", key="refresh_after_create_unique"):
+                        # Opción manual de actualización
+                        if st.button("Actualizar datos ahora", key="refresh_after_create"):
                             st.rerun()
                     else:
-                        st.error("❌ Error al crear el indicador en Google Sheets")
+                        st.error("Error al crear el indicador en Google Sheets")
                         
                 except Exception as e:
-                    st.error(f"❌ Error al crear indicador en Google Sheets: {e}")
+                    st.error(f"Error al crear indicador en Google Sheets: {e}")
     
     @staticmethod
     def _render_add_form(df, codigo_editar):
-        """Formulario para agregar nuevo registro a Google Sheets"""
-        st.subheader("➕ Agregar Nuevo Registro")
+        """Formulario para agregar nuevo registro a Google Sheets - ESTABLE"""
+        st.subheader("Agregar Nuevo Registro")
         
         # Obtener tipo del indicador si existe
         if not df.empty:
             datos_indicador = df[df['Codigo'] == codigo_editar]
             if not datos_indicador.empty:
                 tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
-                st.info(f"📊 Tipo de indicador: **{tipo_indicador}**")
+                st.info(f"Tipo de indicador: **{tipo_indicador}**")
         
-        with st.form("form_agregar_unique"):
+        with st.form("form_agregar"):
             col1, col2 = st.columns(2)
             
             with col1:
@@ -785,7 +720,7 @@ class EditTab:
                     help="Valor según el tipo del indicador (se normalizará automáticamente)"
                 )
             
-            submitted = st.form_submit_button("➕ Agregar a Google Sheets", use_container_width=True)
+            submitted = st.form_submit_button("Agregar a Google Sheets", use_container_width=True)
             
             if submitted:
                 # Verificar si ya existe un registro para esa fecha
@@ -802,34 +737,34 @@ class EditTab:
                 success = DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, None)
                 
                 if success:
-                    st.success("✅ Nuevo registro agregado correctamente a Google Sheets")
-                    st.info("🔄 Los datos se actualizarán automáticamente en unos segundos")
+                    st.success("Nuevo registro agregado correctamente a Google Sheets")
+                    st.info("Los datos se actualizarán automáticamente")
                     
                     # Limpiar cache
                     st.cache_data.clear()
                     st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                     
-                    # Botón manual de actualización
-                    if st.button("🔄 Ver cambios ahora", key="refresh_after_add_unique"):
+                    # Opción manual de actualización
+                    if st.button("Ver cambios ahora", key="refresh_after_add"):
                         st.rerun()
                 else:
-                    st.error("❌ Error al agregar el nuevo registro a Google Sheets")
+                    st.error("Error al agregar el nuevo registro a Google Sheets")
     
     @staticmethod
     def _render_edit_form(df, codigo_editar, registros_indicador):
-        """Formulario para editar registro existente en Google Sheets"""
-        st.subheader("✏️ Editar Registro Existente")
+        """Formulario para editar registro existente en Google Sheets - ESTABLE"""
+        st.subheader("Editar Registro Existente")
         
         if registros_indicador.empty:
             st.info("No hay registros existentes para editar en Google Sheets")
             return
         
-        # Seleccionar registro a editar con key único
+        # Seleccionar registro a editar
         fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
         fecha_seleccionada_str = st.selectbox(
             "Seleccionar fecha a editar",
             fechas_disponibles,
-            key="fecha_editar_unique",
+            key="fecha_editar",
             help="Selecciona el registro que deseas modificar en Google Sheets"
         )
         
@@ -839,12 +774,12 @@ class EditTab:
             fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
             valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
             
-            with st.form("form_editar_unique"):
+            with st.form("form_editar"):
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.info(f"📅 Fecha: {fecha_real.strftime('%d/%m/%Y')}")
-                    st.info(f"📊 Valor actual: {valor_actual:.3f}")
+                    st.info(f"Fecha: {fecha_real.strftime('%d/%m/%Y')}")
+                    st.info(f"Valor actual: {valor_actual:.3f}")
                 
                 with col2:
                     nuevo_valor = st.number_input(
@@ -853,42 +788,42 @@ class EditTab:
                         help="Nuevo valor para este registro en Google Sheets"
                     )
                 
-                submitted = st.form_submit_button("✏️ Actualizar en Google Sheets", use_container_width=True)
+                submitted = st.form_submit_button("Actualizar en Google Sheets", use_container_width=True)
                 
                 if submitted:
                     success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, None)
                     
                     if success:
-                        st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente en Google Sheets")
+                        st.success(f"Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente en Google Sheets")
                         st.balloons()
-                        st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
+                        st.info("Los datos se actualizarán automáticamente desde Google Sheets")
                         
                         # Limpiar cache
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                         
-                        # Botón manual de actualización
-                        if st.button("🔄 Ver cambios ahora", key="refresh_after_edit_unique"):
+                        # Opción manual de actualización
+                        if st.button("Ver cambios ahora", key="refresh_after_edit"):
                             st.rerun()
                     else:
-                        st.error("❌ Error al actualizar el registro en Google Sheets")
+                        st.error("Error al actualizar el registro en Google Sheets")
     
     @staticmethod
     def _render_delete_form(df, codigo_editar, registros_indicador):
-        """Formulario para eliminar registro de Google Sheets"""
-        st.subheader("🗑️ Eliminar Registro")
+        """Formulario para eliminar registro de Google Sheets - ESTABLE"""
+        st.subheader("Eliminar Registro")
         
         if registros_indicador.empty:
             st.info("No hay registros existentes para eliminar en Google Sheets")
             return
         
-        # Seleccionar registro a eliminar con key único
+        # Seleccionar registro a eliminar
         fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
         fecha_seleccionada_str = st.selectbox(
             "Seleccionar fecha a eliminar",
             fechas_disponibles,
-            key="fecha_eliminar_unique",
-            help="⚠️ CUIDADO: Esta acción eliminará el registro de Google Sheets y no se puede deshacer"
+            key="fecha_eliminar",
+            help="CUIDADO: Esta acción eliminará el registro de Google Sheets y no se puede deshacer"
         )
         
         if fecha_seleccionada_str:
@@ -898,7 +833,7 @@ class EditTab:
             valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
             
             st.warning(f"""
-            ⚠️ **ATENCIÓN**: Estás a punto de eliminar el registro de Google Sheets:
+            **ATENCIÓN**: Estás a punto de eliminar el registro de Google Sheets:
             - **Fecha**: {fecha_real.strftime('%d/%m/%Y')}
             - **Valor**: {valor_actual:.3f}
             
@@ -908,140 +843,138 @@ class EditTab:
             col1, col2 = st.columns(2)
             
             with col1:
-                confirmar = st.checkbox("Confirmo que quiero eliminar este registro de Google Sheets", key="confirm_delete_unique")
+                confirmar = st.checkbox("Confirmo que quiero eliminar este registro de Google Sheets", key="confirm_delete")
             
             with col2:
                 if confirmar:
-                    if st.button("🗑️ ELIMINAR DE GOOGLE SHEETS", type="primary", use_container_width=True, key="delete_button_unique"):
+                    if st.button("ELIMINAR DE GOOGLE SHEETS", type="primary", use_container_width=True, key="delete_button"):
                         success = DataEditor.delete_record(df, codigo_editar, fecha_real, None)
                         
                         if success:
-                            st.success(f"✅ Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente de Google Sheets")
+                            st.success(f"Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente de Google Sheets")
                             st.balloons()
-                            st.info("🔄 Los datos se actualizarán automáticamente desde Google Sheets en unos segundos")
+                            st.info("Los datos se actualizarán automáticamente desde Google Sheets")
                             
                             # Limpiar cache
                             st.cache_data.clear()
                             st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                             
-                            # Botón manual de actualización
-                            if st.button("🔄 Ver cambios ahora", key="refresh_after_delete_unique"):
+                            # Opción manual de actualización
+                            if st.button("Ver cambios ahora", key="refresh_after_delete"):
                                 st.rerun()
                         else:
-                            st.error("❌ Error al eliminar el registro de Google Sheets")
+                            st.error("Error al eliminar el registro de Google Sheets")
+    
+    @staticmethod
+    def _generate_and_download_pdf(codigo_editar, excel_data):
+        """Generar y mostrar botón de descarga de PDF - SIMPLIFICADO"""
+        try:
+            from pdf_generator import PDFGenerator
+            
+            pdf_generator = PDFGenerator()
+            
+            if not pdf_generator.is_available():
+                st.error("PDF no disponible. Instala: `pip install reportlab`")
+                return
+            
+            with st.spinner("Generando ficha metodológica en PDF..."):
+                pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
+                
+                if pdf_bytes and len(pdf_bytes) > 0:
+                    st.success("PDF generado correctamente")
+                    st.balloons()
+                    
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"Ficha_Metodologica_{codigo_editar}_{timestamp}.pdf"
+                    
+                    st.download_button(
+                        label="Descargar Ficha Metodológica PDF",
+                        data=pdf_bytes,
+                        file_name=filename,
+                        mime="application/pdf",
+                        key=f"download_pdf_{codigo_editar}_{timestamp}",
+                        use_container_width=True,
+                        help=f"Descargar ficha metodológica de {codigo_editar}"
+                    )
+                else:
+                    st.error("No se pudo generar el PDF. Verifica los datos metodológicos.")
+                    
+        except ImportError:
+            st.error("Archivo pdf_generator.py no encontrado")
+        except Exception as e:
+            st.error(f"Error al generar PDF: {e}")
 
 class TabManager:
-    """Gestor de pestañas del dashboard - ACTUALIZADO"""
+    """Gestor de pestañas del dashboard - VERSIÓN RESTAURADA CON ST.TABS NATIVO"""
     
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
         self.csv_path = None  # No usamos CSV
         self.excel_data = excel_data
-        
-        # Inicializar pestaña activa en session_state
-        if 'active_tab_index' not in st.session_state:
-            st.session_state.active_tab_index = 0
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar pestañas usando CONTENEDORES CONDICIONALES"""
+        """Renderizar pestañas usando ST.TABS NATIVO - SIN PROBLEMAS DE ESTADO"""
         
-        # Nombres de las pestañas
-        tab_names = [
+        # PESTAÑAS NATIVAS DE STREAMLIT - ESTABLES Y SIN ST.RERUN
+        tab1, tab2, tab3, tab4 = st.tabs([
             "Resumen General", 
             "Resumen por Componente", 
             "Evolución", 
             "Gestión de Datos"
-        ]
+        ])
         
-        # Crear navegación principal con botones
-        #st.markdown("")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if st.button("Resumen General", use_container_width=True,
-                        type="primary" if st.session_state.active_tab_index == 0 else "secondary"):
-                st.session_state.active_tab_index = 0
-                st.rerun()
-        
-        with col2:
-            if st.button("Resumen por Componente", use_container_width=True,
-                        type="primary" if st.session_state.active_tab_index == 1 else "secondary"):
-                st.session_state.active_tab_index = 1
-                st.rerun()
-        
-        with col3:
-            if st.button("Evolución", use_container_width=True,
-                        type="primary" if st.session_state.active_tab_index == 2 else "secondary"):
-                st.session_state.active_tab_index = 2
-                st.rerun()
-        
-        with col4:
-            if st.button("Gestión de Datos", use_container_width=True,
-                        type="primary" if st.session_state.active_tab_index == 3 else "secondary"):
-                st.session_state.active_tab_index = 3
-                st.rerun()
-        
-        # Mostrar indicador de pestaña activa
-        st.markdown(f"""
-        <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
-                   padding: 0.5rem 1rem; border-radius: 8px; margin: 1rem 0; text-align: center;">
-            <p style="color: white; margin: 0; font-weight: 500;">
-                📍 <strong>Sección Activa:</strong> {tab_names[st.session_state.active_tab_index]}
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Renderizar contenido según pestaña activa
-        if st.session_state.active_tab_index == 0:
+        # Renderizar contenido en cada pestaña
+        with tab1:
             GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
-        elif st.session_state.active_tab_index == 1:
+        
+        with tab2:
             ComponentSummaryTab.render(df_filtrado, filters)
-        elif st.session_state.active_tab_index == 2:
+        
+        with tab3:
             EvolutionTab.render(self.df, filters)
-        elif st.session_state.active_tab_index == 3:
+        
+        with tab4:
             EditTab.render(self.df, None, self.excel_data)
         
         # Información de estado en sidebar - SIMPLIFICADA
         with st.sidebar:
-            st.markdown("### 📊 Estado del Sistema")
-            
-            # Información de la pestaña activa
-            st.info(f"**Sección Actual:** {tab_names[st.session_state.active_tab_index].replace('📊 ', '').replace('🏗️ ', '').replace('📈 ', '').replace('⚙️ ', '')}")
+            st.markdown("### Estado del Sistema")
             
             # Información de datos
             if not self.df.empty:
-                st.success(f"📊 **{len(self.df)}** registros cargados")
-                st.success(f"🔢 **{self.df['Codigo'].nunique()}** indicadores únicos")
+                st.success(f"**{len(self.df)}** registros cargados")
+                st.success(f"**{self.df['Codigo'].nunique()}** indicadores únicos")
                 
                 # Mostrar información de tipos si existe la columna
                 if 'Tipo' in self.df.columns:
                     tipos_count = self.df['Tipo'].value_counts()
-                    st.info(f"📝 **Tipos:** {dict(tipos_count)}")
+                    st.info(f"**Tipos:** {dict(tipos_count)}")
             else:
-                st.warning("📋 Google Sheets vacío")
+                st.warning("Google Sheets vacío")
             
             # Estado PDF - SIMPLIFICADO
-            with st.expander("📄 Estado PDF", expanded=False):
+            with st.expander("Estado PDF", expanded=False):
                 try:
                     import reportlab
-                    st.success("✅ reportlab: Disponible")
+                    st.success("reportlab: Disponible")
                     reportlab_ok = True
                 except ImportError:
-                    st.error("❌ reportlab: No instalado")
+                    st.error("reportlab: No instalado")
                     reportlab_ok = False
                 
                 if self.excel_data is not None and not self.excel_data.empty:
-                    st.success("✅ Excel: Cargado")
+                    st.success("Excel: Cargado")
                     excel_ok = True
                 else:
-                    st.warning("⚠️ Excel: No disponible")
+                    st.warning("Excel: No disponible")
                     excel_ok = False
                 
                 if reportlab_ok and excel_ok:
-                    st.success("🎉 **PDF completamente funcional**")
+                    st.success("**PDF completamente funcional**")
                 elif reportlab_ok:
-                    st.warning("⚠️ **PDF parcial** (falta Excel)")
+                    st.warning("**PDF parcial** (falta Excel)")
                 elif excel_ok:
-                    st.warning("⚠️ **PDF parcial** (falta reportlab)")
+                    st.warning("**PDF parcial** (falta reportlab)")
                 else:
-                    st.error("❌ **PDF no disponible**")
+                    st.error("**PDF no disponible**")
+            
