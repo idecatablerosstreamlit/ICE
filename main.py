@@ -150,12 +150,12 @@ def show_system_info_footer(df, source_info):
             st.error("**Google Sheets:** Desconectado")
         
         # Botón de actualización
-        if st.button("Actualizar desde Google Sheets", 
-                    help="Recarga los datos desde Google Sheets",
-                    key="footer_refresh"):
-            current_tab = st.session_state.get('active_tab_index', 0)
-            st.session_state.last_load_time = time.time()
-            st.session_state.active_tab_index = current_tab
+        #if st.button("Actualizar desde Google Sheets", 
+        #            help="Recarga los datos desde Google Sheets",
+        #           key="footer_refresh"):
+        #    current_tab = st.session_state.get('active_tab_index', 0)
+        #    st.session_state.last_load_time = time.time()
+        #    st.session_state.active_tab_index = current_tab
             st.rerun()
 
 def verify_data_structure(df):
