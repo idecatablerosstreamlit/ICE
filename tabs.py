@@ -101,7 +101,7 @@ class GeneralSummaryTab:
                     st.error(f"Error en gráfico de componentes: {e}")
                     st.dataframe(puntajes_componente, use_container_width=True)
             else:
-                st.info("Agrega más datos a Google Sheets para ver puntajes por componente")
+                st.info("Agrega más datos para ver puntajes por componente")
         
         except ValueError as e:
             st.error(f"Error de valor en cálculos: {e}")
@@ -134,13 +134,13 @@ class ComponentSummaryTab:
         st.header("Resumen por Componente")
         
         if df.empty:
-            st.info("No hay datos disponibles en Google Sheets para análisis por componente")
+            st.info("No hay datos disponibles para análisis por componente")
             return
         
         # Selector de componente específico para esta vista
         componentes = sorted(df['Componente'].unique())
         if not componentes:
-            st.info("No hay componentes disponibles en Google Sheets")
+            st.info("No hay componentes disponibles")
             return
             
         componente_analisis = st.selectbox(
@@ -210,7 +210,7 @@ class ComponentSummaryTab:
                 use_container_width=True
             )
         else:
-            st.warning("No hay datos para el componente seleccionado en Google Sheets")
+            st.warning("No hay datos para el componente seleccionado")
     
     @staticmethod
     def _render_category_visualization(df, componente):
@@ -267,11 +267,11 @@ class EvolutionTab:
         
         try:
             if df.empty:
-                st.info("No hay datos disponibles en Google Sheets para mostrar evolución")
+                st.info("No hay datos suficientes para mostrar evolución")
                 return
             
             # Información sobre los datos disponibles
-            st.info(f"**Datos desde Google Sheets:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos")
+            st.info(f"**Datos:** {len(df)} registros de {df['Codigo'].nunique()} indicadores únicos")
             
             # Crear filtros sin causar rerun
             evolution_filters = EvolutionFilters.create_evolution_filters_stable(df)
@@ -292,7 +292,7 @@ class EvolutionTab:
                         available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
                         st.dataframe(datos_indicador[available_columns], use_container_width=True)
                 else:
-                    st.warning("No se encontraron datos históricos para este indicador en Google Sheets")
+                    st.warning("No se encontraron datos históricos para este indicador")
                     return
             else:
                 st.info("**Vista general:** Mostrando evolución promedio de todos los indicadores")
@@ -369,7 +369,7 @@ class EditTab:
             # Verificar que Google Sheets esté disponible
             from data_utils import GOOGLE_SHEETS_AVAILABLE
             if not GOOGLE_SHEETS_AVAILABLE:
-                st.error("Google Sheets no disponible. Instala las dependencias: `pip install gspread google-auth`")
+                st.error("Servicio no disponible. Instala las dependencias: `pip install gspread google-auth`")
                 return
             
             # Inicializar session state para preservar selecciones
@@ -387,7 +387,7 @@ class EditTab:
             datos_indicador = df[df['Codigo'] == codigo_editar] if not df.empty else pd.DataFrame()
             
             if datos_indicador.empty and not df.empty:
-                st.error(f"No se encontraron datos para el código {codigo_editar} en Google Sheets")
+                st.error(f"No se encontraron datos para el código {codigo_editar}")
                 return
             elif not df.empty:
                 # Mostrar información del indicador
@@ -417,7 +417,7 @@ class EditTab:
         """Selector de código persistente y estable"""
         # Obtener códigos disponibles
         if df.empty:
-            st.info("Google Sheets está vacío. Puedes crear un nuevo indicador.")
+            st.info("Base de datos vacía. Puedes crear un nuevo indicador.")
             return "CREAR_NUEVO"
         
         codigos_disponibles = sorted(df['Codigo'].dropna().unique())
@@ -436,7 +436,7 @@ class EditTab:
             opciones_codigo,
             index=index_actual,
             key="codigo_editar_selector",
-            help="Los datos se guardan automáticamente en Google Sheets"
+            help="Los datos se guardan automáticamente"
         )
         
         # Actualizar session state
@@ -559,18 +559,18 @@ class EditTab:
     @staticmethod
     def _render_view_records(registros_indicador):
         """Renderizar tabla de registros existentes"""
-        st.subheader("Registros Existentes en Google Sheets")
+        st.subheader("Registros Existentes")
         if not registros_indicador.empty:
             columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
             available_columns = [col for col in columns_to_show if col in registros_indicador.columns]
             st.dataframe(registros_indicador[available_columns], use_container_width=True)
         else:
-            st.info("No hay registros para este indicador en Google Sheets")
+            st.info("No hay registros para este indicador")
     
     @staticmethod
     def _render_new_indicator_form(df):
         """Formulario para crear nuevo indicador en Google Sheets"""
-        st.subheader("Crear Nuevo Indicador en Google Sheets")
+        st.subheader("Crear Nuevo Indicador")
         
         from config import INDICATOR_TYPES
         
@@ -634,7 +634,7 @@ class EditTab:
                     help="Fecha del primer registro"
                 )
             
-            submitted = st.form_submit_button("Crear Indicador en Google Sheets", use_container_width=True)
+            submitted = st.form_submit_button("Crear Indicador", use_container_width=True)
             
             if submitted:
                 # Validaciones
@@ -652,7 +652,7 @@ class EditTab:
                 
                 # Verificar que el código no exista
                 if not df.empty and nuevo_codigo in df['Codigo'].values:
-                    st.error(f"El código '{nuevo_codigo}' ya existe en Google Sheets")
+                    st.error(f"El código '{nuevo_codigo}' ya existe")
                     return
                 
                 # Crear el nuevo registro en Google Sheets
@@ -675,22 +675,22 @@ class EditTab:
                     success = sheets_manager.add_record(data_dict)
                     
                     if success:
-                        st.success(f"Indicador '{nuevo_codigo}' creado correctamente en Google Sheets")
+                        st.success(f"Indicador '{nuevo_codigo}' creado correctamente")
                         # Actualizar session state para seleccionar el nuevo código
                         st.session_state.selected_codigo_edit = nuevo_codigo
                         # Limpiar cache
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
-                        st.info("Los datos se actualizarán automáticamente desde Google Sheets")
+                        st.info("Los datos se actualizarán automáticamente")
                         
                         # Opción manual de actualización
                         if st.button("Actualizar datos ahora", key="refresh_after_create"):
                             st.rerun()
                     else:
-                        st.error("Error al crear el indicador en Google Sheets")
+                        st.error("Error al crear el indicador")
                         
                 except Exception as e:
-                    st.error(f"Error al crear indicador en Google Sheets: {e}")
+                    st.error(f"Error al crear indicador: {e}")
     
     @staticmethod
     def _render_add_form(df, codigo_editar):
@@ -720,7 +720,7 @@ class EditTab:
                     help="Valor según el tipo del indicador (se normalizará automáticamente)"
                 )
             
-            submitted = st.form_submit_button("Agregar a Google Sheets", use_container_width=True)
+            submitted = st.form_submit_button("Agregar", use_container_width=True)
             
             if submitted:
                 # Verificar si ya existe un registro para esa fecha
@@ -730,14 +730,14 @@ class EditTab:
                     registro_existente = df[(df['Codigo'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
                     
                     if not registro_existente.empty:
-                        st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')} en Google Sheets. Usa la pestaña 'Editar' para modificarlo.")
+                        st.warning(f"Ya existe un registro para la fecha {nueva_fecha.strftime('%d/%m/%Y')}. Usa la pestaña 'Editar' para modificarlo.")
                         return
                 
                 # Agregar registro a Google Sheets
                 success = DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, None)
                 
                 if success:
-                    st.success("Nuevo registro agregado correctamente a Google Sheets")
+                    st.success("Nuevo registro agregado correctamente")
                     st.info("Los datos se actualizarán automáticamente")
                     
                     # Limpiar cache
@@ -748,7 +748,7 @@ class EditTab:
                     if st.button("Ver cambios ahora", key="refresh_after_add"):
                         st.rerun()
                 else:
-                    st.error("Error al agregar el nuevo registro a Google Sheets")
+                    st.error("Error al agregar el nuevo registro")
     
     @staticmethod
     def _render_edit_form(df, codigo_editar, registros_indicador):
@@ -756,7 +756,7 @@ class EditTab:
         st.subheader("Editar Registro Existente")
         
         if registros_indicador.empty:
-            st.info("No hay registros existentes para editar en Google Sheets")
+            st.info("No hay registros existentes para editar")
             return
         
         # Seleccionar registro a editar
@@ -765,7 +765,7 @@ class EditTab:
             "Seleccionar fecha a editar",
             fechas_disponibles,
             key="fecha_editar",
-            help="Selecciona el registro que deseas modificar en Google Sheets"
+            help="Selecciona el registro que deseas modificar"
         )
         
         if fecha_seleccionada_str:
@@ -785,18 +785,18 @@ class EditTab:
                     nuevo_valor = st.number_input(
                         "Nuevo Valor",
                         value=float(valor_actual),
-                        help="Nuevo valor para este registro en Google Sheets"
+                        help="Nuevo valor para este registro"
                     )
                 
-                submitted = st.form_submit_button("Actualizar en Google Sheets", use_container_width=True)
+                submitted = st.form_submit_button("Actualizar", use_container_width=True)
                 
                 if submitted:
                     success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, None)
                     
                     if success:
-                        st.success(f"Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente en Google Sheets")
+                        st.success(f"Registro del {fecha_real.strftime('%d/%m/%Y')} actualizado correctamente")
                         st.balloons()
-                        st.info("Los datos se actualizarán automáticamente desde Google Sheets")
+                        st.info("Los datos se actualizarán automáticamente")
                         
                         # Limpiar cache
                         st.cache_data.clear()
@@ -806,7 +806,7 @@ class EditTab:
                         if st.button("Ver cambios ahora", key="refresh_after_edit"):
                             st.rerun()
                     else:
-                        st.error("Error al actualizar el registro en Google Sheets")
+                        st.error("Error al actualizar el registro")
     
     @staticmethod
     def _render_delete_form(df, codigo_editar, registros_indicador):
@@ -814,7 +814,7 @@ class EditTab:
         st.subheader("Eliminar Registro")
         
         if registros_indicador.empty:
-            st.info("No hay registros existentes para eliminar en Google Sheets")
+            st.info("No hay registros existentes para eliminar")
             return
         
         # Seleccionar registro a eliminar
@@ -823,7 +823,7 @@ class EditTab:
             "Seleccionar fecha a eliminar",
             fechas_disponibles,
             key="fecha_eliminar",
-            help="CUIDADO: Esta acción eliminará el registro de Google Sheets y no se puede deshacer"
+            help="CUIDADO: Esta acción eliminará el registro y no se puede deshacer"
         )
         
         if fecha_seleccionada_str:
@@ -833,17 +833,17 @@ class EditTab:
             valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
             
             st.warning(f"""
-            **ATENCIÓN**: Estás a punto de eliminar el registro de Google Sheets:
+            **ATENCIÓN**: Estás a punto de eliminar el registro:
             - **Fecha**: {fecha_real.strftime('%d/%m/%Y')}
             - **Valor**: {valor_actual:.3f}
             
-            Esta acción **NO SE PUEDE DESHACER** y eliminará el registro permanentemente de Google Sheets.
+            Esta acción **NO SE PUEDE DESHACER** y eliminará el registro permanentemente
             """)
             
             col1, col2 = st.columns(2)
             
             with col1:
-                confirmar = st.checkbox("Confirmo que quiero eliminar este registro de Google Sheets", key="confirm_delete")
+                confirmar = st.checkbox("Confirmo que quiero eliminar este registro", key="confirm_delete")
             
             with col2:
                 if confirmar:
@@ -851,9 +851,9 @@ class EditTab:
                         success = DataEditor.delete_record(df, codigo_editar, fecha_real, None)
                         
                         if success:
-                            st.success(f"Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente de Google Sheets")
+                            st.success(f"Registro del {fecha_real.strftime('%d/%m/%Y')} eliminado correctamente")
                             st.balloons()
-                            st.info("Los datos se actualizarán automáticamente desde Google Sheets")
+                            st.info("Los datos se actualizarán automáticamente")
                             
                             # Limpiar cache
                             st.cache_data.clear()
@@ -863,7 +863,7 @@ class EditTab:
                             if st.button("Ver cambios ahora", key="refresh_after_delete"):
                                 st.rerun()
                         else:
-                            st.error("Error al eliminar el registro de Google Sheets")
+                            st.error("Error al eliminar el registro")
     
     @staticmethod
     def _generate_and_download_pdf(codigo_editar, excel_data):
