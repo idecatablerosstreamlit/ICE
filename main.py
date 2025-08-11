@@ -113,7 +113,7 @@ def show_system_info_footer(df, source_info):
     
     # Mostrar información que antes estaba en encabezado
     if not df.empty:
-        st.success(f"Cargados {len(df)} registros desde Google Sheets")
+        st.success(f"Cargados {len(df)} registros")
         st.success("Datos procesados y listos para usar")
     
     # Estadísticas principales
@@ -145,13 +145,13 @@ def show_system_info_footer(df, source_info):
         # Estado de conexión sin iconos
         connection_info = source_info.get('connection_info', {})
         if connection_info.get('connected', False):
-            st.success("**Google Sheets:** Conectado")
+            st.success("Conectado")
         else:
-            st.error("**Google Sheets:** Desconectado")
+            st.error("Desconectado")
         
         # Botón de actualización
-        #if st.button("Actualizar desde Google Sheets", 
-        #            help="Recarga los datos desde Google Sheets",
+        #if st.button("Actualizar", 
+        #            help="Recarga los datos",
         #           key="footer_refresh"):
         #    current_tab = st.session_state.get('active_tab_index', 0)
         #    st.session_state.last_load_time = time.time()
