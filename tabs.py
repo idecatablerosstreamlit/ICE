@@ -63,20 +63,7 @@ class GeneralSummaryTab:
                         <h3 style="color: white; margin: 0; font-size: 1.2rem; font-weight: 600;">Última Actualización</h3>
                         <span style="background: rgba(255, 255, 255, 0.2); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem; font-weight: 500;">{fecha_str}</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                        <div>
-                            <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.25rem;">Indicador</div>
-                            <div style="font-weight: 500; line-height: 1.3; font-size: 0.9rem;">{ultima_actualizacion['indicador']}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.25rem;">Código</div>
-                            <div style="font-weight: 500; font-family: monospace; background: rgba(255, 255, 255, 0.1); padding: 0.25rem 0.5rem; border-radius: 4px; display: inline-block; font-size: 0.9rem;">{ultima_actualizacion['codigo']}</div>
-                        </div>
-                        <div style="grid-column: 1 / -1;">
-                            <div style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 0.25rem;">Componente</div>
-                            <div style="font-weight: 500; font-size: 0.9rem;">{ultima_actualizacion['componente']}</div>
-                        </div>
-                    </div>
+                    
                 </div>
                 """, unsafe_allow_html=True)
                 
