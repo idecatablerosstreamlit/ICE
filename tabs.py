@@ -1034,7 +1034,6 @@ class EditTab:
         
         fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
         
-
 class TabManager:
     """Gestor de pestañas del dashboard - SIN FILTROS DE FECHA"""
     
