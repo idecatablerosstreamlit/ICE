@@ -1,6 +1,6 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN CON FILTROS CORREGIDOS
-TODAS LAS FUNCIONALIDADES PRESERVADAS + FILTROS DE FECHA FUNCIONALES
+Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN SIMPLIFICADA SIN FILTROS
+SOLO FECHA DE ÚLTIMA ACTUALIZACIÓN EN RESUMEN GENERAL
 """
 
 import streamlit as st
@@ -15,8 +15,8 @@ class GeneralSummaryTab:
     """Pestaña de resumen general"""
     
     @staticmethod
-    def render(df, fecha_seleccionada):
-        """Renderizar la pestaña de resumen general - CON FILTROS DE FECHA"""
+    def render(df, fecha_seleccionada=None):
+        """Renderizar la pestaña de resumen general - SIN FILTROS"""
         st.header("Resumen General")
         
         try:
@@ -46,17 +46,30 @@ class GeneralSummaryTab:
                 st.info("Los datos en Google Sheets están vacíos o incompletos")
                 return
             
-            # ✅ APLICAR FILTRO DE FECHA EN LOS CÁLCULOS
-            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(
-                df, fecha_filtro=fecha_seleccionada
-            )
+            # ✅ OBTENER FECHA DE ÚLTIMA ACTUALIZACIÓN
+            ultima_actualizacion = GeneralSummaryTab._get_last_update_info(df)
             
-            # ✅ MOSTRAR QUÉ FECHA SE ESTÁ USANDO
-            if fecha_seleccionada:
-                fecha_str = pd.to_datetime(fecha_seleccionada).strftime('%d/%m/%Y')
-                st.info(f"📅 **Análisis para fecha:** {fecha_str}")
-            else:
-                st.info("📅 **Análisis:** Usando valores más recientes de cada indicador")
+            # ✅ MOSTRAR FECHA DE ÚLTIMA ACTUALIZACIÓN
+            if ultima_actualizacion:
+                fecha_str = ultima_actualizacion['fecha'].strftime('%d/%m/%Y')
+                hora_str = ultima_actualizacion['fecha'].strftime('%H:%M') if hasattr(ultima_actualizacion['fecha'], 'hour') else ""
+                
+                # Card de última actualización
+                st.markdown(f"""
+                <div style="background: linear-gradient(45deg, #28a745 0%, #20c997 100%); 
+                           padding: 1rem; border-radius: 10px; margin: 1rem 0; color: white;">
+                    <h4 style="color: white; margin: 0;">📅 Última Actualización</h4>
+                    <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
+                        <strong>Fecha:</strong> {fecha_str} {hora_str}<br>
+                        <strong>Indicador:</strong> {ultima_actualizacion['indicador']}<br>
+                        <strong>Código:</strong> {ultima_actualizacion['codigo']}<br>
+                        <strong>Componente:</strong> {ultima_actualizacion['componente']}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # ✅ CALCULAR PUNTAJES SIN FILTROS (siempre valores más recientes)
+            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
             
             # Verificar que los cálculos fueron exitosos
             if puntajes_componente.empty and puntajes_categoria.empty and puntaje_general == 0:
@@ -64,7 +77,7 @@ class GeneralSummaryTab:
                 return
             
             # Mostrar información sobre qué datos se están usando
-            st.info("**Puntajes calculados usando valores normalizados:** Los indicadores se normalizan según su tipo antes del cálculo.")
+            st.info("**Puntajes calculados usando valores más recientes:** Los indicadores se normalizan según su tipo antes del cálculo.")
             
             # Mostrar métricas generales
             MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
@@ -83,25 +96,10 @@ class GeneralSummaryTab:
                     st.error(f"Error en velocímetro: {e}")
             
             with col2:
-                # Gráfico de radar
+                # Gráfico de radar (sin filtros)
                 try:
-                    # ✅ PREPARAR DATOS PARA RADAR SEGÚN FILTRO DE FECHA
-                    df_for_radar = df
-                    if fecha_seleccionada:
-                        df_fecha = df[df['Fecha'] == fecha_seleccionada]
-                        if not df_fecha.empty:
-                            df_for_radar = df_fecha
-                        else:
-                            # Usar fecha más cercana
-                            fechas_disponibles = df['Fecha'].dropna().sort_values()
-                            fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_seleccionada)]
-                            if not fecha_mas_cercana.empty:
-                                df_for_radar = df[df['Fecha'] == fecha_mas_cercana.iloc[-1]]
-                            else:
-                                df_for_radar = df[df['Fecha'] == fechas_disponibles.iloc[0]]
-                    
                     st.plotly_chart(
-                        ChartGenerator.radar_chart(df_for_radar, {'fecha': fecha_seleccionada}),
+                        ChartGenerator.radar_chart(df, None),
                         use_container_width=True
                     )
                 except Exception as e:
@@ -131,67 +129,71 @@ class GeneralSummaryTab:
         # Mostrar tabla de datos más recientes
         with st.expander("Ver datos más recientes por indicador"):
             try:
-                # ✅ USAR DATOS FILTRADOS POR FECHA SI APLICA
-                if fecha_seleccionada:
-                    df_for_table = df[df['Fecha'] == fecha_seleccionada]
-                    if df_for_table.empty:
-                        df_for_table = DataProcessor._get_latest_values_by_indicator(df)
-                        st.info("No hay datos para la fecha exacta, mostrando valores más recientes")
-                else:
-                    df_for_table = DataProcessor._get_latest_values_by_indicator(df)
+                df_latest = DataProcessor._get_latest_values_by_indicator(df)
                 
-                if not df_for_table.empty:
+                if not df_latest.empty:
                     columns_to_show = ['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
-                    available_columns = [col for col in columns_to_show if col in df_for_table.columns]
-                    st.dataframe(df_for_table[available_columns], use_container_width=True)
+                    available_columns = [col for col in columns_to_show if col in df_latest.columns]
+                    st.dataframe(df_latest[available_columns], use_container_width=True)
                 else:
                     st.info("No hay datos para mostrar")
             except Exception as e:
                 st.error(f"Error al mostrar datos: {e}")
+    
+    @staticmethod
+    def _get_last_update_info(df):
+        """Obtener información de la última actualización"""
+        try:
+            if df.empty or 'Fecha' not in df.columns:
+                return None
+            
+            # Obtener la fecha más reciente de todos los registros
+            fechas_validas = df['Fecha'].dropna()
+            if fechas_validas.empty:
+                return None
+            
+            # Convertir a datetime si es necesario
+            if not pd.api.types.is_datetime64_any_dtype(fechas_validas):
+                fechas_validas = pd.to_datetime(fechas_validas, errors='coerce').dropna()
+            
+            if fechas_validas.empty:
+                return None
+            
+            # Obtener la fecha más reciente
+            ultima_fecha = fechas_validas.max()
+            
+            # Obtener información del indicador que se actualizó más recientemente
+            registro_mas_reciente = df[df['Fecha'] == ultima_fecha].iloc[0]
+            
+            return {
+                'fecha': ultima_fecha,
+                'indicador': registro_mas_reciente.get('Indicador', 'N/A'),
+                'codigo': registro_mas_reciente.get('Codigo', 'N/A'),
+                'componente': registro_mas_reciente.get('Componente', 'N/A')
+            }
+            
+        except Exception as e:
+            return None
 
 class ComponentSummaryTab:
     """Pestaña de resumen por componente"""
     
     @staticmethod
-    def render(df, filters):
-        """Renderizar la pestaña de resumen por componente - CON FILTROS DE FECHA"""
+    def render(df, filters=None):
+        """Renderizar la pestaña de resumen por componente - SIN FILTROS"""
         st.header("Resumen por Componente")
         
         if df.empty:
             st.info("No hay datos disponibles para análisis por componente")
             return
         
-        # ✅ APLICAR FILTRO DE FECHA SI EXISTE
-        df_work = df.copy()
-        fecha_filtro = filters.get('fecha')
-        
-        if fecha_filtro:
-            fecha_str = pd.to_datetime(fecha_filtro).strftime('%d/%m/%Y')
-            st.info(f"📅 **Análisis para fecha:** {fecha_str}")
-            
-            # Filtrar por fecha
-            df_fecha = df[df['Fecha'] == fecha_filtro]
-            if not df_fecha.empty:
-                df_work = df_fecha
-            else:
-                # Buscar fecha más cercana
-                fechas_disponibles = df['Fecha'].dropna().sort_values()
-                fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
-                if not fecha_mas_cercana.empty:
-                    fecha_usar = fecha_mas_cercana.iloc[-1]
-                    df_work = df[df['Fecha'] == fecha_usar]
-                    st.info(f"Usando fecha más cercana: {pd.to_datetime(fecha_usar).strftime('%d/%m/%Y')}")
-                else:
-                    df_work = df[df['Fecha'] == fechas_disponibles.iloc[0]]
-                    st.info(f"Usando primera fecha disponible: {pd.to_datetime(fechas_disponibles.iloc[0]).strftime('%d/%m/%Y')}")
-        else:
-            st.info("📅 **Análisis:** Usando valores más recientes de cada indicador")
-            df_work = DataProcessor._get_latest_values_by_indicator(df)
+        # ✅ SIEMPRE USAR VALORES MÁS RECIENTES (sin filtros)
+        df_latest = DataProcessor._get_latest_values_by_indicator(df)
         
         # Selector de componente específico para esta vista
-        componentes = sorted(df_work['Componente'].unique()) if not df_work.empty else []
+        componentes = sorted(df_latest['Componente'].unique()) if not df_latest.empty else []
         if not componentes:
-            st.info("No hay componentes disponibles para la fecha seleccionada")
+            st.info("No hay componentes disponibles")
             return
             
         componente_analisis = st.selectbox(
@@ -200,12 +202,12 @@ class ComponentSummaryTab:
             key="comp_analysis_main"
         )
         
-        # ✅ USAR DATOS YA FILTRADOS POR FECHA
-        df_componente = df_work[df_work['Componente'] == componente_analisis]
+        # Filtrar por componente seleccionado
+        df_componente = df_latest[df_latest['Componente'] == componente_analisis]
         
         if not df_componente.empty:
             # Información sobre los datos que se están usando
-            st.info(f"**Análisis de {componente_analisis}:** Basado en valores normalizados de cada indicador.")
+            st.info(f"**Análisis de {componente_analisis}:** Basado en valores más recientes de cada indicador.")
             
             # Métricas del componente
             col1, col2, col3 = st.columns(3)
@@ -232,9 +234,9 @@ class ComponentSummaryTab:
                 else:
                     st.metric("Última Medición", "No disponible")
             
-            # Tabla de categorías
+            # Tabla de categorías (sin filtros)
             try:
-                ChartGenerator.show_category_table_simple(df, componente_analisis, fecha_filtro)
+                ChartGenerator.show_category_table_simple(df, componente_analisis)
             except Exception as e:
                 st.error(f"Error al mostrar categorías: {e}")
             
@@ -248,47 +250,28 @@ class ComponentSummaryTab:
                 st.plotly_chart(fig_evol, use_container_width=True)
             
             with col_der:
-                # Selector de tipo de visualización
-                ComponentSummaryTab._render_category_visualization(df, componente_analisis, fecha_filtro)
+                # Selector de tipo de visualización (sin filtros)
+                ComponentSummaryTab._render_category_visualization(df, componente_analisis)
             
             # Tabla de indicadores del componente
-            st.subheader(f"Indicadores para {componente_analisis}")
+            st.subheader(f"Indicadores Más Recientes de {componente_analisis}")
             columns_to_show = ['Indicador', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
             available_columns = [col for col in columns_to_show if col in df_componente.columns]
-            
-            # Mostrar fecha usada en la tabla
-            if fecha_filtro:
-                st.info(f"Datos mostrados para fecha: {pd.to_datetime(fecha_filtro).strftime('%d/%m/%Y')}")
             
             st.dataframe(
                 df_componente[available_columns].sort_values('Valor_Normalizado' if 'Valor_Normalizado' in df_componente.columns else 'Valor', ascending=False),
                 use_container_width=True
             )
         else:
-            st.warning("No hay datos para el componente seleccionado en la fecha especificada")
+            st.warning("No hay datos para el componente seleccionado")
     
     @staticmethod
-    def _render_category_visualization(df, componente, fecha_filtro=None):
-        """Renderizar visualización de categorías - CON FILTRO DE FECHA"""
+    def _render_category_visualization(df, componente):
+        """Renderizar visualización de categorías - SIN FILTROS"""
         
-        # ✅ USAR DATOS FILTRADOS POR FECHA
-        if fecha_filtro is not None:
-            df_fecha = df[df['Fecha'] == fecha_filtro]
-            if not df_fecha.empty:
-                df_componente = df_fecha[df_fecha['Componente'] == componente]
-            else:
-                # Usar fecha más cercana
-                fechas_disponibles = df['Fecha'].dropna().sort_values()
-                fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
-                if not fecha_mas_cercana.empty:
-                    df_componente = df[df['Fecha'] == fecha_mas_cercana.iloc[-1]]
-                    df_componente = df_componente[df_componente['Componente'] == componente]
-                else:
-                    df_componente = df[df['Fecha'] == fechas_disponibles.iloc[0]]
-                    df_componente = df_componente[df_componente['Componente'] == componente]
-        else:
-            df_latest = DataProcessor._get_latest_values_by_indicator(df)
-            df_componente = df_latest[df_latest['Componente'] == componente]
+        # Usar valores más recientes
+        df_latest = DataProcessor._get_latest_values_by_indicator(df)
+        df_componente = df_latest[df_latest['Componente'] == componente]
         
         # Contar categorías para determinar mejor visualización
         num_categorias = df_componente['Categoria'].nunique()
@@ -314,27 +297,27 @@ class ComponentSummaryTab:
             key=f"viz_selector_{componente}"
         )
         
-        # Renderizar la visualización seleccionada
+        # Renderizar la visualización seleccionada (sin filtros)
         if "Barras" in tipo_viz:
             # Usar barras horizontales
-            fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None, fecha_filtro)
+            fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None)
             st.plotly_chart(fig_bar, use_container_width=True)
         elif "Radar" in tipo_viz:
             if num_categorias >= 3:
                 # Usar radar de categorías
-                fig_radar_cat = ChartGenerator.radar_chart_categories(df, componente, None, fecha_filtro)
+                fig_radar_cat = ChartGenerator.radar_chart_categories(df, componente, None)
                 st.plotly_chart(fig_radar_cat, use_container_width=True)
             else:
                 st.warning(f"Se requieren al menos 3 categorías para el radar. {componente} tiene {num_categorias}.")
                 # Fallback a barras horizontales
-                fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None, fecha_filtro)
+                fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None)
                 st.plotly_chart(fig_bar, use_container_width=True)
 
 class EvolutionTab:
     """Pestaña de evolución"""
     
     @staticmethod
-    def render(df, filters):
+    def render(df, filters=None):
         """Renderizar la pestaña de evolución - FUNCIONALIDAD COMPLETA PRESERVADA"""
         st.header("Evolución Temporal de Indicadores")
         
@@ -978,17 +961,18 @@ class EditTab:
             st.error(f"Error al generar PDF: {e}")
 
 class TabManager:
-    """Gestor de pestañas del dashboard - FUNCIONALIDAD COMPLETA PRESERVADA"""
+    """Gestor de pestañas del dashboard - SIN FILTROS DE FECHA"""
     
+    def __init__(self, df, csv_path, excel_data=None):
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
         self.csv_path = None  # No usamos CSV
         self.excel_data = excel_data
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar pestañas usando ST.TABS NATIVO - TODAS LAS FUNCIONALIDADES"""
+        """Renderizar pestañas - SIN FILTROS DE FECHA"""
         
-        # PESTAÑAS NATIVAS DE STREAMLIT - ESTABLES Y SIN ST.RERUN
+        # PESTAÑAS NATIVAS DE STREAMLIT - ESTABLES Y SIN FILTROS
         tab1, tab2, tab3, tab4 = st.tabs([
             "Resumen General", 
             "Resumen por Componente", 
@@ -996,20 +980,20 @@ class TabManager:
             "Gestión de Datos"
         ])
         
-        # ✅ PASAR FILTROS CORRECTAMENTE A CADA PESTAÑA
+        # ✅ PASAR DATOS SIN FILTROS A CADA PESTAÑA
         with tab1:
-            GeneralSummaryTab.render(self.df, filters.get('fecha'))
+            GeneralSummaryTab.render(self.df)  # Sin filtros de fecha
         
         with tab2:
-            ComponentSummaryTab.render(self.df, filters)  # Pasar todos los filtros
+            ComponentSummaryTab.render(self.df)  # Sin filtros de fecha
         
         with tab3:
-            EvolutionTab.render(self.df, filters)
+            EvolutionTab.render(self.df)  # Mantiene sus propios filtros de indicador
         
         with tab4:
             EditTab.render(self.df, None, self.excel_data)
         
-        # Información de estado en sidebar - COMPLETA
+        # Información de estado en sidebar - SIMPLIFICADA
         with st.sidebar:
             st.markdown("### Estado del Sistema")
             
