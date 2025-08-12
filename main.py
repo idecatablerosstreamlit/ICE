@@ -108,15 +108,15 @@ def load_data_with_status():
         source_info = data_loader.get_data_source_info()
         
         # Mostrar resultados de carga
-        if df_loaded is not None and not df_loaded.empty:
-            st.success(f"✅ Datos cargados: {len(df_loaded)} registros de Google Sheets")
-        else:
-            st.info("📋 Google Sheets está vacío o no se pudo conectar")
+        # if df_loaded is not None and not df_loaded.empty:
+        #     st.success(f"✅ Datos cargados: {len(df_loaded)} registros de Google Sheets")
+        # else:
+         #    st.info("📋 Google Sheets está vacío o no se pudo conectar")
         
-        if excel_data is not None and not excel_data.empty:
-            st.success(f"✅ Datos metodológicos: {len(excel_data)} indicadores")
-        else:
-            st.warning("⚠️ No se encontró archivo Excel metodológico")
+        # if excel_data is not None and not excel_data.empty:
+        #     st.success(f"✅ Datos metodológicos: {len(excel_data)} indicadores")
+        # else:
+         #    st.warning("⚠️ No se encontró archivo Excel metodológico")
         
         return df_loaded, source_info, excel_data
         
