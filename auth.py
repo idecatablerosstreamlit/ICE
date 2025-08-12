@@ -28,7 +28,7 @@ class AuthenticationManager:
     
     def login_form(self):
         """Mostrar formulario de login"""
-        st.markdown("### 🔐 Acceso de Administrador")
+        st.markdown("### Acceso de Administrador")
         st.warning("Se requieren permisos de administrador para crear, editar o eliminar indicadores")
         
         with st.form("login_form"):
@@ -52,11 +52,11 @@ class AuthenticationManager:
                     st.session_state.authenticated = True
                     st.session_state.auth_time = datetime.now()
                     st.session_state.admin_user = username
-                    st.success("✅ Acceso autorizado")
+                    st.success("Acceso autorizado")
                     st.balloons()
                     st.rerun()
                 else:
-                    st.error("❌ Usuario o contraseña incorrectos")
+                    st.error("Usuario o contraseña incorrectos")
                     return False
         
         return False
@@ -88,7 +88,7 @@ class AuthenticationManager:
         if self.is_authenticated():
             with st.sidebar:
                 st.markdown("---")
-                st.markdown("### 👤 Sesión Activa")
+                st.markdown("### Sesión Activa")
                 st.success(f"**Usuario:** {st.session_state.get('admin_user', 'admin')}")
                 
                 # Mostrar tiempo restante
@@ -101,13 +101,13 @@ class AuthenticationManager:
                     else:
                         st.warning("**Sesión expirada**")
                 
-                if st.button("🚪 Cerrar Sesión", use_container_width=True):
+                if st.button("Cerrar Sesión", use_container_width=True):
                     self.logout()
     
     def require_auth_for_action(self, action_name):
         """Decorador/wrapper para requerir autenticación en acciones específicas"""
         if not self.is_authenticated():
-            st.warning(f"🔒 **Acción restringida:** {action_name}")
+            st.warning(f"Acción restringida: {action_name}")
             st.info("Se requieren permisos de administrador para realizar esta acción")
             return False
         return True
