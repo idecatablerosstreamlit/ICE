@@ -1,5 +1,5 @@
 """
-Módulo de gráficos para el Dashboard ICE - VERSIÓN COMPLETA
+Módulo de gráficos para el Dashboard ICE - VERSIÓN COMPLETA CON FILTROS CORREGIDOS
 Generación de visualizaciones y métricas para el sistema de monitoreo
 """
 
@@ -74,21 +74,31 @@ class ChartGenerator:
     
     @staticmethod
     def radar_chart(df, filters=None):
-        """Crear gráfico de radar por componentes"""
+        """Crear gráfico de radar por componentes - CORREGIDO PARA USAR DATOS FILTRADOS"""
         try:
             if df.empty:
                 return ChartGenerator._create_empty_chart("No hay datos disponibles")
             
-            # Obtener valores más recientes por indicador
-            df_latest = ChartGenerator._get_latest_values_by_indicator(df)
+            # ✅ DETERMINAR SI USAR DATOS YA FILTRADOS O OBTENER MÁS RECIENTES
+            # Si el DataFrame viene con pocos registros, probablemente ya está filtrado por fecha
+            total_indicadores = df['Codigo'].nunique() if 'Codigo' in df.columns else 0
+            
+            # Si hay filtros de fecha aplicados, usar los datos tal como vienen
+            if filters and filters.get('fecha') is not None:
+                # Los datos ya vienen filtrados por fecha, usarlos directamente
+                df_latest = df
+            else:
+                # No hay filtro de fecha, obtener valores más recientes por indicador
+                df_latest = ChartGenerator._get_latest_values_by_indicator(df)
             
             if df_latest.empty:
                 return ChartGenerator._create_empty_chart("No hay datos para mostrar")
             
-            # Agrupar por componente
+            # Verificar columnas necesarias
             if 'Componente' not in df_latest.columns or 'Valor_Normalizado' not in df_latest.columns:
                 return ChartGenerator._create_empty_chart("Faltan columnas necesarias")
             
+            # Agrupar por componente
             componentes = df_latest.groupby('Componente')['Valor_Normalizado'].mean().reset_index()
             
             if componentes.empty:
@@ -261,8 +271,8 @@ class ChartGenerator:
             return ChartGenerator._create_error_chart("Error en evolución")
     
     @staticmethod
-    def horizontal_bar_chart(df, componente=None, categoria=None):
-        """Crear gráfico de barras horizontales para categorías"""
+    def horizontal_bar_chart(df, componente=None, categoria=None, fecha_filtro=None):
+        """Crear gráfico de barras horizontales para categorías - CORREGIDO"""
         try:
             if df.empty:
                 return ChartGenerator._create_empty_chart("No hay datos disponibles")
@@ -275,14 +285,28 @@ class ChartGenerator:
             if df_filtered.empty:
                 return ChartGenerator._create_empty_chart("No hay datos para el componente seleccionado")
             
-            # Obtener valores más recientes
-            df_latest = ChartGenerator._get_latest_values_by_indicator(df_filtered)
+            # ✅ APLICAR FILTRO DE FECHA SI SE ESPECIFICA
+            if fecha_filtro is not None:
+                df_fecha = df_filtered[df_filtered['Fecha'] == fecha_filtro]
+                if not df_fecha.empty:
+                    df_filtered = df_fecha
+                else:
+                    # Usar fecha más cercana
+                    fechas_disponibles = df_filtered['Fecha'].dropna().sort_values()
+                    fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
+                    if not fecha_mas_cercana.empty:
+                        df_filtered = df_filtered[df_filtered['Fecha'] == fecha_mas_cercana.iloc[-1]]
+                    else:
+                        df_filtered = df_filtered[df_filtered['Fecha'] == fechas_disponibles.iloc[0]]
+            else:
+                # Obtener valores más recientes
+                df_filtered = ChartGenerator._get_latest_values_by_indicator(df_filtered)
             
             # Agrupar por categoría
-            if 'Categoria' not in df_latest.columns:
+            if 'Categoria' not in df_filtered.columns:
                 return ChartGenerator._create_empty_chart("No hay información de categorías")
             
-            puntajes_categoria = df_latest.groupby('Categoria')['Valor_Normalizado'].mean().reset_index()
+            puntajes_categoria = df_filtered.groupby('Categoria')['Valor_Normalizado'].mean().reset_index()
             puntajes_categoria = puntajes_categoria.sort_values('Valor_Normalizado', ascending=True)
             
             # Crear colores
@@ -326,8 +350,8 @@ class ChartGenerator:
             return ChartGenerator._create_error_chart("Error en barras horizontales")
     
     @staticmethod
-    def radar_chart_categories(df, componente=None, categoria=None):
-        """Crear gráfico de radar por categorías"""
+    def radar_chart_categories(df, componente=None, categoria=None, fecha_filtro=None):
+        """Crear gráfico de radar por categorías - CORREGIDO"""
         try:
             if df.empty:
                 return ChartGenerator._create_empty_chart("No hay datos disponibles")
@@ -340,14 +364,28 @@ class ChartGenerator:
             if df_filtered.empty:
                 return ChartGenerator._create_empty_chart("No hay datos para el componente")
             
-            # Obtener valores más recientes
-            df_latest = ChartGenerator._get_latest_values_by_indicator(df_filtered)
+            # ✅ APLICAR FILTRO DE FECHA SI SE ESPECIFICA
+            if fecha_filtro is not None:
+                df_fecha = df_filtered[df_filtered['Fecha'] == fecha_filtro]
+                if not df_fecha.empty:
+                    df_filtered = df_fecha
+                else:
+                    # Usar fecha más cercana
+                    fechas_disponibles = df_filtered['Fecha'].dropna().sort_values()
+                    fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
+                    if not fecha_mas_cercana.empty:
+                        df_filtered = df_filtered[df_filtered['Fecha'] == fecha_mas_cercana.iloc[-1]]
+                    else:
+                        df_filtered = df_filtered[df_filtered['Fecha'] == fechas_disponibles.iloc[0]]
+            else:
+                # Obtener valores más recientes
+                df_filtered = ChartGenerator._get_latest_values_by_indicator(df_filtered)
             
             # Agrupar por categoría
-            if 'Categoria' not in df_latest.columns:
+            if 'Categoria' not in df_filtered.columns:
                 return ChartGenerator._create_empty_chart("No hay información de categorías")
             
-            categorias = df_latest.groupby('Categoria')['Valor_Normalizado'].mean().reset_index()
+            categorias = df_filtered.groupby('Categoria')['Valor_Normalizado'].mean().reset_index()
             
             if len(categorias) < 3:
                 return ChartGenerator._create_empty_chart("Se requieren al menos 3 categorías para el radar")
@@ -386,8 +424,8 @@ class ChartGenerator:
             return ChartGenerator._create_error_chart("Error en radar de categorías")
     
     @staticmethod
-    def show_category_table_simple(df, componente):
-        """Mostrar tabla simple de categorías"""
+    def show_category_table_simple(df, componente, fecha_filtro=None):
+        """Mostrar tabla simple de categorías - CORREGIDO"""
         try:
             if df.empty:
                 st.info("No hay datos disponibles")
@@ -400,15 +438,29 @@ class ChartGenerator:
                 st.info(f"No hay datos para el componente {componente}")
                 return
             
-            # Obtener valores más recientes
-            df_latest = ChartGenerator._get_latest_values_by_indicator(df_componente)
+            # ✅ APLICAR FILTRO DE FECHA SI SE ESPECIFICA
+            if fecha_filtro is not None:
+                df_fecha = df_componente[df_componente['Fecha'] == fecha_filtro]
+                if not df_fecha.empty:
+                    df_componente = df_fecha
+                else:
+                    # Usar fecha más cercana
+                    fechas_disponibles = df_componente['Fecha'].dropna().sort_values()
+                    fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
+                    if not fecha_mas_cercana.empty:
+                        df_componente = df_componente[df_componente['Fecha'] == fecha_mas_cercana.iloc[-1]]
+                    else:
+                        df_componente = df_componente[df_componente['Fecha'] == fechas_disponibles.iloc[0]]
+            else:
+                # Obtener valores más recientes
+                df_componente = ChartGenerator._get_latest_values_by_indicator(df_componente)
             
             # Agrupar por categoría
-            if 'Categoria' not in df_latest.columns:
+            if 'Categoria' not in df_componente.columns:
                 st.info("No hay información de categorías")
                 return
             
-            categorias_stats = df_latest.groupby('Categoria').agg({
+            categorias_stats = df_componente.groupby('Categoria').agg({
                 'Valor_Normalizado': ['mean', 'count'],
                 'Indicador': 'count'
             }).round(3)
@@ -575,8 +627,8 @@ class MetricsDisplay:
             st.error(f"Error al mostrar métricas: {e}")
     
     @staticmethod
-    def show_component_metrics(df, componente):
-        """Mostrar métricas específicas de un componente"""
+    def show_component_metrics(df, componente, fecha_filtro=None):
+        """Mostrar métricas específicas de un componente - CORREGIDO"""
         try:
             if df.empty:
                 st.info("No hay datos disponibles")
@@ -589,25 +641,39 @@ class MetricsDisplay:
                 st.info(f"No hay datos para el componente {componente}")
                 return
             
-            # Obtener valores más recientes
-            df_latest = ChartGenerator._get_latest_values_by_indicator(df_componente)
+            # ✅ APLICAR FILTRO DE FECHA SI SE ESPECIFICA
+            if fecha_filtro is not None:
+                df_fecha = df_componente[df_componente['Fecha'] == fecha_filtro]
+                if not df_fecha.empty:
+                    df_componente = df_fecha
+                else:
+                    # Usar fecha más cercana
+                    fechas_disponibles = df_componente['Fecha'].dropna().sort_values()
+                    fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
+                    if not fecha_mas_cercana.empty:
+                        df_componente = df_componente[df_componente['Fecha'] == fecha_mas_cercana.iloc[-1]]
+                    else:
+                        df_componente = df_componente[df_componente['Fecha'] == fechas_disponibles.iloc[0]]
+            else:
+                # Obtener valores más recientes
+                df_componente = ChartGenerator._get_latest_values_by_indicator(df_componente)
             
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                if 'Valor_Normalizado' in df_latest.columns:
-                    valor_promedio = df_latest['Valor_Normalizado'].mean()
+                if 'Valor_Normalizado' in df_componente.columns:
+                    valor_promedio = df_componente['Valor_Normalizado'].mean()
                     st.metric("Valor Promedio", f"{valor_promedio:.1%}")
                 else:
                     st.metric("Valor Promedio", "N/A")
             
             with col2:
-                total_indicadores = df_latest['Indicador'].nunique()
+                total_indicadores = df_componente['Indicador'].nunique()
                 st.metric("Total Indicadores", str(total_indicadores))
             
             with col3:
-                if 'Fecha' in df_latest.columns:
-                    ultima_fecha = df_latest['Fecha'].max()
+                if 'Fecha' in df_componente.columns:
+                    ultima_fecha = df_componente['Fecha'].max()
                     if pd.notna(ultima_fecha):
                         fecha_str = pd.to_datetime(ultima_fecha).strftime('%d/%m/%Y')
                         st.metric("Última Actualización", fecha_str)
