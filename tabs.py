@@ -422,7 +422,7 @@ class EditTab:
             codigo_editar = EditTab._render_codigo_selector(df)
             
             # MODO CONSULTA - Siempre disponible
-            st.markdown("### 📊 Modo Consulta (Disponible para todos)")
+            st.markdown("### Modo Consulta (Disponible para todos)")
             
             if codigo_editar and codigo_editar != "CREAR_NUEVO":
                 # Validar que el código seleccionado existe en los datos
@@ -446,27 +446,26 @@ class EditTab:
             st.markdown("---")
             
             # MODO ADMINISTRADOR - Requiere autenticación
-            st.markdown("### 🔐 Modo Administrador (Requiere autenticación)")
+            st.markdown("### Modo Administrador (Requiere autenticación)")
             
             if not auth_manager.is_authenticated():
                 # Mostrar formulario de login
                 auth_manager.login_form()
                 
                 # Mostrar info de acciones disponibles para admin
-                with st.expander("ℹ️ ¿Qué puedes hacer como administrador?"):
+                with st.expander("¿Qué puedes hacer como administrador?"):
                     st.markdown("""
                     **Con acceso de administrador podrás:**
-                    - ✏️ **Crear nuevos indicadores** con todos sus datos
-                    - 📝 **Agregar registros** a indicadores existentes  
-                    - 🔄 **Editar valores** de registros existentes
-                    - 🗑️ **Eliminar registros** (acción irreversible)
-                    - 📋 **Generar PDFs** de fichas metodológicas
+                    - Crear nuevos indicadores con todos sus datos
+                    - Agregar registros a indicadores existentes  
+                    - Editar valores de registros existentes
+                    - Eliminar registros (acción irreversible)
                     
                     **Credenciales:** admin / qwerty
                     """)
             else:
                 # Usuario autenticado - mostrar opciones de administrador
-                st.success("✅ **Modo Administrador Activo** - Tienes acceso completo")
+                st.success("Modo Administrador Activo - Tienes acceso completo")
                 
                 if codigo_editar == "CREAR_NUEVO":
                     EditTab._render_new_indicator_form_auth(df)
@@ -538,7 +537,7 @@ class EditTab:
     @staticmethod
     def _render_view_records_public(registros_indicador):
         """Ver registros - modo público"""
-        st.subheader("📋 Registros del Indicador")
+        st.subheader("Registros del Indicador")
         if not registros_indicador.empty:
             columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
             available_columns = [col for col in columns_to_show if col in registros_indicador.columns]
@@ -591,11 +590,11 @@ class EditTab:
     @staticmethod
     def _render_metodological_expander(codigo_editar, excel_data):
         """Renderizar información metodológica"""
-        with st.expander("📚 Información Metodológica"):
+        with st.expander("Información Metodológica"):
             col1, col2 = st.columns(2)
             
             with col1:
-                st.markdown("#### 📖 Ficha Metodológica")
+                st.markdown("#### Ficha Metodológica")
                 if excel_data is not None and not excel_data.empty:
                     indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
                     
@@ -624,16 +623,13 @@ class EditTab:
                     st.warning("No hay datos metodológicos disponibles")
             
             with col2:
-                st.markdown("#### 📄 Generar PDF")
-                if auth_manager.is_authenticated():
-                    EditTab._render_pdf_section(codigo_editar, excel_data)
-                else:
-                    st.info("🔒 **Generación de PDF restringida**")
-                    st.caption("Inicia sesión como administrador para generar PDFs")
+                st.markdown("#### Generar PDF")
+                # PDF SIEMPRE DISPONIBLE - NO REQUIERE AUTENTICACIÓN
+                EditTab._render_pdf_section(codigo_editar, excel_data)
     
     @staticmethod
     def _render_pdf_section(codigo_editar, excel_data):
-        """Sección de generación de PDF (solo admin)"""
+        """Sección de generación de PDF (SIEMPRE DISPONIBLE)"""
         try:
             import reportlab
             reportlab_available = True
@@ -644,7 +640,7 @@ class EditTab:
             codigo_existe = codigo_editar in excel_data['Codigo'].values
             
             if codigo_existe:
-                if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}"):
+                if st.button("Generar PDF", key=f"generate_pdf_{codigo_editar}"):
                     EditTab._generate_and_download_pdf(codigo_editar, excel_data)
             else:
                 st.warning(f"No hay datos metodológicos para {codigo_editar}")
@@ -657,7 +653,7 @@ class EditTab:
     @staticmethod
     def _render_new_indicator_form_auth(df):
         """Formulario para crear nuevo indicador (solo admin)"""
-        st.subheader("➕ Crear Nuevo Indicador")
+        st.subheader("Crear Nuevo Indicador")
         
         if not auth_manager.require_auth_for_action("Crear nuevo indicador"):
             return
@@ -722,7 +718,7 @@ class EditTab:
                     help="Fecha del primer registro"
                 )
             
-            submitted = st.form_submit_button("🚀 Crear Indicador", use_container_width=True)
+            submitted = st.form_submit_button("Crear Indicador", use_container_width=True)
             
             if submitted:
                 if EditTab._validate_and_create_indicator(
@@ -785,13 +781,13 @@ class EditTab:
     @staticmethod
     def _render_admin_management_tabs(df, codigo_editar, registros_indicador, excel_data):
         """Pestañas de gestión para administradores"""
-        st.subheader("🛠️ Herramientas de Administración")
+        st.subheader("Herramientas de Administración")
         
         tab1, tab2, tab3, tab4 = st.tabs([
-            "📊 Vista Detallada",
-            "➕ Agregar Registro", 
-            "✏️ Editar Registro",
-            "🗑️ Eliminar Registro"
+            "Vista Detallada",
+            "Agregar Registro", 
+            "Editar Registro",
+            "Eliminar Registro"
         ])
         
         with tab1:
@@ -870,7 +866,7 @@ class EditTab:
             with col2:
                 nuevo_valor = st.number_input("Nuevo Valor", value=0.5)
             
-            submitted = st.form_submit_button("💾 Agregar Registro", use_container_width=True)
+            submitted = st.form_submit_button("Agregar Registro", use_container_width=True)
             
             if submitted:
                 fecha_dt = pd.to_datetime(nueva_fecha)
@@ -886,11 +882,11 @@ class EditTab:
                 success = DataEditor.add_new_record(df, codigo_editar, fecha_dt, nuevo_valor, None)
                 
                 if success:
-                    st.success("✅ Registro agregado correctamente")
+                    st.success("Registro agregado correctamente")
                     st.cache_data.clear()
                     st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                 else:
-                    st.error("❌ Error al agregar el registro")
+                    st.error("Error al agregar el registro")
     
     @staticmethod
     def _render_edit_form_auth(df, codigo_editar, registros_indicador):
@@ -905,6 +901,92 @@ class EditTab:
             return
         
         fechas_disponibles = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
+        fecha_seleccionada_str = st.selectbox(
+            "Seleccionar registro a eliminar",
+            fechas_disponibles,
+            key="fecha_eliminar_auth",
+            help="CUIDADO: Esta acción es irreversible"
+        )
+        
+        if fecha_seleccionada_str:
+            idx_seleccionado = fechas_disponibles.index(fecha_seleccionada_str)
+            fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
+            valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
+            
+            st.error(f"""
+            ATENCIÓN - ACCIÓN IRREVERSIBLE
+            
+            Vas a eliminar permanentemente:
+            - **Fecha:** {fecha_real.strftime('%d/%m/%Y')}
+            - **Valor:** {valor_actual:.3f}
+            - **Indicador:** {codigo_editar}
+            
+            Esta acción **NO SE PUEDE DESHACER**
+            """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                confirmar = st.checkbox(
+                    "Confirmo que quiero eliminar este registro",
+                    key="confirm_delete_auth"
+                )
+            
+            with col2:
+                if confirmar:
+                    if st.button(
+                        "ELIMINAR PERMANENTEMENTE",
+                        type="primary",
+                        use_container_width=True,
+                        key="delete_button_auth"
+                    ):
+                        success = DataEditor.delete_record(df, codigo_editar, fecha_real, None)
+                        
+                        if success:
+                            st.success("Registro eliminado correctamente")
+                            st.cache_data.clear()
+                            st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Error al eliminar el registro")
+    
+    @staticmethod
+    def _generate_and_download_pdf(codigo_editar, excel_data):
+        """Generar PDF (solo admin)"""
+        try:
+            from pdf_generator import PDFGenerator
+            
+            pdf_generator = PDFGenerator()
+            
+            if not pdf_generator.is_available():
+                st.error("PDF no disponible. Instala: `pip install reportlab`")
+                return
+            
+            with st.spinner("Generando ficha metodológica..."):
+                pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
+                
+                if pdf_bytes and len(pdf_bytes) > 0:
+                    st.success("PDF generado correctamente")
+                    
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"Ficha_Metodologica_{codigo_editar}_{timestamp}.pdf"
+                    
+                    st.download_button(
+                        label="Descargar Ficha Metodológica PDF",
+                        data=pdf_bytes,
+                        file_name=filename,
+                        mime="application/pdf",
+                        key=f"download_pdf_{codigo_editar}_{timestamp}",
+                        use_container_width=True
+                    )
+                else:
+                    st.error("No se pudo generar el PDF")
+                    
+        except ImportError:
+            st.error("Archivo pdf_generator.py no encontrado")
+        except Exception as e:
+            st.error(f"Error al generar PDF: {e}")
         fecha_seleccionada_str = st.selectbox(
             "Seleccionar registro a editar",
             fechas_disponibles,
@@ -926,17 +1008,17 @@ class EditTab:
                 with col2:
                     nuevo_valor = st.number_input("Nuevo Valor", value=float(valor_actual))
                 
-                submitted = st.form_submit_button("💾 Actualizar", use_container_width=True)
+                submitted = st.form_submit_button("Actualizar", use_container_width=True)
                 
                 if submitted:
                     success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, None)
                     
                     if success:
-                        st.success("✅ Registro actualizado")
+                        st.success("Registro actualizado")
                         st.cache_data.clear()
                         st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
                     else:
-                        st.error("❌ Error al actualizar")
+                        st.error("Error al actualizar")
     
     @staticmethod
     def _render_delete_form_auth(df, codigo_editar, registros_indicador):
