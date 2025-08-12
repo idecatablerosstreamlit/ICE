@@ -55,8 +55,7 @@ class GeneralSummaryTab:
                 
                 
                 # Card de última actualización
-                # Tarjeta de última actualización - MEJORADA
-                # Tarjeta con azul más suave
+                
                 st.markdown(f"""
                 <div style="background: #2d3748; padding: 1.5rem; border-radius: 12px; margin: 1.5rem 0; color: white; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border-left: 4px solid #4299e1;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
