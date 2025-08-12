@@ -964,7 +964,6 @@ class TabManager:
     """Gestor de pestañas del dashboard - SIN FILTROS DE FECHA"""
     
     def __init__(self, df, csv_path, excel_data=None):
-    def __init__(self, df, csv_path, excel_data=None):
         self.df = df
         self.csv_path = None  # No usamos CSV
         self.excel_data = excel_data
