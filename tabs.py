@@ -52,21 +52,93 @@ class GeneralSummaryTab:
             # ✅ MOSTRAR FECHA DE ÚLTIMA ACTUALIZACIÓN
             if ultima_actualizacion:
                 fecha_str = ultima_actualizacion['fecha'].strftime('%d/%m/%Y')
-                hora_str = ultima_actualizacion['fecha'].strftime('%H:%M') if hasattr(ultima_actualizacion['fecha'], 'hour') else ""
+                
                 
                 # Card de última actualización
+                # Tarjeta de última actualización - MEJORADA
                 st.markdown(f"""
-                <div style="background: linear-gradient(45deg, #28a745 0%, #20c997 100%); 
-                           padding: 1rem; border-radius: 10px; margin: 1rem 0; color: white;">
-                    <h4 style="color: white; margin: 0;">📅 Última Actualización</h4>
-                    <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-                        <strong>Fecha:</strong> {fecha_str} {hora_str}<br>
-                        <strong>Indicador:</strong> {ultima_actualizacion['indicador']}<br>
-                        <strong>Código:</strong> {ultima_actualizacion['codigo']}<br>
-                        <strong>Componente:</strong> {ultima_actualizacion['componente']}
-                    </p>
+                <div style="
+                    background: #272f7a; 
+                    padding: 1.5rem; 
+                    border-radius: 12px; 
+                    margin: 1.5rem 0; 
+                    color: white;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    border-left: 4px solid #4a90e2;
+                ">
+                    <div style="
+                        display: flex; 
+                        justify-content: space-between; 
+                        align-items: flex-start;
+                        margin-bottom: 1rem;
+                    ">
+                        <h3 style="
+                            color: white; 
+                            margin: 0; 
+                            font-size: 1.2rem; 
+                            font-weight: 600;
+                        ">Última Actualización</h3>
+                        <span style="
+                            background: rgba(255, 255, 255, 0.2); 
+                            padding: 0.25rem 0.75rem; 
+                            border-radius: 20px; 
+                            font-size: 0.9rem; 
+                            font-weight: 500;
+                        ">{fecha_str}</span>
+                    </div>
+                    
+                    <div style="
+                        display: grid; 
+                        grid-template-columns: 1fr 1fr; 
+                        gap: 1rem; 
+                        margin-top: 1rem;
+                    ">
+                        <div>
+                            <div style="
+                                font-size: 0.85rem; 
+                                opacity: 0.8; 
+                                margin-bottom: 0.25rem;
+                            ">Indicador</div>
+                            <div style="
+                                font-weight: 500; 
+                                line-height: 1.3;
+                                font-size: 0.9rem;
+                            ">{ultima_actualizacion['indicador']}</div>
+                        </div>
+                        
+                        <div>
+                            <div style="
+                                font-size: 0.85rem; 
+                                opacity: 0.8; 
+                                margin-bottom: 0.25rem;
+                            ">Código</div>
+                            <div style="
+                                font-weight: 500; 
+                                font-family: monospace; 
+                                background: rgba(255, 255, 255, 0.1); 
+                                padding: 0.25rem 0.5rem; 
+                                border-radius: 4px; 
+                                display: inline-block;
+                                font-size: 0.9rem;
+                            ">{ultima_actualizacion['codigo']}</div>
+                        </div>
+                        
+                        <div style="grid-column: 1 / -1;">
+                            <div style="
+                                font-size: 0.85rem; 
+                                opacity: 0.8; 
+                                margin-bottom: 0.25rem;
+                            ">Componente</div>
+                            <div style="
+                                font-weight: 500;
+                                font-size: 0.9rem;
+                            ">{ultima_actualizacion['componente']}</div>
+                        </div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                
             
             # ✅ CALCULAR PUNTAJES SIN FILTROS (siempre valores más recientes)
             puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
