@@ -52,20 +52,9 @@ class GeneralSummaryTab:
             # ✅ MOSTRAR FECHA DE ÚLTIMA ACTUALIZACIÓN
             if ultima_actualizacion:
                 fecha_str = ultima_actualizacion['fecha'].strftime('%d/%m/%Y')
+            
                 
-                
-                # Card de última actualización
-                
-                st.markdown(f"""
-                <div style="background: #2d3748; padding: 1.5rem; border-radius: 12px; margin: 1.5rem 0; color: white; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border-left: 4px solid #4299e1;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                        <h3 style="color: white; margin: 0; font-size: 1.2rem; font-weight: 600;">Última Actualización</h3>
-                        <span style="background: rgba(255, 255, 255, 0.2); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.9rem; font-weight: 500;">{fecha_str}</span>
-                    </div>
-                    
-                </div>
-                """, unsafe_allow_html=True)
-                
+                              
                 
             
             # ✅ CALCULAR PUNTAJES SIN FILTROS (siempre valores más recientes)
