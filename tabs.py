@@ -47,17 +47,10 @@ class GeneralSummaryTab:
                 return
             
             # ✅ OBTENER FECHA DE ÚLTIMA ACTUALIZACIÓN
+          
             ultima_actualizacion = GeneralSummaryTab._get_last_update_info(df)
             
-            # ✅ MOSTRAR FECHA DE ÚLTIMA ACTUALIZACIÓN
-            if ultima_actualizacion:
-                fecha_str = ultima_actualizacion['fecha'].strftime('%d/%m/%Y')
-            
-                
-                              
-                
-            
-            # ✅ CALCULAR PUNTAJES SIN FILTROS (siempre valores más recientes)
+            # CALCULAR PUNTAJES SIN FILTROS
             puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
             
             # Verificar que los cálculos fueron exitosos
@@ -69,7 +62,7 @@ class GeneralSummaryTab:
             st.info("**Puntajes calculados usando valores más recientes:** Los indicadores se normalizan según su tipo antes del cálculo.")
             
             # Mostrar métricas generales
-            MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente)
+            MetricsDisplay.show_general_metrics(puntaje_general, puntajes_componente, ultima_actualizacion)
             
             # Crear layout con velocímetro y radar
             col1, col2 = st.columns([1, 2])
