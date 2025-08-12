@@ -575,12 +575,11 @@ class ChartGenerator:
 
 class MetricsDisplay:
     """Clase para mostrar métricas del dashboard"""
-    
     @staticmethod
-    def show_general_metrics(puntaje_general, puntajes_componente):
+    def show_general_metrics(puntaje_general, puntajes_componente, ultima_actualizacion=None):
         """Mostrar métricas generales"""
         try:
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4, col5 = st.columns(5)
             
             with col1:
                 st.metric(
@@ -622,9 +621,21 @@ class MetricsDisplay:
                     )
                 else:
                     st.metric("Componentes ≥70%", "0")
+            
+            with col5:
+                if ultima_actualizacion:
+                    fecha_str = ultima_actualizacion['fecha'].strftime('%d/%m/%Y')
+                    st.metric(
+                        "Última Actualización",
+                        fecha_str,
+                        help=f"Indicador: {ultima_actualizacion['indicador']}"
+                    )
+                else:
+                    st.metric("Última Actualización", "N/A")
                     
         except Exception as e:
             st.error(f"Error al mostrar métricas: {e}")
+    
     
     @staticmethod
     def show_component_metrics(df, componente, fecha_filtro=None):
