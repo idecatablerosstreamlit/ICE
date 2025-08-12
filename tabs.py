@@ -1,14 +1,6 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN RESTAURADA
-RESTAURACIONES:
-1. Navegación principal con st.tabs() nativo para estabilidad
-2. Sub-pestañas simplificadas sin st.rerun() problemático
-3. Session state consolidado y persistente
-4. Formularios estables que no se resetean
-5. Funcionalidades metodológicas y PDF restauradas
-6. Títulos normalizados sin emojis
-7. Manejo de errores específico y detallado
-8. Todas las visualizaciones preservadas
+Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN CON FILTROS CORREGIDOS
+TODAS LAS FUNCIONALIDADES PRESERVADAS + FILTROS DE FECHA FUNCIONALES
 """
 
 import streamlit as st
@@ -24,7 +16,7 @@ class GeneralSummaryTab:
     
     @staticmethod
     def render(df, fecha_seleccionada):
-        """Renderizar la pestaña de resumen general"""
+        """Renderizar la pestaña de resumen general - CON FILTROS DE FECHA"""
         st.header("Resumen General")
         
         try:
@@ -54,8 +46,17 @@ class GeneralSummaryTab:
                 st.info("Los datos en Google Sheets están vacíos o incompletos")
                 return
             
-            # Calcular puntajes
-            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(df)
+            # ✅ APLICAR FILTRO DE FECHA EN LOS CÁLCULOS
+            puntajes_componente, puntajes_categoria, puntaje_general = DataProcessor.calculate_scores(
+                df, fecha_filtro=fecha_seleccionada
+            )
+            
+            # ✅ MOSTRAR QUÉ FECHA SE ESTÁ USANDO
+            if fecha_seleccionada:
+                fecha_str = pd.to_datetime(fecha_seleccionada).strftime('%d/%m/%Y')
+                st.info(f"📅 **Análisis para fecha:** {fecha_str}")
+            else:
+                st.info("📅 **Análisis:** Usando valores más recientes de cada indicador")
             
             # Verificar que los cálculos fueron exitosos
             if puntajes_componente.empty and puntajes_categoria.empty and puntaje_general == 0:
@@ -84,8 +85,23 @@ class GeneralSummaryTab:
             with col2:
                 # Gráfico de radar
                 try:
+                    # ✅ PREPARAR DATOS PARA RADAR SEGÚN FILTRO DE FECHA
+                    df_for_radar = df
+                    if fecha_seleccionada:
+                        df_fecha = df[df['Fecha'] == fecha_seleccionada]
+                        if not df_fecha.empty:
+                            df_for_radar = df_fecha
+                        else:
+                            # Usar fecha más cercana
+                            fechas_disponibles = df['Fecha'].dropna().sort_values()
+                            fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_seleccionada)]
+                            if not fecha_mas_cercana.empty:
+                                df_for_radar = df[df['Fecha'] == fecha_mas_cercana.iloc[-1]]
+                            else:
+                                df_for_radar = df[df['Fecha'] == fechas_disponibles.iloc[0]]
+                    
                     st.plotly_chart(
-                        ChartGenerator.radar_chart(df, None),
+                        ChartGenerator.radar_chart(df_for_radar, {'fecha': fecha_seleccionada}),
                         use_container_width=True
                     )
                 except Exception as e:
@@ -115,11 +131,19 @@ class GeneralSummaryTab:
         # Mostrar tabla de datos más recientes
         with st.expander("Ver datos más recientes por indicador"):
             try:
-                df_latest = DataProcessor._get_latest_values_by_indicator(df)
-                if not df_latest.empty:
+                # ✅ USAR DATOS FILTRADOS POR FECHA SI APLICA
+                if fecha_seleccionada:
+                    df_for_table = df[df['Fecha'] == fecha_seleccionada]
+                    if df_for_table.empty:
+                        df_for_table = DataProcessor._get_latest_values_by_indicator(df)
+                        st.info("No hay datos para la fecha exacta, mostrando valores más recientes")
+                else:
+                    df_for_table = DataProcessor._get_latest_values_by_indicator(df)
+                
+                if not df_for_table.empty:
                     columns_to_show = ['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
-                    available_columns = [col for col in columns_to_show if col in df_latest.columns]
-                    st.dataframe(df_latest[available_columns], use_container_width=True)
+                    available_columns = [col for col in columns_to_show if col in df_for_table.columns]
+                    st.dataframe(df_for_table[available_columns], use_container_width=True)
                 else:
                     st.info("No hay datos para mostrar")
             except Exception as e:
@@ -130,17 +154,44 @@ class ComponentSummaryTab:
     
     @staticmethod
     def render(df, filters):
-        """Renderizar la pestaña de resumen por componente con visualizaciones adaptivas"""
+        """Renderizar la pestaña de resumen por componente - CON FILTROS DE FECHA"""
         st.header("Resumen por Componente")
         
         if df.empty:
             st.info("No hay datos disponibles para análisis por componente")
             return
         
+        # ✅ APLICAR FILTRO DE FECHA SI EXISTE
+        df_work = df.copy()
+        fecha_filtro = filters.get('fecha')
+        
+        if fecha_filtro:
+            fecha_str = pd.to_datetime(fecha_filtro).strftime('%d/%m/%Y')
+            st.info(f"📅 **Análisis para fecha:** {fecha_str}")
+            
+            # Filtrar por fecha
+            df_fecha = df[df['Fecha'] == fecha_filtro]
+            if not df_fecha.empty:
+                df_work = df_fecha
+            else:
+                # Buscar fecha más cercana
+                fechas_disponibles = df['Fecha'].dropna().sort_values()
+                fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
+                if not fecha_mas_cercana.empty:
+                    fecha_usar = fecha_mas_cercana.iloc[-1]
+                    df_work = df[df['Fecha'] == fecha_usar]
+                    st.info(f"Usando fecha más cercana: {pd.to_datetime(fecha_usar).strftime('%d/%m/%Y')}")
+                else:
+                    df_work = df[df['Fecha'] == fechas_disponibles.iloc[0]]
+                    st.info(f"Usando primera fecha disponible: {pd.to_datetime(fechas_disponibles.iloc[0]).strftime('%d/%m/%Y')}")
+        else:
+            st.info("📅 **Análisis:** Usando valores más recientes de cada indicador")
+            df_work = DataProcessor._get_latest_values_by_indicator(df)
+        
         # Selector de componente específico para esta vista
-        componentes = sorted(df['Componente'].unique())
+        componentes = sorted(df_work['Componente'].unique()) if not df_work.empty else []
         if not componentes:
-            st.info("No hay componentes disponibles")
+            st.info("No hay componentes disponibles para la fecha seleccionada")
             return
             
         componente_analisis = st.selectbox(
@@ -149,9 +200,8 @@ class ComponentSummaryTab:
             key="comp_analysis_main"
         )
         
-        # Obtener valores más recientes y filtrar por componente
-        df_latest = DataProcessor._get_latest_values_by_indicator(df)
-        df_componente = df_latest[df_latest['Componente'] == componente_analisis]
+        # ✅ USAR DATOS YA FILTRADOS POR FECHA
+        df_componente = df_work[df_work['Componente'] == componente_analisis]
         
         if not df_componente.empty:
             # Información sobre los datos que se están usando
@@ -184,7 +234,7 @@ class ComponentSummaryTab:
             
             # Tabla de categorías
             try:
-                ChartGenerator.show_category_table_simple(df, componente_analisis)
+                ChartGenerator.show_category_table_simple(df, componente_analisis, fecha_filtro)
             except Exception as e:
                 st.error(f"Error al mostrar categorías: {e}")
             
@@ -199,25 +249,48 @@ class ComponentSummaryTab:
             
             with col_der:
                 # Selector de tipo de visualización
-                ComponentSummaryTab._render_category_visualization(df, componente_analisis)
+                ComponentSummaryTab._render_category_visualization(df, componente_analisis, fecha_filtro)
             
             # Tabla de indicadores del componente
-            st.subheader(f"Indicadores Más Recientes de {componente_analisis}")
+            st.subheader(f"Indicadores para {componente_analisis}")
             columns_to_show = ['Indicador', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
             available_columns = [col for col in columns_to_show if col in df_componente.columns]
+            
+            # Mostrar fecha usada en la tabla
+            if fecha_filtro:
+                st.info(f"Datos mostrados para fecha: {pd.to_datetime(fecha_filtro).strftime('%d/%m/%Y')}")
+            
             st.dataframe(
                 df_componente[available_columns].sort_values('Valor_Normalizado' if 'Valor_Normalizado' in df_componente.columns else 'Valor', ascending=False),
                 use_container_width=True
             )
         else:
-            st.warning("No hay datos para el componente seleccionado")
+            st.warning("No hay datos para el componente seleccionado en la fecha especificada")
     
     @staticmethod
-    def _render_category_visualization(df, componente):
-        """Renderizar visualización de categorías"""
+    def _render_category_visualization(df, componente, fecha_filtro=None):
+        """Renderizar visualización de categorías - CON FILTRO DE FECHA"""
+        
+        # ✅ USAR DATOS FILTRADOS POR FECHA
+        if fecha_filtro is not None:
+            df_fecha = df[df['Fecha'] == fecha_filtro]
+            if not df_fecha.empty:
+                df_componente = df_fecha[df_fecha['Componente'] == componente]
+            else:
+                # Usar fecha más cercana
+                fechas_disponibles = df['Fecha'].dropna().sort_values()
+                fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= pd.to_datetime(fecha_filtro)]
+                if not fecha_mas_cercana.empty:
+                    df_componente = df[df['Fecha'] == fecha_mas_cercana.iloc[-1]]
+                    df_componente = df_componente[df_componente['Componente'] == componente]
+                else:
+                    df_componente = df[df['Fecha'] == fechas_disponibles.iloc[0]]
+                    df_componente = df_componente[df_componente['Componente'] == componente]
+        else:
+            df_latest = DataProcessor._get_latest_values_by_indicator(df)
+            df_componente = df_latest[df_latest['Componente'] == componente]
+        
         # Contar categorías para determinar mejor visualización
-        df_latest = DataProcessor._get_latest_values_by_indicator(df)
-        df_componente = df_latest[df_latest['Componente'] == componente]
         num_categorias = df_componente['Categoria'].nunique()
         
         # Selector de tipo de visualización
@@ -244,17 +317,17 @@ class ComponentSummaryTab:
         # Renderizar la visualización seleccionada
         if "Barras" in tipo_viz:
             # Usar barras horizontales
-            fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None)
+            fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None, fecha_filtro)
             st.plotly_chart(fig_bar, use_container_width=True)
         elif "Radar" in tipo_viz:
             if num_categorias >= 3:
                 # Usar radar de categorías
-                fig_radar_cat = ChartGenerator.radar_chart_categories(df, componente, None)
+                fig_radar_cat = ChartGenerator.radar_chart_categories(df, componente, None, fecha_filtro)
                 st.plotly_chart(fig_radar_cat, use_container_width=True)
             else:
                 st.warning(f"Se requieren al menos 3 categorías para el radar. {componente} tiene {num_categorias}.")
                 # Fallback a barras horizontales
-                fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None)
+                fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None, fecha_filtro)
                 st.plotly_chart(fig_bar, use_container_width=True)
 
 class EvolutionTab:
@@ -262,7 +335,7 @@ class EvolutionTab:
     
     @staticmethod
     def render(df, filters):
-        """Renderizar la pestaña de evolución"""
+        """Renderizar la pestaña de evolución - FUNCIONALIDAD COMPLETA PRESERVADA"""
         st.header("Evolución Temporal de Indicadores")
         
         try:
@@ -358,11 +431,11 @@ class EvolutionTab:
                 st.code(str(e))
 
 class EditTab:
-    """Pestaña de edición - VERSIÓN RESTAURADA"""
+    """Pestaña de edición - FUNCIONALIDAD COMPLETA PRESERVADA"""
     
     @staticmethod
     def render(df, csv_path, excel_data=None):
-        """Renderizar la pestaña de edición con Google Sheets - USANDO ST.TABS NATIVO"""
+        """Renderizar la pestaña de edición con Google Sheets - TODAS LAS FUNCIONALIDADES"""
         st.header("Gestión de Indicadores")
         
         try:
@@ -905,7 +978,7 @@ class EditTab:
             st.error(f"Error al generar PDF: {e}")
 
 class TabManager:
-    """Gestor de pestañas del dashboard - VERSIÓN RESTAURADA CON ST.TABS NATIVO"""
+    """Gestor de pestañas del dashboard - FUNCIONALIDAD COMPLETA PRESERVADA"""
     
     def __init__(self, df, csv_path, excel_data=None):
         self.df = df
@@ -913,7 +986,7 @@ class TabManager:
         self.excel_data = excel_data
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar pestañas usando ST.TABS NATIVO - SIN PROBLEMAS DE ESTADO"""
+        """Renderizar pestañas usando ST.TABS NATIVO - TODAS LAS FUNCIONALIDADES"""
         
         # PESTAÑAS NATIVAS DE STREAMLIT - ESTABLES Y SIN ST.RERUN
         tab1, tab2, tab3, tab4 = st.tabs([
@@ -923,12 +996,12 @@ class TabManager:
             "Gestión de Datos"
         ])
         
-        # Renderizar contenido en cada pestaña
+        # ✅ PASAR FILTROS CORRECTAMENTE A CADA PESTAÑA
         with tab1:
-            GeneralSummaryTab.render(df_filtrado, filters.get('fecha'))
+            GeneralSummaryTab.render(self.df, filters.get('fecha'))
         
         with tab2:
-            ComponentSummaryTab.render(df_filtrado, filters)
+            ComponentSummaryTab.render(self.df, filters)  # Pasar todos los filtros
         
         with tab3:
             EvolutionTab.render(self.df, filters)
@@ -936,7 +1009,7 @@ class TabManager:
         with tab4:
             EditTab.render(self.df, None, self.excel_data)
         
-        # Información de estado en sidebar - SIMPLIFICADA
+        # Información de estado en sidebar - COMPLETA
         with st.sidebar:
             st.markdown("### Estado del Sistema")
             
@@ -949,10 +1022,30 @@ class TabManager:
                 if 'Tipo' in self.df.columns:
                     tipos_count = self.df['Tipo'].value_counts()
                     st.info(f"**Tipos:** {dict(tipos_count)}")
+                
+                # Información de fechas
+                if 'Fecha' in self.df.columns:
+                    fechas_count = self.df['Fecha'].nunique()
+                    fecha_min = self.df['Fecha'].min()
+                    fecha_max = self.df['Fecha'].max()
+                    st.info(f"**Fechas:** {fechas_count} diferentes")
+                    st.info(f"**Rango:** {pd.to_datetime(fecha_min).strftime('%d/%m/%Y')} - {pd.to_datetime(fecha_max).strftime('%d/%m/%Y')}")
+                
+                # Información de componentes
+                if 'Componente' in self.df.columns:
+                    componentes_count = self.df['Componente'].nunique()
+                    st.info(f"**Componentes:** {componentes_count}")
+                    
+                    # Lista de componentes
+                    with st.expander("Ver componentes"):
+                        componentes_list = sorted(self.df['Componente'].unique())
+                        for comp in componentes_list:
+                            count = len(self.df[self.df['Componente'] == comp])
+                            st.write(f"• **{comp}:** {count} registros")
             else:
                 st.warning("Google Sheets vacío")
             
-            # Estado PDF - SIMPLIFICADO
+            # Estado PDF - COMPLETO
             with st.expander("Estado PDF", expanded=False):
                 try:
                     import reportlab
@@ -960,13 +1053,15 @@ class TabManager:
                     reportlab_ok = True
                 except ImportError:
                     st.error("reportlab: No instalado")
+                    st.code("pip install reportlab")
                     reportlab_ok = False
                 
                 if self.excel_data is not None and not self.excel_data.empty:
-                    st.success("Excel: Cargado")
+                    st.success(f"Excel: {len(self.excel_data)} fichas")
                     excel_ok = True
                 else:
                     st.warning("Excel: No disponible")
+                    st.caption("Coloca 'Batería de indicadores.xlsx' en el directorio")
                     excel_ok = False
                 
                 if reportlab_ok and excel_ok:
@@ -978,3 +1073,43 @@ class TabManager:
                 else:
                     st.error("**PDF no disponible**")
             
+            # Estado Google Sheets - COMPLETO
+            with st.expander("Estado Google Sheets", expanded=False):
+                try:
+                    from google_sheets_manager import GoogleSheetsManager
+                    sheets_manager = GoogleSheetsManager()
+                    connection_info = sheets_manager.get_connection_info()
+                    
+                    if connection_info.get('connected', False):
+                        st.success("Conexión: Activa")
+                        st.info(f"Hoja: {connection_info.get('worksheet_name', 'N/A')}")
+                        if 'timeout' in connection_info:
+                            st.info(f"Timeout: {connection_info['timeout']}s")
+                    else:
+                        st.error("Conexión: Inactiva")
+                    
+                    # Test de conexión
+                    if st.button("🔧 Test Conexión", key="sidebar_test"):
+                        success, message = sheets_manager.test_connection()
+                        if success:
+                            st.success(message)
+                        else:
+                            st.error(message)
+                            
+                except Exception as e:
+                    st.error(f"Error: {e}")
+            
+            # Controles de actualización
+            st.markdown("### Controles")
+            
+            if st.button("🔄 Actualizar Datos", key="sidebar_refresh", use_container_width=True):
+                st.cache_data.clear()
+                st.session_state.data_timestamp = time.time()
+                st.rerun()
+            
+            if st.button("🧹 Limpiar Cache", key="sidebar_cache", use_container_width=True):
+                st.cache_data.clear()
+                st.session_state.clear()
+                st.success("Cache limpiado")
+                time.sleep(1)
+                st.rerun()
