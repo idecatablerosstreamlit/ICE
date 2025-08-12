@@ -96,16 +96,16 @@ class AuthManager:
     
     def login_form(self):
         """Mostrar formulario de login"""
-        with st.form("login_form"):
+        with st.form("login_form_unique"):
             st.markdown("#### 🔐 Iniciar Sesión como Administrador")
             
             col1, col2 = st.columns(2)
             
             with col1:
-                username = st.text_input("Usuario", placeholder="admin")
+                username = st.text_input("Usuario", placeholder="admin", key="login_username")
             
             with col2:
-                password = st.text_input("Contraseña", type="password", placeholder="qwerty")
+                password = st.text_input("Contraseña", type="password", placeholder="qwerty", key="login_password")
             
             login_button = st.form_submit_button("Iniciar Sesión", use_container_width=True)
             
@@ -113,6 +113,7 @@ class AuthManager:
                 if username and password:
                     if self.login(username, password):
                         st.success(f"✅ Sesión iniciada como {username}")
+                        time.sleep(1)
                         st.rerun()
                     else:
                         st.error("❌ Credenciales incorrectas")
@@ -144,40 +145,11 @@ class AuthManager:
                     st.success(f"🔓 **Sesión activa:** {username} ({role})")
             
             with col2:
-                if st.button("Cerrar Sesión", key="logout_button"):
+                if st.button("Cerrar Sesión", key="logout_button_unique"):
                     self.logout()
                     st.rerun()
         else:
             st.info("🔒 **Sin autenticar** - Solo modo consulta disponible")
-    
-    def session_timeout_check(self, timeout_hours=8):
-        """Verificar timeout de sesión (opcional)"""
-        if self.is_authenticated():
-            login_time = st.session_state.get('login_time', 0)
-            if login_time:
-                elapsed_hours = (time.time() - login_time) / 3600
-                if elapsed_hours > timeout_hours:
-                    self.logout()
-                    st.warning(f"⏰ Sesión expirada después de {timeout_hours} horas")
-                    st.rerun()
-    
-    def get_available_actions(self):
-        """Obtener lista de acciones disponibles para el usuario actual"""
-        if not self.is_authenticated():
-            return ['view']
-        
-        role = self.get_user_role()
-        return self.user_roles.get(role, ['view'])
-    
-    def show_permissions_info(self):
-        """Mostrar información de permisos del usuario actual"""
-        if self.is_authenticated():
-            actions = self.get_available_actions()
-            role = self.get_user_role()
-            
-            st.info(f"**Permisos de {role}:** {', '.join(actions)}")
-        else:
-            st.info("**Permisos de invitado:** Solo visualización")
 
 # Instancia global del gestor de autenticación
 auth_manager = AuthManager()
