@@ -807,7 +807,7 @@ class EditTab:
     
     @staticmethod
     def _render_edit_form_auth(df, codigo_editar, registros_indicador):
-        """Formulario para editar registros - CORREGIDO"""
+        """Formulario para editar registros - COMPLETAMENTE CORREGIDO"""
         st.write("**Modificar registro existente**")
         
         if not auth_manager.require_auth_for_action("Editar registro"):
@@ -817,59 +817,63 @@ class EditTab:
             st.info("No hay registros para editar")
             return
         
-        # FECHAS DISPONIBLES PARA EDITAR
-        fechas_disponibles_edit = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
-        
-        fecha_seleccionada_edit = st.selectbox(
-            "Seleccionar registro a editar:",
-            fechas_disponibles_edit,
-            key="fecha_editar_selector_auth",
-            help="Elige el registro que quieres modificar"
-        )
-        
-        if fecha_seleccionada_edit:
-            idx_seleccionado = fechas_disponibles_edit.index(fecha_seleccionada_edit)
-            fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
-            valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
+        try:
+            # FECHAS DISPONIBLES PARA EDITAR (variable única)
+            fechas_edit_list = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
             
-            st.info(f"**Editando registro del {fecha_real.strftime('%d/%m/%Y')}**")
+            fecha_edit_selected = st.selectbox(
+                "Seleccionar registro a editar:",
+                fechas_edit_list,
+                key="edit_fecha_selector_unique",
+                help="Elige el registro que quieres modificar"
+            )
             
-            with st.form("form_editar_registro_auth"):
-                col1, col2 = st.columns(2)
+            if fecha_edit_selected:
+                idx_edit = fechas_edit_list.index(fecha_edit_selected)
+                fecha_edit_real = registros_indicador.iloc[idx_edit]['Fecha']
+                valor_edit_actual = registros_indicador.iloc[idx_edit]['Valor']
                 
-                with col1:
-                    st.markdown("**Información actual:**")
-                    st.write(f"📅 **Fecha:** {fecha_real.strftime('%d/%m/%Y')}")
-                    st.write(f"📊 **Valor actual:** {valor_actual:.3f}")
+                st.info(f"**Editando registro del {fecha_edit_real.strftime('%d/%m/%Y')}**")
                 
-                with col2:
-                    st.markdown("**Nuevo valor:**")
-                    nuevo_valor = st.number_input(
-                        "Nuevo Valor", 
-                        value=float(valor_actual),
-                        help="Introduce el nuevo valor para este registro"
-                    )
-                
-                submitted_edit = st.form_submit_button("✏️ Actualizar Registro", use_container_width=True)
-                
-                if submitted_edit:
-                    if nuevo_valor != valor_actual:
-                        success = DataEditor.update_record(df, codigo_editar, fecha_real, nuevo_valor, None)
-                        
-                        if success:
-                            st.success(f"✅ Registro actualizado: {valor_actual:.3f} → {nuevo_valor:.3f}")
-                            st.cache_data.clear()
-                            st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
-                            time.sleep(1)
-                            st.rerun()
+                with st.form("form_editar_unico_auth"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**Información actual:**")
+                        st.write(f"📅 **Fecha:** {fecha_edit_real.strftime('%d/%m/%Y')}")
+                        st.write(f"📊 **Valor actual:** {valor_edit_actual:.3f}")
+                    
+                    with col2:
+                        st.markdown("**Nuevo valor:**")
+                        nuevo_valor_edit = st.number_input(
+                            "Nuevo Valor", 
+                            value=float(valor_edit_actual),
+                            help="Introduce el nuevo valor para este registro"
+                        )
+                    
+                    submitted_edit_form = st.form_submit_button("✏️ Actualizar Registro", use_container_width=True)
+                    
+                    if submitted_edit_form:
+                        if nuevo_valor_edit != valor_edit_actual:
+                            success = DataEditor.update_record(df, codigo_editar, fecha_edit_real, nuevo_valor_edit, None)
+                            
+                            if success:
+                                st.success(f"✅ Registro actualizado: {valor_edit_actual:.3f} → {nuevo_valor_edit:.3f}")
+                                st.cache_data.clear()
+                                st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error("❌ Error al actualizar el registro")
                         else:
-                            st.error("❌ Error al actualizar el registro")
-                    else:
-                        st.warning("⚠️ El valor no ha cambiado")
+                            st.warning("⚠️ El valor no ha cambiado")
+        
+        except Exception as e:
+            st.error(f"Error en formulario de edición: {e}")
     
     @staticmethod
     def _render_delete_form_auth(df, codigo_editar, registros_indicador):
-        """Formulario para eliminar registros - CORREGIDO"""
+        """Formulario para eliminar registros - COMPLETAMENTE CORREGIDO"""
         st.write("**Eliminar registro permanentemente**")
         
         if not auth_manager.require_auth_for_action("Eliminar registro"):
@@ -879,67 +883,71 @@ class EditTab:
             st.info("No hay registros para eliminar")
             return
         
-        # FECHAS DISPONIBLES PARA ELIMINAR
-        fechas_disponibles_delete = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
-        
-        fecha_seleccionada_delete = st.selectbox(
-            "⚠️ Seleccionar registro a eliminar:",
-            fechas_disponibles_delete,
-            key="fecha_eliminar_selector_auth",
-            help="CUIDADO: Esta acción es irreversible"
-        )
-        
-        if fecha_seleccionada_delete:
-            idx_seleccionado = fechas_disponibles_delete.index(fecha_seleccionada_delete)
-            fecha_real = registros_indicador.iloc[idx_seleccionado]['Fecha']
-            valor_actual = registros_indicador.iloc[idx_seleccionado]['Valor']
+        try:
+            # FECHAS DISPONIBLES PARA ELIMINAR (variable única)
+            fechas_delete_list = registros_indicador['Fecha'].dt.strftime('%d/%m/%Y (%A)').tolist()
             
-            # ADVERTENCIA DE ELIMINACIÓN
-            st.error(f"""
-            🚨 **ATENCIÓN - ACCIÓN IRREVERSIBLE**
+            fecha_delete_selected = st.selectbox(
+                "⚠️ Seleccionar registro a eliminar:",
+                fechas_delete_list,
+                key="delete_fecha_selector_unique",
+                help="CUIDADO: Esta acción es irreversible"
+            )
             
-            Vas a eliminar permanentemente:
-            - **📅 Fecha:** {fecha_real.strftime('%d/%m/%Y')}
-            - **📊 Valor:** {valor_actual:.3f}
-            - **🏷️ Indicador:** {codigo_editar}
-            
-            ⚠️ **Esta acción NO SE PUEDE DESHACER**
-            """)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                confirmar_delete = st.checkbox(
-                    "✅ Confirmo que quiero eliminar este registro",
-                    key="confirm_delete_checkbox_auth",
-                    help="Marca esta casilla para habilitar el botón de eliminación"
-                )
-            
-            with col2:
-                if confirmar_delete:
-                    if st.button(
-                        "🗑️ ELIMINAR PERMANENTEMENTE",
-                        type="primary",
-                        use_container_width=True,
-                        key="delete_button_final_auth"
-                    ):
-                        with st.spinner("Eliminando registro..."):
-                            success = DataEditor.delete_record(df, codigo_editar, fecha_real, None)
-                            
-                            if success:
-                                st.success("✅ Registro eliminado correctamente")
-                                st.cache_data.clear()
-                                st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
-                                time.sleep(2)
-                                st.rerun()
-                            else:
-                                st.error("❌ Error al eliminar el registro")
-                else:
-                    st.button(
-                        "🔒 Confirma primero para eliminar",
-                        disabled=True,
-                        use_container_width=True
+            if fecha_delete_selected:
+                idx_delete = fechas_delete_list.index(fecha_delete_selected)
+                fecha_delete_real = registros_indicador.iloc[idx_delete]['Fecha']
+                valor_delete_actual = registros_indicador.iloc[idx_delete]['Valor']
+                
+                # ADVERTENCIA DE ELIMINACIÓN
+                st.error(f"""
+                🚨 **ATENCIÓN - ACCIÓN IRREVERSIBLE**
+                
+                Vas a eliminar permanentemente:
+                - **📅 Fecha:** {fecha_delete_real.strftime('%d/%m/%Y')}
+                - **📊 Valor:** {valor_delete_actual:.3f}
+                - **🏷️ Indicador:** {codigo_editar}
+                
+                ⚠️ **Esta acción NO SE PUEDE DESHACER**
+                """)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    confirmar_delete_checkbox = st.checkbox(
+                        "✅ Confirmo que quiero eliminar este registro",
+                        key="confirm_delete_checkbox_unique",
+                        help="Marca esta casilla para habilitar el botón de eliminación"
                     )
+                
+                with col2:
+                    if confirmar_delete_checkbox:
+                        if st.button(
+                            "🗑️ ELIMINAR PERMANENTEMENTE",
+                            type="primary",
+                            use_container_width=True,
+                            key="delete_button_final_unique"
+                        ):
+                            with st.spinner("Eliminando registro..."):
+                                success = DataEditor.delete_record(df, codigo_editar, fecha_delete_real, None)
+                                
+                                if success:
+                                    st.success("✅ Registro eliminado correctamente")
+                                    st.cache_data.clear()
+                                    st.session_state.data_timestamp = st.session_state.get('data_timestamp', 0) + 1
+                                    time.sleep(2)
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Error al eliminar el registro")
+                    else:
+                        st.button(
+                            "🔒 Confirma primero para eliminar",
+                            disabled=True,
+                            use_container_width=True
+                        )
+        
+        except Exception as e:
+            st.error(f"Error en formulario de eliminación: {e}")
     
     @staticmethod
     def _generate_and_download_pdf(codigo_editar, excel_data):
