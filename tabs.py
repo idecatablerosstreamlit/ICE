@@ -368,7 +368,7 @@ class EditTab:
             codigo_editar = EditTab._render_codigo_selector(df)
             
             # MODO CONSULTA
-            st.markdown("### 📖 Modo Consulta (Disponible para todos)")
+            st.markdown("### 📖 Modo Consulta")
             
             if codigo_editar and codigo_editar != "CREAR_NUEVO":
                 datos_indicador = df[df['Codigo'] == codigo_editar] if not df.empty else pd.DataFrame()
@@ -386,7 +386,7 @@ class EditTab:
             st.markdown("---")
             
             # MODO ADMINISTRADOR
-            st.markdown("### 🔐 Modo Administrador (Requiere autenticación)")
+            st.markdown("### 🔐 Modo Administrador")
             
             if not auth_manager.is_authenticated():
                 auth_manager.login_form()
