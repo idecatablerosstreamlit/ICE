@@ -497,20 +497,45 @@ class DataProcessor:
     
     @staticmethod
     def calculate_scores(df, fecha_filtro=None):
-        """Calcular puntajes usando normalización simple"""
+        """Calcular puntajes usando normalización simple - APLICANDO FILTRO DE FECHA"""
         try:
             if df.empty:
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
             
-            # Usar valores más recientes
-            df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
+            # ✅ APLICAR FILTRO DE FECHA SI SE PROPORCIONA
+            if fecha_filtro is not None:
+                # Convertir fecha_filtro a datetime si es necesario
+                if not pd.api.types.is_datetime64_any_dtype(pd.Series([fecha_filtro])):
+                    fecha_filtro = pd.to_datetime(fecha_filtro)
+                
+                # Filtrar por la fecha específica
+                df_filtrado = df[df['Fecha'] == fecha_filtro].copy()
+                
+                if df_filtrado.empty:
+                    # Si no hay datos para esa fecha exacta, usar los más cercanos
+                    fechas_disponibles = df['Fecha'].dropna().sort_values()
+                    fecha_mas_cercana = fechas_disponibles[fechas_disponibles <= fecha_filtro]
+                    
+                    if not fecha_mas_cercana.empty:
+                        fecha_usar = fecha_mas_cercana.iloc[-1]  # La más reciente antes o igual
+                        df_filtrado = df[df['Fecha'] == fecha_usar].copy()
+                    else:
+                        # Si no hay fechas anteriores, usar la primera disponible
+                        fecha_usar = fechas_disponibles.iloc[0]
+                        df_filtrado = df[df['Fecha'] == fecha_usar].copy()
+                    
+                    # Informar al usuario
+                    st.info(f"Usando fecha: {pd.to_datetime(fecha_usar).strftime('%d/%m/%Y')}")
+            else:
+                # Sin filtro de fecha, usar valores más recientes por indicador
+                df_filtrado = DataProcessor._get_latest_values_by_indicator(df)
             
             if df_filtrado.empty:
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
             
-            # Verificar columnas necesarias
+            # Resto del método permanece igual...
             required_columns = ['Valor_Normalizado', 'Peso', 'Componente', 'Categoria']
             if not all(col in df_filtrado.columns for col in required_columns):
                 return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
@@ -542,6 +567,7 @@ class DataProcessor:
             return pd.DataFrame({'Componente': [], 'Puntaje_Ponderado': []}), \
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
     
+      
     @staticmethod
     def _get_latest_values_by_indicator(df):
         """Obtener valores más recientes por indicador"""
