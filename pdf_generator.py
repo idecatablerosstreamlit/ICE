@@ -1,7 +1,8 @@
-# Archivo: pdf_generator.py - VERSIÓN CORREGIDA PARA TEXTO COMPLETO
+# Archivo: pdf_generator.py - VERSIÓN ACTUALIZADA PARA FICHAS DESDE GOOGLE SHEETS
 
 """
-Generador de PDFs para fichas metodológicas del Dashboard ICE - CORREGIDO PARA MOSTRAR TEXTO COMPLETO
+Generador de PDFs para fichas metodológicas del Dashboard ICE - ACTUALIZADO PARA GOOGLE SHEETS
+ACTUALIZACIÓN: Ya no usa Excel, ahora usa datos de la pestaña "Fichas" de Google Sheets
 """
 
 import streamlit as st
@@ -22,34 +23,37 @@ except ImportError:
     PDF_AVAILABLE = False
 
 class PDFGenerator:
-    """Generador de fichas metodológicas en PDF - CORREGIDO PARA TEXTO COMPLETO"""
+    """Generador de fichas metodológicas en PDF - ACTUALIZADO PARA GOOGLE SHEETS"""
     
     def __init__(self):
         self.pdf_available = PDF_AVAILABLE
     
-    def generate_metodological_sheet(self, codigo, excel_data):
-        """Generar ficha metodológica en PDF - MÉTODO PRINCIPAL CORREGIDO"""
+    def generate_metodological_sheet(self, codigo, fichas_data):
+        """Generar ficha metodológica en PDF - USANDO DATOS DE GOOGLE SHEETS"""
         try:
             if not self.pdf_available:
                 st.error("📦 **Para descargar PDFs instala:** `pip install reportlab`")
                 return None
             
-            if excel_data is None or excel_data.empty:
-                st.error("❌ No hay datos metodológicos disponibles. Asegúrate de que 'Batería de indicadores.xlsx' esté en el directorio.")
+            if fichas_data is None or fichas_data.empty:
+                st.error("❌ No hay datos metodológicos disponibles. Verifica la pestaña 'Fichas' en Google Sheets.")
                 return None
             
-            # Buscar datos del indicador
-            indicador_data = excel_data[excel_data['Codigo'] == codigo]
+            # Buscar datos del indicador en las fichas de Google Sheets
+            indicador_data = fichas_data[fichas_data['Codigo'] == codigo]
             
             if indicador_data.empty:
                 st.error(f"❌ No se encontraron datos metodológicos para el código {codigo}")
                 
                 # Mostrar códigos disponibles
-                codigos_disponibles = excel_data['Codigo'].dropna().unique().tolist()
-                if codigos_disponibles:
-                    st.info(f"💡 Códigos disponibles en Excel: {', '.join(map(str, codigos_disponibles[:10]))}")
-                    if len(codigos_disponibles) > 10:
-                        st.info(f"... y {len(codigos_disponibles) - 10} más")
+                if 'Codigo' in fichas_data.columns:
+                    codigos_disponibles = fichas_data['Codigo'].dropna().unique().tolist()
+                    if codigos_disponibles:
+                        st.info(f"💡 Códigos disponibles en pestaña 'Fichas': {', '.join(map(str, codigos_disponibles[:10]))}")
+                        if len(codigos_disponibles) > 10:
+                            st.info(f"... y {len(codigos_disponibles) - 10} más")
+                else:
+                    st.warning("⚠️ La pestaña 'Fichas' no tiene la columna 'Codigo'")
                 
                 return None
             
@@ -144,6 +148,7 @@ class PDFGenerator:
         
         institucion_data = [
             ['Sistema:', 'Dashboard ICE - Infraestructura de Conocimiento Espacial'],
+            ['Fuente de datos:', 'Google Sheets - Pestaña "Fichas"'],
             ['Fecha de generación:', datetime.now().strftime('%d/%m/%Y %H:%M:%S')],
             ['Código del indicador:', codigo]
         ]
@@ -265,6 +270,12 @@ class PDFGenerator:
             story.append(Spacer(1, 15))
             story.append(Paragraph("8. SOPORTE LEGAL", subtitle_style))
             story.append(Paragraph(soporte, normal_style))
+        
+        # Pie de página con información del sistema
+        story.append(Spacer(1, 30))
+        story.append(Paragraph("―――――――――――――――――――――――――――――――――――", normal_style))
+        story.append(Paragraph("<i>Documento generado automáticamente desde Google Sheets por el Dashboard ICE</i>", normal_style))
+        story.append(Paragraph(f"<i>Fecha y hora de generación: {datetime.now().strftime('%d/%m/%Y a las %H:%M:%S')}</i>", normal_style))
         
         return story
     
