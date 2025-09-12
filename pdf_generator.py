@@ -8,8 +8,14 @@ ACTUALIZACIÓN: Ya no usa Excel, ahora usa datos de la pestaña "Fichas" de Goog
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-from datetime import datetime
 
+from datetime import datetime
+import pytz
+
+def get_colombia_time():
+    """Obtener fecha y hora actual de Colombia"""
+    colombia_tz = pytz.timezone('America/Bogota')
+    return datetime.now(colombia_tz)
 # Importación condicional de reportlab
 try:
     from reportlab.lib.pagesizes import letter, A4
