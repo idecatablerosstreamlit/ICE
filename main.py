@@ -324,7 +324,7 @@ def show_system_info_complete_sheets(df, source_info, fichas_data):
             st.error(f"**Generación PDF:** {pdf_status}")
         
         # Información de cache
-        st.info(f"**Cache timestamp:** {st.session_state.get('data_timestamp', 'No inicializado')}")
+        st.info(f"**Cache timestamp:** {get_colombia_time().strftime('%d/%m/%Y %H:%M:%S COT')}")
     
     # Controles de gestión
     st.markdown("#### ⚙️ Controles de Sistema")
