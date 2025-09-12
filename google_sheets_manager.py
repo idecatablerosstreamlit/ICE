@@ -103,7 +103,7 @@ class GoogleSheetsManager:
             # NUEVO: Obtener o crear worksheet de fichas metodológicas
             try:
                 self.fichas_worksheet = self.sheet.worksheet(self.fichas_worksheet_name)
-                st.success("✅ Pestaña 'Fichas' conectada")
+                
             except gspread.WorksheetNotFound:
                 st.warning("⚠️ Pestaña 'Fichas' no encontrada. Creando...")
                 # Crear worksheet de fichas
