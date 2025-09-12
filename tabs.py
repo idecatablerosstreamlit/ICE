@@ -1,6 +1,6 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN COMPLETAMENTE CORREGIDA
-CORRECCIÓN: Funciones de editar y eliminar completamente separadas y funcionales
+Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN CON FICHAS DESDE GOOGLE SHEETS
+ACTUALIZACIÓN: Ya no usa Excel, ahora usa fichas desde la pestaña "Fichas" de Google Sheets
 """
 
 import streamlit as st
@@ -343,11 +343,11 @@ class EvolutionTab:
             st.error(f"Error en evolución: {e}")
 
 class EditTab:
-    """Pestaña de gestión con autenticación"""
+    """Pestaña de gestión con autenticación - ACTUALIZADA PARA FICHAS DESDE GOOGLE SHEETS"""
     
     @staticmethod
-    def render(df, csv_path, excel_data=None):
-        """Renderizar gestión de indicadores"""
+    def render(df, csv_path, fichas_data=None):
+        """Renderizar gestión de indicadores - ACTUALIZADO PARA FICHAS DESDE SHEETS"""
         st.header("Gestión de Indicadores")
         
         try:
@@ -375,7 +375,7 @@ class EditTab:
                 
                 if not datos_indicador.empty:
                     EditTab._render_indicator_info_card(datos_indicador, codigo_editar)
-                    EditTab._render_metodological_expander(codigo_editar, excel_data)
+                    EditTab._render_metodological_expander(codigo_editar, fichas_data)
                     
                     registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
                     EditTab._render_view_records_public(registros_indicador)
@@ -398,6 +398,8 @@ class EditTab:
                     - Agregar registros a indicadores existentes  
                     - Editar valores de registros
                     - Eliminar registros (irreversible)
+                    - Crear y editar fichas metodológicas
+                    - Generar PDFs desde Google Sheets
                     
                     **Credenciales:** admin / qwerty
                     """)
@@ -410,7 +412,7 @@ class EditTab:
                     datos_indicador = df[df['Codigo'] == codigo_editar]
                     if not datos_indicador.empty:
                         registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
-                        EditTab._render_admin_management_tabs(df, codigo_editar, registros_indicador, excel_data)
+                        EditTab._render_admin_management_tabs(df, codigo_editar, registros_indicador, fichas_data)
                     else:
                         st.warning("Selecciona un indicador válido")
                 else:
@@ -512,15 +514,15 @@ class EditTab:
             st.error(f"Error al obtener información del indicador {codigo_editar}")
     
     @staticmethod
-    def _render_metodological_expander(codigo_editar, excel_data):
-        """Información metodológica"""
+    def _render_metodological_expander(codigo_editar, fichas_data):
+        """Información metodológica - ACTUALIZADA PARA USAR FICHAS DE GOOGLE SHEETS"""
         with st.expander("📋 Información Metodológica"):
             col1, col2 = st.columns(2)
             
             with col1:
                 st.markdown("#### Ficha Metodológica")
-                if excel_data is not None and not excel_data.empty:
-                    indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
+                if fichas_data is not None and not fichas_data.empty:
+                    indicador_metodologico = fichas_data[fichas_data['Codigo'] == codigo_editar]
                     
                     if not indicador_metodologico.empty:
                         metodologia = indicador_metodologico.iloc[0]
@@ -540,34 +542,124 @@ class EditTab:
                         st.write(f"**Entidad:** {safe_get('Entidad')}")
                         st.write("**Definición:**")
                         st.write(safe_get('Definicion'))
+                        
+                        # Mostrar más campos si están disponibles
+                        objetivo = safe_get('Objetivo')
+                        if objetivo != 'N/A':
+                            st.write("**Objetivo:**")
+                            st.write(objetivo)
                     else:
-                        st.warning(f"No se encontró información metodológica para {codigo_editar}")
+                        st.warning(f"No se encontró ficha metodológica para {codigo_editar} en Google Sheets")
+                        
+                        # Mostrar códigos disponibles
+                        if 'Codigo' in fichas_data.columns:
+                            codigos_disponibles = fichas_data['Codigo'].dropna().unique().tolist()
+                            if codigos_disponibles:
+                                st.info(f"💡 Códigos disponibles: {', '.join(map(str, codigos_disponibles[:5]))}")
                 else:
-                    st.warning("No hay datos metodológicos disponibles")
+                    st.warning("No hay datos de fichas disponibles. Verifica la pestaña 'Fichas' en Google Sheets.")
+                    
+                    # Opción para crear nueva ficha
+                    if st.button("➕ Crear ficha metodológica", key=f"crear_ficha_{codigo_editar}"):
+                        EditTab._render_create_ficha_form(codigo_editar)
             
             with col2:
                 st.markdown("#### 📄 Generar PDF")
-                EditTab._render_pdf_section(codigo_editar, excel_data)
+                EditTab._render_pdf_section(codigo_editar, fichas_data)
     
     @staticmethod
-    def _render_pdf_section(codigo_editar, excel_data):
-        """Sección de PDF"""
+    def _render_create_ficha_form(codigo_editar):
+        """Formulario para crear nueva ficha metodológica"""
+        st.subheader(f"📋 Crear Ficha para {codigo_editar}")
+        
+        with st.form("form_crear_ficha"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                nombre_indicador = st.text_input("Nombre del Indicador", key="ficha_nombre")
+                definicion = st.text_area("Definición", key="ficha_definicion")
+                objetivo = st.text_area("Objetivo", key="ficha_objetivo")
+                area_tematica = st.text_input("Área Temática", key="ficha_area")
+                
+            with col2:
+                sector = st.text_input("Sector", key="ficha_sector")
+                entidad = st.text_input("Entidad", key="ficha_entidad")
+                dependencia = st.text_input("Dependencia", key="ficha_dependencia")
+                tema = st.text_input("Tema", key="ficha_tema")
+            
+            submitted = st.form_submit_button("💾 Guardar Ficha")
+            
+            if submitted:
+                # Crear ficha
+                ficha_data = {
+                    'Codigo': codigo_editar,
+                    'Nombre_Indicador': nombre_indicador,
+                    'Definicion': definicion,
+                    'Objetivo': objetivo,
+                    'Area_Tematica': area_tematica,
+                    'Tema': tema,
+                    'Sector': sector,
+                    'Entidad': entidad,
+                    'Dependencia': dependencia,
+                    'Formula_Calculo': '',
+                    'Variables': '',
+                    'Unidad_Medida': '',
+                    'Metodologia_Calculo': '',
+                    'Tipo_Acumulacion': '',
+                    'Fuente_Informacion': '',
+                    'Tipo_Indicador': '',
+                    'Periodicidad': '',
+                    'Desagregacion_Geografica': '',
+                    'Desagregacion_Poblacional': '',
+                    'Clasificacion_Calidad': '',
+                    'Clasificacion_Intervencion': '',
+                    'Observaciones': '',
+                    'Limitaciones': '',
+                    'Interpretacion': '',
+                    'Directivo_Responsable': '',
+                    'Correo_Directivo': '',
+                    'Telefono_Contacto': '',
+                    'Enlaces_Web': '',
+                    'Soporte_Legal': ''
+                }
+                
+                try:
+                    from data_utils import SheetsDataLoader
+                    fichas_loader = SheetsDataLoader()
+                    success = fichas_loader.add_ficha(ficha_data)
+                    
+                    if success:
+                        st.success("✅ Ficha metodológica creada correctamente")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ Error al crear la ficha")
+                        
+                except Exception as e:
+                    st.error(f"❌ Error al guardar ficha: {e}")
+    
+    @staticmethod
+    def _render_pdf_section(codigo_editar, fichas_data):
+        """Sección de PDF - ACTUALIZADA PARA FICHAS DE GOOGLE SHEETS"""
         try:
             import reportlab
             reportlab_available = True
         except ImportError:
             reportlab_available = False
         
-        if reportlab_available and excel_data is not None and not excel_data.empty:
-            if codigo_editar in excel_data['Codigo'].values:
+        if reportlab_available and fichas_data is not None and not fichas_data.empty:
+            if codigo_editar in fichas_data['Codigo'].values:
                 if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}"):
-                    EditTab._generate_and_download_pdf(codigo_editar, excel_data)
+                    EditTab._generate_and_download_pdf(codigo_editar, fichas_data)
             else:
-                st.warning(f"No hay datos metodológicos para {codigo_editar}")
+                st.warning(f"No hay ficha metodológica para {codigo_editar} en Google Sheets")
+                if st.button("➕ Crear ficha primero", key=f"crear_ficha_pdf_{codigo_editar}"):
+                    EditTab._render_create_ficha_form(codigo_editar)
         elif not reportlab_available:
             st.error("Para PDFs instala: `pip install reportlab`")
         else:
-            st.warning("Necesitas 'Batería de indicadores.xlsx'")
+            st.warning("No hay fichas metodológicas disponibles en Google Sheets")
+            st.info("💡 Asegúrate de tener la pestaña 'Fichas' en tu Google Sheets")
     
     @staticmethod
     def _render_new_indicator_form_auth(df):
@@ -689,8 +781,8 @@ class EditTab:
             return False
     
     @staticmethod
-    def _render_admin_management_tabs(df, codigo_editar, registros_indicador, excel_data):
-        """Pestañas de gestión para administradores"""
+    def _render_admin_management_tabs(df, codigo_editar, registros_indicador, fichas_data):
+        """Pestañas de gestión para administradores - ACTUALIZADO PARA FICHAS SHEETS"""
         st.subheader("🛠️ Herramientas de Administración")
         
         tab1, tab2, tab3, tab4 = st.tabs([
@@ -701,7 +793,7 @@ class EditTab:
         ])
         
         with tab1:
-            EditTab._render_detailed_view(registros_indicador, excel_data, codigo_editar)
+            EditTab._render_detailed_view(registros_indicador, fichas_data, codigo_editar)
         
         with tab2:
             EditTab._render_add_form_auth(df, codigo_editar)
@@ -713,8 +805,8 @@ class EditTab:
             EditTab._render_delete_form_auth(df, codigo_editar, registros_indicador)
     
     @staticmethod
-    def _render_detailed_view(registros_indicador, excel_data, codigo_editar):
-        """Vista detallada para administradores"""
+    def _render_detailed_view(registros_indicador, fichas_data, codigo_editar):
+        """Vista detallada para administradores - ACTUALIZADA PARA FICHAS SHEETS"""
         st.write("**Vista completa de registros con herramientas de análisis**")
         
         if not registros_indicador.empty:
@@ -746,14 +838,18 @@ class EditTab:
             st.dataframe(registros_indicador, use_container_width=True)
             
             # Información metodológica expandida
-            if excel_data is not None and not excel_data.empty:
+            if fichas_data is not None and not fichas_data.empty:
                 with st.expander("📋 Información Metodológica Completa"):
-                    indicador_metodologico = excel_data[excel_data['Codigo'] == codigo_editar]
+                    indicador_metodologico = fichas_data[fichas_data['Codigo'] == codigo_editar]
                     if not indicador_metodologico.empty:
                         metodologia = indicador_metodologico.iloc[0]
                         st.dataframe(metodologia.to_frame().T, use_container_width=True)
                     else:
-                        st.info("No hay información metodológica para este código")
+                        st.info("No hay información metodológica para este código en Google Sheets")
+                        if st.button("➕ Crear ficha metodológica", key=f"crear_ficha_detailed_{codigo_editar}"):
+                            EditTab._render_create_ficha_form(codigo_editar)
+            else:
+                st.warning("⚠️ No hay fichas metodológicas disponibles en Google Sheets")
         else:
             st.info("No hay registros para mostrar")
     
@@ -950,8 +1046,8 @@ class EditTab:
             st.error(f"Error en formulario de eliminación: {e}")
     
     @staticmethod
-    def _generate_and_download_pdf(codigo_editar, excel_data):
-        """Generar y descargar PDF"""
+    def _generate_and_download_pdf(codigo_editar, fichas_data):
+        """Generar y descargar PDF - ACTUALIZADO PARA FICHAS DE GOOGLE SHEETS"""
         try:
             from pdf_generator import PDFGenerator
             
@@ -961,11 +1057,11 @@ class EditTab:
                 st.error("PDF no disponible. Instala: `pip install reportlab`")
                 return
             
-            with st.spinner("Generando ficha metodológica..."):
-                pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, excel_data)
+            with st.spinner("Generando ficha metodológica desde Google Sheets..."):
+                pdf_bytes = pdf_generator.generate_metodological_sheet(codigo_editar, fichas_data)
                 
                 if pdf_bytes and len(pdf_bytes) > 0:
-                    st.success("✅ PDF generado correctamente")
+                    st.success("✅ PDF generado correctamente desde Google Sheets")
                     
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"Ficha_Metodologica_{codigo_editar}_{timestamp}.pdf"
@@ -987,12 +1083,12 @@ class EditTab:
             st.error(f"Error al generar PDF: {e}")
 
 class TabManager:
-    """Gestor de pestañas del dashboard"""
+    """Gestor de pestañas del dashboard - ACTUALIZADO PARA FICHAS DESDE GOOGLE SHEETS"""
     
-    def __init__(self, df, csv_path, excel_data=None):
+    def __init__(self, df, csv_path, fichas_data=None):
         self.df = df
         self.csv_path = None
-        self.excel_data = excel_data
+        self.fichas_data = fichas_data
     
     def render_tabs(self, df_filtrado, filters):
         """Renderizar todas las pestañas"""
@@ -1014,7 +1110,7 @@ class TabManager:
             EvolutionTab.render(self.df)
         
         with tab4:
-            EditTab.render(self.df, None, self.excel_data)
+            EditTab.render(self.df, None, self.fichas_data)
         
         # Sidebar con información del sistema
         with st.sidebar:
@@ -1047,7 +1143,7 @@ class TabManager:
             else:
                 st.warning("📋 Google Sheets vacío")
             
-            # Estado de servicios
+            # Estado de servicios - ACTUALIZADO PARA FICHAS
             with st.expander("🔧 Estado de Servicios", expanded=False):
                 # PDF
                 try:
@@ -1058,13 +1154,16 @@ class TabManager:
                     st.error("📄 PDF: No instalado")
                     pdf_ok = False
                 
-                # Excel
-                if self.excel_data is not None and not self.excel_data.empty:
-                    st.success(f"📊 Excel: {len(self.excel_data)} fichas")
-                    excel_ok = True
+                # Fichas metodológicas desde Google Sheets
+                if self.fichas_data is not None and not self.fichas_data.empty:
+                    st.success(f"📊 Fichas: {len(self.fichas_data)} disponibles")
+                    fichas_ok = True
+                elif self.fichas_data is not None and self.fichas_data.empty:
+                    st.warning("📊 Fichas: Pestaña vacía")
+                    fichas_ok = False
                 else:
-                    st.warning("📊 Excel: No disponible")
-                    excel_ok = False
+                    st.error("📊 Fichas: No disponibles")
+                    fichas_ok = False
                 
                 # Google Sheets
                 try:
@@ -1074,6 +1173,10 @@ class TabManager:
                     
                     if connection_info.get('connected', False):
                         st.success("📝 Google Sheets: Conectado")
+                        if connection_info.get('fichas_available', False):
+                            st.success("📋 Pestaña 'Fichas': Disponible")
+                        else:
+                            st.warning("📋 Pestaña 'Fichas': No disponible")
                     else:
                         st.error("📝 Google Sheets: Desconectado")
                         
