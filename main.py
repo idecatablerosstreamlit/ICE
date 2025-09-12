@@ -13,7 +13,14 @@ from config import (
 )
 from data_utils import DataLoader, SheetsDataLoader
 from tabs import TabManager
+from datetime import datetime, timezone, timedelta
 
+# Configurar zona horaria de Colombia (UTC-5)
+COLOMBIA_TZ = timezone(timedelta(hours=-5))
+
+def get_colombia_time():
+    """Obtener fecha y hora actual de Colombia"""
+    return datetime.now(COLOMBIA_TZ)
 def main():
     configure_page()
     
