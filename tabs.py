@@ -1094,10 +1094,10 @@ class TabManager:
         """Renderizar todas las pestañas"""
         
         tab1, tab2, tab3, tab4 = st.tabs([
-            "📊 Resumen General", 
-            "🏢 Resumen por Componente", 
-            "📈 Evolución", 
-            "⚙️ Gestión de Datos"
+            "Resumen General", 
+            "Resumen por Componente", 
+            "Evolución", 
+            "Gestión de Datos"
         ])
         
         with tab1:
