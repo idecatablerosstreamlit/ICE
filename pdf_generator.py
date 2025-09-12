@@ -3,12 +3,12 @@
 """
 Generador de PDFs para fichas metodológicas del Dashboard ICE - ACTUALIZADO PARA GOOGLE SHEETS
 ACTUALIZACIÓN: Ya no usa Excel, ahora usa datos de la pestaña "Fichas" de Google Sheets
+CORRECCIÓN: Ahora usa la fecha y hora de Colombia correctamente
 """
 
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-
 from datetime import datetime
 import pytz
 
@@ -16,6 +16,7 @@ def get_colombia_time():
     """Obtener fecha y hora actual de Colombia"""
     colombia_tz = pytz.timezone('America/Bogota')
     return datetime.now(colombia_tz)
+
 # Importación condicional de reportlab
 try:
     from reportlab.lib.pagesizes import letter, A4
@@ -149,13 +150,17 @@ class PDFGenerator:
         story.append(Paragraph("Dashboard ICE - Infraestructura de Conocimiento Espacial", normal_style))
         story.append(Spacer(1, 20))
         
+        # ✅ CORRECCIÓN: Usar get_colombia_time() en lugar de datetime.now()
+        colombia_time = get_colombia_time()
+        fecha_generacion = colombia_time.strftime('%d/%m/%Y %H:%M:%S COT')
+        
         # Información institucional
         story.append(Paragraph("INFORMACIÓN DEL DOCUMENTO", subtitle_style))
         
         institucion_data = [
             ['Sistema:', 'Dashboard ICE - Infraestructura de Conocimiento Espacial'],
             ['Fuente de datos:', 'Google Sheets - Pestaña "Fichas"'],
-            ['Fecha de generación:', datetime.now().strftime('%d/%m/%Y %H:%M:%S')],
+            ['Fecha de generación:', fecha_generacion],  # ✅ CORREGIDO
             ['Código del indicador:', codigo]
         ]
         
@@ -277,11 +282,14 @@ class PDFGenerator:
             story.append(Paragraph("8. SOPORTE LEGAL", subtitle_style))
             story.append(Paragraph(soporte, normal_style))
         
+        # ✅ CORRECCIÓN: Usar get_colombia_time() en el pie de página también
+        fecha_pie = colombia_time.strftime('%d/%m/%Y a las %H:%M:%S COT')
+        
         # Pie de página con información del sistema
         story.append(Spacer(1, 30))
         story.append(Paragraph("―――――――――――――――――――――――――――――――――――", normal_style))
         story.append(Paragraph("<i>Documento generado automáticamente desde Google Sheets por el Dashboard ICE</i>", normal_style))
-        story.append(Paragraph(f"<i>Fecha y hora de generación: {datetime.now().strftime('%d/%m/%Y a las %H:%M:%S')}</i>", normal_style))
+        story.append(Paragraph(f"<i>Fecha y hora de generación: {fecha_pie}</i>", normal_style))  # ✅ CORREGIDO
         
         return story
     
