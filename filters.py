@@ -162,7 +162,7 @@ class EvolutionFilters:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**📊 Selección de Indicador**")
+            st.markdown("**Selección de Indicador**")
             
             try:
                 # ✅ INICIALIZAR estado si no existe
@@ -183,7 +183,7 @@ class EvolutionFilters:
                     return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
                 
                 # Crear opciones con información adicional
-                opciones_display = ["🌍 Todos los indicadores (Vista General)"]
+                opciones_display = ["Todos los indicadores (Vista General)"]
                 codigo_map = {opciones_display[0]: None}
                 
                 for codigo in codigos_disponibles:
@@ -273,13 +273,13 @@ class EvolutionFilters:
             tipo_grafico = "Línea"
             
             # Mostrar información sobre el tipo de gráfico
-            st.info("📈 **Tipo de gráfico:** Línea (óptimo para mostrar tendencias temporales)")
+            st.info("**Tipo de gráfico:** Línea (óptimo para mostrar tendencias temporales)")
             
             # Mostrar estadísticas si hay un indicador seleccionado
             if codigo_seleccionado:
                 datos_indicador = df[df['Codigo'] == codigo_seleccionado]
                 if not datos_indicador.empty:
-                    st.markdown("**📊 Estadísticas:**")
+                    st.markdown("**Estadísticas:**")
                     st.write(f"• **Registros:** {len(datos_indicador)}")
                     st.write(f"• **Rango:** {datos_indicador['Valor'].min():.3f} - {datos_indicador['Valor'].max():.3f}")
                     st.write(f"• **Promedio:** {datos_indicador['Valor'].mean():.3f}")
