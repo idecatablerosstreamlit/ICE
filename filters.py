@@ -156,13 +156,13 @@ class EvolutionFilters:
     
     @staticmethod
     def create_evolution_filters_stable(df):
-        
-        
+        """Crear filtros para la pestaña de evolución SIN opción de barras"""
+        st.markdown("### 🎛️ Configuración de Visualización")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Selección de Indicador**")
+            st.markdown("**📊 Selección de Indicador**")
             
             try:
                 # ✅ INICIALIZAR estado si no existe
@@ -170,6 +170,8 @@ class EvolutionFilters:
                     st.session_state.evolution_selected_codigo = None
                 if 'evolution_selected_indicador' not in st.session_state:
                     st.session_state.evolution_selected_indicador = None
+                if 'evolution_search_term' not in st.session_state:
+                    st.session_state.evolution_search_term = ""
                 
                 # Obtener códigos únicos disponibles
                 if 'Codigo' in df.columns:
@@ -182,18 +184,39 @@ class EvolutionFilters:
                     st.warning("No hay códigos de indicadores disponibles")
                     return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
                 
+                # 🔍 CUADRO DE BÚSQUEDA
+                search_term = st.text_input(
+                    "🔍 Buscar indicador:",
+                    value=st.session_state.evolution_search_term,
+                    placeholder="Busca por código o nombre del indicador...",
+                    key="evolution_search_input",
+                    help="Escribe para filtrar los indicadores disponibles"
+                )
+                st.session_state.evolution_search_term = search_term
+                
                 # Crear opciones con información adicional
-                opciones_display = ["Todos los indicadores (Vista General)"]
+                opciones_display = ["🌍 Todos los indicadores (Vista General)"]
                 codigo_map = {opciones_display[0]: None}
                 
+                # Filtrar indicadores según búsqueda
                 for codigo in codigos_disponibles:
                     try:
                         indicador_info = df[df['Codigo'] == codigo].iloc[0]
                         nombre = indicador_info['Indicador'] if 'Indicador' in indicador_info else 'Sin nombre'
                         componente = indicador_info['Componente'] if 'Componente' in indicador_info else 'Sin componente'
                         
+                        # Aplicar filtro de búsqueda
+                        if search_term.strip():
+                            search_lower = search_term.lower().strip()
+                            codigo_match = search_lower in str(codigo).lower()
+                            nombre_match = search_lower in nombre.lower()
+                            componente_match = search_lower in componente.lower()
+                            
+                            if not (codigo_match or nombre_match or componente_match):
+                                continue  # Skip this indicator if no match
+                        
                         # Limitar longitud para mejor visualización
-                        nombre_corto = nombre[:50] + "..." if len(nombre) > 50 else nombre
+                        nombre_corto = nombre[:45] + "..." if len(nombre) > 45 else nombre
                         display_text = f"📈 {codigo} - {nombre_corto}"
                         
                         opciones_display.append(display_text)
@@ -202,6 +225,12 @@ class EvolutionFilters:
                     except Exception as e:
                         st.warning(f"Error procesando código {codigo}: {e}")
                         continue
+                
+                # Mostrar resultados de búsqueda
+                if search_term.strip() and len(opciones_display) == 1:
+                    st.info(f"🔍 No se encontraron indicadores que coincidan con '{search_term}'")
+                elif search_term.strip():
+                    st.success(f"🔍 {len(opciones_display)-1} indicadores encontrados")
                 
                 # ✅ DETERMINAR índice actual basado en session_state
                 index_actual = 0
@@ -253,7 +282,7 @@ class EvolutionFilters:
                 return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
         
         with col2:
-            st.markdown("**Opciones de Visualización**")
+            st.markdown("**🎨 Opciones de Visualización**")
             
             # ✅ INICIALIZAR estado para opciones de visualización
             if 'evolution_mostrar_meta' not in st.session_state:
@@ -273,13 +302,13 @@ class EvolutionFilters:
             tipo_grafico = "Línea"
             
             # Mostrar información sobre el tipo de gráfico
-            st.info("**Tipo de gráfico:** Línea (óptimo para mostrar tendencias temporales)")
+            st.info("📈 **Tipo de gráfico:** Línea (óptimo para mostrar tendencias temporales)")
             
             # Mostrar estadísticas si hay un indicador seleccionado
             if codigo_seleccionado:
                 datos_indicador = df[df['Codigo'] == codigo_seleccionado]
                 if not datos_indicador.empty:
-                    st.markdown("**Estadísticas:**")
+                    st.markdown("**📊 Estadísticas:**")
                     st.write(f"• **Registros:** {len(datos_indicador)}")
                     st.write(f"• **Rango:** {datos_indicador['Valor'].min():.3f} - {datos_indicador['Valor'].max():.3f}")
                     st.write(f"• **Promedio:** {datos_indicador['Valor'].mean():.3f}")
