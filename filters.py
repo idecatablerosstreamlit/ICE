@@ -157,12 +157,12 @@ class EvolutionFilters:
     @staticmethod
     def create_evolution_filters_stable(df):
         """Crear filtros para la pestaña de evolución SIN opción de barras"""
-        st.markdown("### 🎛️ Configuración de Visualización")
+        
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**📊 Selección de Indicador**")
+            st.markdown("**Selección de Indicador**")
             
             try:
                 # ✅ INICIALIZAR estado si no existe
@@ -195,7 +195,7 @@ class EvolutionFilters:
                 st.session_state.evolution_search_term = search_term
                 
                 # Crear opciones con información adicional
-                opciones_display = ["🌍 Todos los indicadores (Vista General)"]
+                opciones_display = ["Todos los indicadores (Vista General)"]
                 codigo_map = {opciones_display[0]: None}
                 
                 # Filtrar indicadores según búsqueda
@@ -282,9 +282,9 @@ class EvolutionFilters:
                 return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
         
         with col2:
-            st.markdown("**🎨 Opciones de Visualización**")
+           
             
-            # ✅ INICIALIZAR estado para opciones de visualización
+            # INICIALIZAR estado para opciones de visualización
             if 'evolution_mostrar_meta' not in st.session_state:
                 st.session_state.evolution_mostrar_meta = True
             
@@ -308,7 +308,7 @@ class EvolutionFilters:
             if codigo_seleccionado:
                 datos_indicador = df[df['Codigo'] == codigo_seleccionado]
                 if not datos_indicador.empty:
-                    st.markdown("**📊 Estadísticas:**")
+                    st.markdown("**Estadísticas:**")
                     st.write(f"• **Registros:** {len(datos_indicador)}")
                     st.write(f"• **Rango:** {datos_indicador['Valor'].min():.3f} - {datos_indicador['Valor'].max():.3f}")
                     st.write(f"• **Promedio:** {datos_indicador['Valor'].mean():.3f}")
