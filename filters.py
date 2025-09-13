@@ -152,12 +152,12 @@ class FilterManager:
         return active_filters
 
 class EvolutionFilters:
-    """Filtros específicos para la pestaña de evolución - VERSIÓN ESTABLE"""
+    """Filtros específicos para la pestaña de evolución - VERSIÓN ESTABLE SIN BARRAS"""
     
     @staticmethod
     def create_evolution_filters_stable(df):
-        """Crear filtros para la pestaña de evolución SIN causar rerun"""
-        st.markdown("### 🎛️ Configuración de Visualización")
+        
+        
         
         col1, col2 = st.columns(2)
         
@@ -258,8 +258,6 @@ class EvolutionFilters:
             # ✅ INICIALIZAR estado para opciones de visualización
             if 'evolution_mostrar_meta' not in st.session_state:
                 st.session_state.evolution_mostrar_meta = True
-            if 'evolution_tipo_grafico' not in st.session_state:
-                st.session_state.evolution_tipo_grafico = "Línea"
             
             # Opción para mostrar línea de meta con KEY ÚNICO
             mostrar_meta = st.checkbox(
@@ -270,16 +268,12 @@ class EvolutionFilters:
             )
             st.session_state.evolution_mostrar_meta = mostrar_meta
             
-            # Seleccionar tipo de gráfico con KEY ÚNICO
-            tipo_grafico = st.radio(
-                "📊 Tipo de gráfico:",
-                options=["Línea", "Barras"],
-                index=0 if st.session_state.evolution_tipo_grafico == "Línea" else 1,
-                horizontal=True,
-                key="evolution_tipo_grafico_stable",
-                help="Línea: mejor para ver tendencias / Barras: mejor para comparar valores puntuales"
-            )
-            st.session_state.evolution_tipo_grafico = tipo_grafico
+            # ❌ ELIMINADO: Selector de tipo de gráfico
+            # Solo usaremos gráficos de línea
+            tipo_grafico = "Línea"
+            
+            # Mostrar información sobre el tipo de gráfico
+            st.info("📈 **Tipo de gráfico:** Línea (óptimo para mostrar tendencias temporales)")
             
             # Mostrar estadísticas si hay un indicador seleccionado
             if codigo_seleccionado:
@@ -294,7 +288,7 @@ class EvolutionFilters:
             'codigo': codigo_seleccionado,
             'indicador': indicador_seleccionado,
             'mostrar_meta': mostrar_meta,
-            'tipo_grafico': tipo_grafico
+            'tipo_grafico': tipo_grafico  # Siempre será "Línea"
         }
     
     @staticmethod
