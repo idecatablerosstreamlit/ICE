@@ -253,7 +253,7 @@ class EvolutionFilters:
                 return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
         
         with col2:
-            st.markdown("**🎨 Opciones de Visualización**")
+            st.markdown("**Opciones de Visualización**")
             
             # ✅ INICIALIZAR estado para opciones de visualización
             if 'evolution_mostrar_meta' not in st.session_state:
