@@ -474,7 +474,7 @@ class EditTab:
                 
                 # Crear opción con formato: "CÓDIGO - Nombre del indicador"
                 nombre_corto = nombre[:60] + "..." if len(nombre) > 60 else nombre
-                display_option = f"📊 {codigo} - {nombre_corto}"
+                display_option = f"{codigo} - {nombre_corto}"
                 
                 opciones_codigo.append(display_option)
                 codigo_map[display_option] = codigo
@@ -536,18 +536,18 @@ class EditTab:
             st.markdown(f"""
             <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
                        padding: 1.5rem; border-radius: 10px; margin: 1rem 0; color: white;">
-                <h3 style="color: white; margin: 0;">📊 {codigo_editar} - {nombre_indicador}</h3>
+                <h3 style="color: white; margin: 0;">{codigo_editar} - {nombre_indicador}</h3>
                 <div style="margin: 1rem 0; padding: 1rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div>
-                            <strong>🏢 Componente:</strong> {componente_indicador}<br>
+                            <strong>Componente:</strong> {componente_indicador}<br>
                             <strong>📂 Categoría:</strong> {categoria_indicador}<br>
                             <strong>🏷️ Tipo:</strong> {tipo_indicador}
                         </div>
                         <div>
-                            <strong>📊 Registros:</strong> {total_registros}<br>
-                            <strong>📈 Promedio:</strong> {valor_promedio:.3f}<br>
-                            <strong>📅 Última fecha:</strong> {pd.to_datetime(fecha_mas_reciente).strftime('%d/%m/%Y') if pd.notna(fecha_mas_reciente) else 'N/A'}
+                            <strong>Registros:</strong> {total_registros}<br>
+                            <strong>Promedio:</strong> {valor_promedio:.3f}<br>
+                            <strong>Última fecha:</strong> {pd.to_datetime(fecha_mas_reciente).strftime('%d/%m/%Y') if pd.notna(fecha_mas_reciente) else 'N/A'}
                         </div>
                     </div>
                 </div>
@@ -560,7 +560,7 @@ class EditTab:
     @staticmethod
     def _render_view_records_public(registros_indicador):
         """Ver registros - modo público"""
-        st.subheader("📊 Registros del Indicador")
+        st.subheader("Registros del Indicador")
         if not registros_indicador.empty:
             # Estadísticas
             col1, col2, col3 = st.columns(3)
