@@ -1,6 +1,6 @@
 """
-Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN CON FICHAS DESDE GOOGLE SHEETS
-ACTUALIZACIÓN: Ya no usa Excel, ahora usa fichas desde la pestaña "Fichas" de Google Sheets
+Interfaces de usuario para las pestañas del Dashboard ICE - VERSIÓN CON BÚSQUEDA EN GESTIÓN
+ACTUALIZACIÓN: Agregado cuadro de búsqueda y mejor visualización código + nombre
 """
 
 import streamlit as st
@@ -343,11 +343,11 @@ class EvolutionTab:
             st.error(f"Error en evolución: {e}")
 
 class EditTab:
-    """Pestaña de gestión con autenticación - ACTUALIZADA PARA FICHAS DESDE GOOGLE SHEETS"""
+    """Pestaña de gestión con autenticación y búsqueda mejorada"""
     
     @staticmethod
     def render(df, csv_path, fichas_data=None):
-        """Renderizar gestión de indicadores - ACTUALIZADO PARA FICHAS DESDE SHEETS"""
+        """Renderizar gestión de indicadores - CON BÚSQUEDA MEJORADA"""
         st.header("Gestión de Indicadores")
         
         try:
@@ -363,9 +363,11 @@ class EditTab:
             # Inicializar session state
             if 'selected_codigo_edit' not in st.session_state:
                 st.session_state.selected_codigo_edit = None
+            if 'edit_search_term' not in st.session_state:
+                st.session_state.edit_search_term = ""
             
-            # Selector de código
-            codigo_editar = EditTab._render_codigo_selector(df)
+            # Selector de código CON BÚSQUEDA
+            codigo_editar = EditTab._render_codigo_selector_with_search(df)
             
             # MODO CONSULTA
             st.markdown("### 📖 Modo Consulta")
@@ -374,7 +376,7 @@ class EditTab:
                 datos_indicador = df[df['Codigo'] == codigo_editar] if not df.empty else pd.DataFrame()
                 
                 if not datos_indicador.empty:
-                    EditTab._render_indicator_info_card(datos_indicador, codigo_editar)
+                    EditTab._render_indicator_info_card_enhanced(datos_indicador, codigo_editar)
                     EditTab._render_metodological_expander(codigo_editar, fichas_data)
                     
                     registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
@@ -422,45 +424,138 @@ class EditTab:
             st.error(f"Error en gestión: {e}")
     
     @staticmethod
-    def _render_codigo_selector(df):
-        """Selector de código"""
+    def _render_codigo_selector_with_search(df):
+        """Selector de código CON BÚSQUEDA MEJORADA"""
         if df.empty:
             st.info("Base de datos vacía")
             return "CREAR_NUEVO" if auth_manager.is_authenticated() else None
         
         codigos_disponibles = sorted(df['Codigo'].dropna().unique())
         
+        if not codigos_disponibles:
+            st.warning("No hay indicadores disponibles")
+            return "CREAR_NUEVO" if auth_manager.is_authenticated() else None
+        
+        # 🔍 CUADRO DE BÚSQUEDA
+        search_term = st.text_input(
+            "🔍 Buscar indicador:",
+            value=st.session_state.edit_search_term,
+            placeholder="Busca por código o nombre del indicador...",
+            key="edit_search_input",
+            help="Escribe para filtrar los indicadores disponibles"
+        )
+        st.session_state.edit_search_term = search_term
+        
+        # Preparar opciones con código + nombre
         if auth_manager.is_authenticated():
-            opciones_codigo = ["[Crear nuevo código]"] + list(codigos_disponibles)
+            opciones_codigo = ["[Crear nuevo código]"]
+            codigo_map = {"[Crear nuevo código]": "CREAR_NUEVO"}
         else:
-            opciones_codigo = list(codigos_disponibles)
+            opciones_codigo = []
+            codigo_map = {}
+        
+        # Filtrar y crear opciones
+        for codigo in codigos_disponibles:
+            try:
+                # Obtener información del indicador
+                indicador_data = df[df['Codigo'] == codigo].iloc[0]
+                nombre = indicador_data.get('Indicador', 'Sin nombre')
+                componente = indicador_data.get('Componente', 'Sin componente')
+                
+                # Aplicar filtro de búsqueda
+                if search_term.strip():
+                    search_lower = search_term.lower().strip()
+                    codigo_match = search_lower in str(codigo).lower()
+                    nombre_match = search_lower in nombre.lower()
+                    componente_match = search_lower in componente.lower()
+                    
+                    if not (codigo_match or nombre_match or componente_match):
+                        continue  # Skip this indicator if no match
+                
+                # Crear opción con formato: "CÓDIGO - Nombre del indicador"
+                nombre_corto = nombre[:60] + "..." if len(nombre) > 60 else nombre
+                display_option = f"📊 {codigo} - {nombre_corto}"
+                
+                opciones_codigo.append(display_option)
+                codigo_map[display_option] = codigo
+                
+            except Exception as e:
+                st.warning(f"Error procesando código {codigo}: {e}")
+                continue
+        
+        # Mostrar resultados de búsqueda
+        total_filtered = len(opciones_codigo) - (1 if auth_manager.is_authenticated() else 0)
+        if search_term.strip() and total_filtered == 0:
+            st.info(f"🔍 No se encontraron indicadores que coincidan con '{search_term}'")
+        elif search_term.strip():
+            st.success(f"🔍 {total_filtered} indicadores encontrados")
         
         if not opciones_codigo:
             st.warning("No hay indicadores disponibles")
             return None
         
+        # Determinar índice actual
         index_actual = 0
-        if st.session_state.selected_codigo_edit in codigos_disponibles:
-            try:
-                if auth_manager.is_authenticated():
-                    index_actual = opciones_codigo.index(st.session_state.selected_codigo_edit)
-                else:
-                    index_actual = codigos_disponibles.index(st.session_state.selected_codigo_edit)
-            except ValueError:
-                index_actual = 0
+        if st.session_state.selected_codigo_edit:
+            for i, opcion in enumerate(opciones_codigo):
+                if codigo_map.get(opcion) == st.session_state.selected_codigo_edit:
+                    index_actual = i
+                    break
         
-        codigo_seleccionado = st.selectbox(
+        # Selector principal
+        codigo_seleccionado_display = st.selectbox(
             "Seleccionar Indicador", 
             opciones_codigo,
             index=index_actual,
-            key="codigo_consulta_selector"
+            key="codigo_consulta_selector_enhanced",
+            help="Selecciona un indicador para consultar o gestionar"
         )
         
-        if codigo_seleccionado == "[Crear nuevo código]":
+        codigo_real = codigo_map.get(codigo_seleccionado_display)
+        
+        if codigo_real == "CREAR_NUEVO":
             return "CREAR_NUEVO"
         else:
-            st.session_state.selected_codigo_edit = codigo_seleccionado
-            return codigo_seleccionado
+            st.session_state.selected_codigo_edit = codigo_real
+            return codigo_real
+    
+    @staticmethod
+    def _render_indicator_info_card_enhanced(datos_indicador, codigo_editar):
+        """Card mejorada con información del indicador - MOSTRANDO CÓDIGO + NOMBRE"""
+        try:
+            nombre_indicador = datos_indicador['Indicador'].iloc[0]
+            componente_indicador = datos_indicador['Componente'].iloc[0]
+            categoria_indicador = datos_indicador['Categoria'].iloc[0]
+            tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
+            
+            # Estadísticas rápidas
+            total_registros = len(datos_indicador)
+            valor_promedio = datos_indicador['Valor'].mean()
+            fecha_mas_reciente = datos_indicador['Fecha'].max()
+            
+            st.markdown(f"""
+            <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
+                       padding: 1.5rem; border-radius: 10px; margin: 1rem 0; color: white;">
+                <h3 style="color: white; margin: 0;">📊 {codigo_editar} - {nombre_indicador}</h3>
+                <div style="margin: 1rem 0; padding: 1rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <strong>🏢 Componente:</strong> {componente_indicador}<br>
+                            <strong>📂 Categoría:</strong> {categoria_indicador}<br>
+                            <strong>🏷️ Tipo:</strong> {tipo_indicador}
+                        </div>
+                        <div>
+                            <strong>📊 Registros:</strong> {total_registros}<br>
+                            <strong>📈 Promedio:</strong> {valor_promedio:.3f}<br>
+                            <strong>📅 Última fecha:</strong> {pd.to_datetime(fecha_mas_reciente).strftime('%d/%m/%Y') if pd.notna(fecha_mas_reciente) else 'N/A'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        except IndexError:
+            st.error(f"Error al obtener información del indicador {codigo_editar}")
     
     @staticmethod
     def _render_view_records_public(registros_indicador):
@@ -487,31 +582,6 @@ class EditTab:
             st.dataframe(registros_indicador[available_columns], use_container_width=True)
         else:
             st.info("No hay registros para este indicador")
-    
-    @staticmethod
-    def _render_indicator_info_card(datos_indicador, codigo_editar):
-        """Card con información del indicador"""
-        try:
-            nombre_indicador = datos_indicador['Indicador'].iloc[0]
-            componente_indicador = datos_indicador['Componente'].iloc[0]
-            categoria_indicador = datos_indicador['Categoria'].iloc[0]
-            tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
-            
-            st.markdown(f"""
-            <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
-                       padding: 1rem; border-radius: 10px; margin: 1rem 0; color: white;">
-                <h4 style="color: white; margin: 0;">{nombre_indicador}</h4>
-                <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
-                    <strong>Componente:</strong> {componente_indicador}<br>
-                    <strong>Categoría:</strong> {categoria_indicador}<br>
-                    <strong>Código:</strong> {codigo_editar}<br>
-                    <strong>Tipo:</strong> {tipo_indicador}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        except IndexError:
-            st.error(f"Error al obtener información del indicador {codigo_editar}")
     
     @staticmethod
     def _render_metodological_expander(codigo_editar, fichas_data):
@@ -1094,10 +1164,10 @@ class TabManager:
         """Renderizar todas las pestañas"""
         
         tab1, tab2, tab3, tab4 = st.tabs([
-            "Resumen General", 
-            "Resumen por Componente", 
-            "Evolución", 
-            "Gestión de Datos"
+            "📊 Resumen General", 
+            "🏢 Resumen por Componente", 
+            "📈 Evolución", 
+            "⚙️ Gestión de Datos"
         ])
         
         with tab1:
