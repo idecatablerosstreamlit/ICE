@@ -109,39 +109,39 @@ def main():
         # Opciones de recuperación
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Reintentar", use_container_width=True):
+            if st.button("🔄 Reintentar", width='stretch'):
                 current_tab = st.session_state.get('active_tab_index', 0)
                 st.session_state.last_load_time = time.time()
                 st.session_state.active_tab_index = current_tab
                 st.rerun()
         
         with col2:
-            if st.button("🧹 Limpiar Cache", use_container_width=True):
+            if st.button("🧹 Limpiar Cache", width='stretch'):
                 st.cache_data.clear()
                 st.session_state.data_timestamp = time.time()
                 st.rerun()
 
 def load_data_with_status_sheets():
-    """ACTUALIZADO: Cargar datos con fichas desde Google Sheets"""
+    """ACTUALIZADO: Cargar datos combinados desde Google Sheets"""
     try:
         # Mostrar estado de carga
-        with st.spinner("🔄 Conectando con Google Sheets..."):
-            # Cargar desde Google Sheets
+        with st.spinner("🔄 Conectando con Google Sheets y combinando datos..."):
+            # Cargar datos combinados desde Google Sheets
             data_loader = DataLoader()
-            df_loaded = data_loader.load_data()
-        
-        # NUEVO: Cargar fichas desde Google Sheets
+            df_loaded = data_loader.load_combined_data()
+
+        # NUEVO: Cargar fichas desde Google Sheets (para la pestaña de fichas)
         with st.spinner("📋 Cargando fichas metodológicas desde Google Sheets..."):
             fichas_loader = SheetsDataLoader()
             fichas_data = fichas_loader.load_fichas_data()
-        
+
         # Obtener información de la fuente
         source_info = data_loader.get_data_source_info()
-        
+
         # Mostrar resultados de carga solo si hay problemas
         if df_loaded is None or df_loaded.empty:
             st.info("📋 Google Sheets está vacío o no se pudo conectar")
-        
+
         if fichas_data is None:
             st.warning("⚠️ No se pudieron cargar las fichas metodológicas desde Google Sheets")
             st.info("💡 Verifica que existe la pestaña 'Fichas' en tu Google Sheets")
@@ -157,8 +157,8 @@ def load_data_with_status_sheets():
         st.error(f"❌ Error al cargar datos: {e}")
         # Retornar datos vacíos para mantener funcionalidad
         empty_df = pd.DataFrame(columns=[
-            'Linea_Accion', 'Componente', 'Categoria', 
-            'Codigo', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado'
+            'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA',
+            'COD', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado'
         ])
         return empty_df, {'source': 'Google Sheets (Error)', 'connection_info': {'connected': False}}, None
 
@@ -189,8 +189,8 @@ def get_last_update_date(df):
         return {
             'fecha': ultima_fecha,
             'indicador': registro_mas_reciente.get('Indicador', 'N/A'),
-            'codigo': registro_mas_reciente.get('Codigo', 'N/A'),
-            'componente': registro_mas_reciente.get('Componente', 'N/A')
+            'codigo': registro_mas_reciente.get('COD', 'N/A'),
+            'componente': registro_mas_reciente.get('COMPONENTE PROPUESTO', registro_mas_reciente.get('Componente', 'N/A'))
         }
         
     except Exception as e:
@@ -216,9 +216,20 @@ def verify_data_structure_complete(df):
         """)
         return True
     
-    # Verificar columnas esenciales
-    required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
+    # Verificar columnas esenciales (nombres actualizados)
+    required_columns = ['COD', 'Fecha', 'Valor']
+    # Verificar columnas con nombres flexibles (ahora estandarizados)
+    has_componente = 'Componente' in df.columns
+    has_categoria = 'Categoria' in df.columns
+    has_indicador = 'Indicador' in df.columns
+
     missing_columns = [col for col in required_columns if col not in df.columns]
+    if not has_componente:
+        missing_columns.append('COMPONENTE PROPUESTO')
+    if not has_categoria:
+        missing_columns.append('CATEGORÍA')
+    if not has_indicador:
+        missing_columns.append('Indicador')
     
     if missing_columns:
         st.error(f"❌ **Error:** Faltan columnas esenciales en Google Sheets: {missing_columns}")
@@ -233,12 +244,12 @@ def verify_data_structure_complete(df):
             # Mostrar muestra de datos si existe
             if not df.empty:
                 st.write("**Muestra de datos:**")
-                st.dataframe(df.head(3), use_container_width=True)
+                st.dataframe(df.head(3), width='stretch')
         
         return False
     
     # Verificar datos válidos
-    datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
+    datos_validos = df.dropna(subset=['COD', 'Fecha', 'Valor'])
     if datos_validos.empty:
         st.warning("⚠️ Los datos en Google Sheets están incompletos")
         st.info("Hay registros pero faltan valores en campos esenciales")
@@ -263,7 +274,7 @@ def show_system_info_complete_sheets(df, source_info, fichas_data):
         if not df.empty:
             st.success(f"**Total registros:** {len(df)}")
             
-            indicadores_unicos = df['Codigo'].nunique()
+            indicadores_unicos = df['COD'].nunique()
             st.success(f"**Indicadores únicos:** {indicadores_unicos}")
             
             if 'Fecha' in df.columns:
@@ -334,7 +345,7 @@ def show_system_info_complete_sheets(df, source_info, fichas_data):
     with col3:
         if st.button("🔄 Actualizar Datos", 
                     help="Recarga los datos desde Google Sheets",
-                    use_container_width=True):
+                    width='stretch'):
             current_tab = st.session_state.get('active_tab_index', 0)
             st.session_state.last_load_time = time.time()
             st.session_state.active_tab_index = current_tab
@@ -343,7 +354,7 @@ def show_system_info_complete_sheets(df, source_info, fichas_data):
     with col4:
         if st.button("🧹 Limpiar Cache", 
                     help="Limpia el cache de Streamlit",
-                    use_container_width=True):
+                    width='stretch'):
             st.cache_data.clear()
             st.session_state.data_timestamp = time.time()
             st.success("Cache limpiado")
@@ -353,7 +364,7 @@ def show_system_info_complete_sheets(df, source_info, fichas_data):
     with col5:
         if st.button("🔧 Test Conexión", 
                     help="Probar conexión con Google Sheets",
-                    use_container_width=True):
+                    width='stretch'):
             try:
                 from google_sheets_manager import GoogleSheetsManager
                 sheets_manager = GoogleSheetsManager()
@@ -379,8 +390,8 @@ def show_system_info_complete_sheets(df, source_info, fichas_data):
                 st.metric("Total Fichas", total_fichas)
             
             with col7:
-                if 'Codigo' in fichas_data.columns:
-                    fichas_con_codigo = fichas_data['Codigo'].notna().sum()
+                if 'COD' in fichas_data.columns:
+                    fichas_con_codigo = fichas_data['COD'].notna().sum()
                     st.metric("Fichas Válidas", fichas_con_codigo)
                 else:
                     st.metric("Fichas Válidas", "N/A")
@@ -401,10 +412,10 @@ def show_system_info_complete_sheets(df, source_info, fichas_data):
                 if columnas_disponibles:
                     st.dataframe(
                         fichas_data[columnas_disponibles].head(5), 
-                        use_container_width=True
+                        width='stretch'
                     )
                 else:
-                    st.dataframe(fichas_data.head(5), use_container_width=True)
+                    st.dataframe(fichas_data.head(5), width='stretch')
         else:
             st.info("La pestaña 'Fichas' existe pero está vacía")
             
@@ -479,11 +490,11 @@ def show_error_message():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("📋 Ver instrucciones de configuración", use_container_width=True):
+        if st.button("📋 Ver instrucciones de configuración", width='stretch'):
             show_setup_instructions()
     
     with col2:
-        if st.button("🔄 Intentar reconectar", use_container_width=True):
+        if st.button("🔄 Intentar reconectar", width='stretch'):
             st.rerun()
 
 if __name__ == "__main__":

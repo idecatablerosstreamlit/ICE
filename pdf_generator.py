@@ -47,20 +47,20 @@ class PDFGenerator:
                 return None
             
             # Buscar datos del indicador en las fichas de Google Sheets
-            indicador_data = fichas_data[fichas_data['Codigo'] == codigo]
+            indicador_data = fichas_data[fichas_data['COD'] == codigo]
             
             if indicador_data.empty:
                 st.error(f"❌ No se encontraron datos metodológicos para el código {codigo}")
                 
                 # Mostrar códigos disponibles
-                if 'Codigo' in fichas_data.columns:
-                    codigos_disponibles = fichas_data['Codigo'].dropna().unique().tolist()
+                if 'COD' in fichas_data.columns:
+                    codigos_disponibles = fichas_data['COD'].dropna().unique().tolist()
                     if codigos_disponibles:
                         st.info(f"💡 Códigos disponibles en pestaña 'Fichas': {', '.join(map(str, codigos_disponibles[:10]))}")
                         if len(codigos_disponibles) > 10:
                             st.info(f"... y {len(codigos_disponibles) - 10} más")
                 else:
-                    st.warning("⚠️ La pestaña 'Fichas' no tiene la columna 'Codigo'")
+                    st.warning("⚠️ La pestaña 'Fichas' no tiene la columna 'COD'")
                 
                 return None
             
@@ -382,3 +382,24 @@ class PDFGenerator:
     def is_available(self):
         """Verificar si PDF está disponible"""
         return self.pdf_available
+
+    @staticmethod
+    def generate_ficha_pdf(ficha_row):
+        """
+        Generar PDF de ficha metodológica desde una fila de datos
+        Args:
+            ficha_row: Serie de pandas con los datos de la ficha
+        Returns:
+            BytesIO con el contenido del PDF
+        """
+        if not PDF_AVAILABLE:
+            raise ImportError("reportlab no está disponible. Instala con: pip install reportlab")
+
+        # Crear DataFrame temporal con la fila
+        import pandas as pd
+        fichas_df_temp = pd.DataFrame([ficha_row])
+
+        # Usar el método existente
+        generator = PDFGenerator()
+        codigo = ficha_row.get('COD', 'UNKNOWN')
+        return generator.generate_metodological_sheet(codigo, fichas_df_temp)

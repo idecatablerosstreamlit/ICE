@@ -49,13 +49,15 @@ class GeneralSummaryTab:
                 """)
                 return
                 
-            required_cols = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria']
+            required_cols = ['COD', 'Fecha', 'Valor', 'Componente', 'Categoria']
+
             missing_cols = [col for col in required_cols if col not in df.columns]
+
             if missing_cols:
                 st.error(f"Faltan columnas esenciales: {missing_cols}")
                 return
-            
-            datos_validos = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
+
+            datos_validos = df.dropna(subset=['COD', 'Fecha', 'Valor'])
             if datos_validos.empty:
                 st.info("Los datos están vacíos o incompletos")
                 return
@@ -82,7 +84,7 @@ class GeneralSummaryTab:
                 try:
                     st.plotly_chart(
                         ChartGenerator.gauge_chart(puntaje_general), 
-                        use_container_width=True
+                        width='stretch'
                     )
                 except Exception as e:
                     st.error(f"Error en velocímetro: {e}")
@@ -91,7 +93,7 @@ class GeneralSummaryTab:
                 try:
                     st.plotly_chart(
                         ChartGenerator.radar_chart(df, None),
-                        use_container_width=True
+                        width='stretch'
                     )
                 except Exception as e:
                     st.error(f"Error en radar: {e}")
@@ -101,19 +103,19 @@ class GeneralSummaryTab:
             if not puntajes_componente.empty:
                 try:
                     fig_comp = ChartGenerator.component_bar_chart(puntajes_componente)
-                    st.plotly_chart(fig_comp, use_container_width=True)
+                    st.plotly_chart(fig_comp, width='stretch')
                 except Exception as e:
                     st.error(f"Error en gráfico: {e}")
-                    st.dataframe(puntajes_componente, use_container_width=True)
+                    st.dataframe(puntajes_componente, width='stretch')
             
             # Tabla de datos recientes
             with st.expander("Ver datos más recientes por indicador"):
                 try:
                     df_latest = DataProcessor._get_latest_values_by_indicator(df)
                     if not df_latest.empty:
-                        columns_to_show = ['Codigo', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
+                        columns_to_show = ['COD', 'Indicador', 'Componente', 'Categoria', 'Valor', 'Tipo', 'Valor_Normalizado', 'Fecha']
                         available_columns = [col for col in columns_to_show if col in df_latest.columns]
-                        st.dataframe(df_latest[available_columns], use_container_width=True)
+                        st.dataframe(df_latest[available_columns], width='stretch')
                 except Exception as e:
                     st.error(f"Error al mostrar datos: {e}")
         
@@ -143,7 +145,7 @@ class GeneralSummaryTab:
             return {
                 'fecha': ultima_fecha,
                 'indicador': registro_mas_reciente.get('Indicador', 'N/A'),
-                'codigo': registro_mas_reciente.get('Codigo', 'N/A'),
+                'codigo': registro_mas_reciente.get('COD', 'N/A'),
                 'componente': registro_mas_reciente.get('Componente', 'N/A')
             }
         except:
@@ -208,7 +210,7 @@ class ComponentSummaryTab:
             with col_izq:
                 df_componente_historico = df[df['Componente'] == componente_analisis]
                 fig_evol = ChartGenerator.evolution_chart(df_componente_historico, componente=componente_analisis)
-                st.plotly_chart(fig_evol, use_container_width=True)
+                st.plotly_chart(fig_evol, width='stretch')
             
             with col_der:
                 ComponentSummaryTab._render_category_visualization(df, componente_analisis)
@@ -223,7 +225,7 @@ class ComponentSummaryTab:
                     'Valor_Normalizado' if 'Valor_Normalizado' in df_componente.columns else 'Valor', 
                     ascending=False
                 ),
-                use_container_width=True
+                width='stretch'
             )
     
     @staticmethod
@@ -250,50 +252,119 @@ class ComponentSummaryTab:
         
         if "Barras" in tipo_viz:
             fig_bar = ChartGenerator.horizontal_bar_chart(df, componente, None)
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_bar, width='stretch')
         elif "Radar" in tipo_viz and num_categorias >= 3:
             fig_radar_cat = ChartGenerator.radar_chart_categories(df, componente, None)
-            st.plotly_chart(fig_radar_cat, use_container_width=True)
+            st.plotly_chart(fig_radar_cat, width='stretch')
         else:
             st.warning(f"Se requieren 3+ categorías para radar. {componente} tiene {num_categorias}.")
 
 class EvolutionTab:
     """Pestaña de evolución"""
-    
+
     @staticmethod
-    def render(df, filters=None):
-        """Renderizar evolución temporal"""
+    def render(df, filters=None, fichas_data=None):
+        """Renderizar evolución temporal con información de fichas"""
         st.header("Evolución Temporal de Indicadores")
-        
+
         try:
             if df.empty:
                 st.info("No hay datos para mostrar evolución")
                 return
-            
-            st.info(f"**Datos:** {len(df)} registros de {df['Codigo'].nunique()} indicadores")
-            
+
             # Crear filtros
             evolution_filters = EvolutionFilters.create_evolution_filters_stable(df)
-            
-            if evolution_filters['indicador']:
-                st.success(f"**Indicador:** {evolution_filters['indicador']}")
-                
-                datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
-                
-                if not datos_indicador.empty:
-                    st.write(f"**Registros históricos:** {len(datos_indicador)}")
-                    
-                    with st.expander("Ver datos históricos"):
-                        columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
-                        available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
-                        st.dataframe(datos_indicador[available_columns], use_container_width=True)
+
+            # Solo mostrar si hay indicador seleccionado
+            if not evolution_filters['indicador'] or not evolution_filters['codigo']:
+                st.warning("⚠️ Por favor selecciona un indicador para ver su evolución")
+                return
+
+            # Obtener datos del indicador
+            datos_indicador = df[df['COD'] == evolution_filters['codigo']].sort_values('Fecha')
+
+            if datos_indicador.empty:
+                st.warning("No hay datos históricos para este indicador")
+                return
+
+            # === RESUMEN DEL INDICADOR ===
+            st.markdown("---")
+            st.subheader(f"{evolution_filters['indicador']}")
+
+            # Buscar ficha metodológica
+            ficha_info = None
+            if fichas_data is not None and not fichas_data.empty:
+                try:
+                    ficha_info = fichas_data[fichas_data['COD'] == evolution_filters['codigo']].iloc[0]
+                except:
+                    pass
+
+            # Mostrar información básica
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                if ficha_info is not None:
+                    st.markdown(f"**Definición:** {ficha_info.get('Definicion', 'No disponible')}")
+                    st.markdown(f"**Unidad de Medida:** {ficha_info.get('Unidad_Medida', 'No disponible')}")
+                    st.markdown(f"**Metodología de Cálculo:** {ficha_info.get('Metodologia_Calculo', 'No disponible')}")
                 else:
-                    st.warning("No hay datos históricos")
-                    return
-            else:
-                st.info("**Vista general:** Evolución promedio")
+                    st.info("No hay ficha metodológica disponible para este indicador")
+
+                # Información adicional
+                indicador_data = datos_indicador.iloc[0]
+                st.markdown(f"**Componente:** {indicador_data.get('Componente', 'N/A')}")
+                st.markdown(f"**Categoría:** {indicador_data.get('Categoria', 'N/A')}")
+                st.markdown(f"**Registros históricos:** {len(datos_indicador)}")
+
+            with col2:
+                st.markdown("### Descargas")
+
+                # Descargar ficha en PDF
+                if ficha_info is not None:
+                    try:
+                        from pdf_generator import PDFGenerator
+                        pdf_bytes = PDFGenerator.generate_ficha_pdf(ficha_info)
+                        if pdf_bytes:
+                            st.download_button(
+                                label="Descargar Ficha PDF",
+                                data=pdf_bytes,
+                                file_name=f"ficha_{evolution_filters['codigo']}.pdf",
+                                mime="application/pdf",
+                                width='stretch',
+                                key=f"download_pdf_{evolution_filters['codigo']}"
+                            )
+                        else:
+                            st.button("Error al generar PDF", disabled=True, width='stretch')
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                        st.button("Ficha no disponible", disabled=True, width='stretch')
+                else:
+                    st.button("Ficha no disponible", disabled=True, width='stretch')
+
+                # Descargar histórico en Excel
+                try:
+                    import io
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        columns_to_export = ['Fecha', 'Valor', 'Valor_Recalculado', 'Tipo', 'Componente', 'Categoria']
+                        available_columns = [col for col in columns_to_export if col in datos_indicador.columns]
+                        datos_indicador[available_columns].to_excel(writer, index=False, sheet_name='Histórico')
+
+                    st.download_button(
+                        label="Descargar Histórico Excel",
+                        data=output.getvalue(),
+                        file_name=f"historico_{evolution_filters['codigo']}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        width='stretch',
+                        key=f"download_excel_{evolution_filters['codigo']}"
+                    )
+                except Exception as e:
+                    st.error(f"Error al generar Excel: {e}")
+
+            st.markdown("---")
             
-            # Generar gráfico
+            # === GRÁFICO DE EVOLUCIÓN ===
+            st.subheader("Gráfico de Evolución")
             try:
                 fig = ChartGenerator.evolution_chart(
                     df,
@@ -302,43 +373,74 @@ class EvolutionTab:
                     tipo_grafico=evolution_filters['tipo_grafico'],
                     mostrar_meta=evolution_filters['mostrar_meta']
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             except Exception as e:
                 st.error(f"Error en gráfico: {e}")
-            
-            # Análisis detallado si hay indicador seleccionado
-            if evolution_filters['codigo'] and evolution_filters['indicador']:
-                st.subheader(f"Análisis: {evolution_filters['indicador']}")
-                
-                datos_indicador = df[df['Codigo'] == evolution_filters['codigo']].sort_values('Fecha')
-                
-                if len(datos_indicador) > 1:
-                    col1, col2, col3, col4 = st.columns(4)
-                    
-                    valor_col = 'Valor_Normalizado' if 'Valor_Normalizado' in datos_indicador.columns else 'Valor'
-                    
-                    with col1:
-                        valor_inicial = datos_indicador.iloc[0][valor_col]
-                        st.metric("Valor Inicial", f"{valor_inicial:.3f}")
-                    
-                    with col2:
-                        valor_actual = datos_indicador.iloc[-1][valor_col]
-                        st.metric("Valor Actual", f"{valor_actual:.3f}")
-                    
-                    with col3:
-                        cambio = valor_actual - valor_inicial
-                        st.metric("Cambio Total", f"{cambio:+.3f}")
-                    
-                    with col4:
-                        if valor_inicial != 0:
-                            cambio_pct = (cambio / valor_inicial) * 100
-                            st.metric("Cambio %", f"{cambio_pct:+.1f}%")
-                
-                # Tabla histórica
-                columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
-                available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
-                st.dataframe(datos_indicador[available_columns], use_container_width=True)
-        
+
+            # === ANÁLISIS ESTADÍSTICO ===
+            st.subheader("Análisis Estadístico")
+
+            if len(datos_indicador) > 1:
+                col1, col2, col3, col4 = st.columns(4)
+
+                valor_col = 'Valor_Normalizado' if 'Valor_Normalizado' in datos_indicador.columns else 'Valor'
+
+                with col1:
+                    valor_inicial = datos_indicador.iloc[0][valor_col]
+                    st.metric("Valor Inicial", f"{valor_inicial:.3f}")
+
+                with col2:
+                    valor_actual = datos_indicador.iloc[-1][valor_col]
+                    st.metric("Valor Actual", f"{valor_actual:.3f}")
+
+                with col3:
+                    cambio = valor_actual - valor_inicial
+                    st.metric("Cambio Total", f"{cambio:+.3f}")
+
+                with col4:
+                    if valor_inicial != 0:
+                        cambio_pct = (cambio / valor_inicial) * 100
+                        st.metric("Cambio %", f"{cambio_pct:+.1f}%")
+
+            # === TABLA DE DATOS HISTÓRICOS ===
+            st.subheader("Datos Históricos")
+            columns_to_show = ['Fecha', 'Valor', 'Valor_Recalculado', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
+            available_columns = [col for col in columns_to_show if col in datos_indicador.columns]
+            st.dataframe(datos_indicador[available_columns], width='stretch', height=300)
+
+            # === NOTAS EXPLICATIVAS ===
+            notas = []
+
+            # Nota sobre Valor_Recalculado
+            if 'Valor_Recalculado' in available_columns:
+                notas.append(
+                    "**\\*** *Valor Recalculado*: Aplica únicamente para valores numéricos expresados en pesos. "
+                    "Corresponde al valor indexado mediante la aplicación del Índice de Precios al Consumidor (IPC). "
+                    "La metodología de indexación ajusta los valores históricos por inflación acumulada desde el año base hasta el año actual, "
+                    "permitiendo comparar valores de diferentes años en términos de poder adquisitivo constante. "
+                    "Fórmula: Valor Recalculado = Valor Original × Factor IPC Acumulado."
+                )
+
+            # Nota sobre normalización especial (promedio o acumulado)
+            if ficha_info is not None:
+                calculo_tipo = ficha_info.get('Calculo', '').lower().strip()
+                if calculo_tipo == 'promedio':
+                    notas.append(
+                        "**\\*\\*** *Valor Normalizado*: Para este indicador, el valor normalizado corresponde al **promedio** "
+                        "de los valores normalizados de los últimos 4 años disponibles."
+                    )
+                elif calculo_tipo == 'acumulado':
+                    notas.append(
+                        "**\\*\\*** *Valor Normalizado*: Para este indicador, el valor normalizado corresponde a la **suma acumulada** "
+                        "de los valores de los últimos 4 años disponibles, normalizada posteriormente."
+                    )
+
+            # Mostrar notas si existen
+            if notas:
+                st.markdown("---")
+                for nota in notas:
+                    st.markdown(nota)
+
         except Exception as e:
             st.error(f"Error en evolución: {e}")
 
@@ -371,7 +473,7 @@ class EditTab:
             st.markdown("### 📖 Modo Consulta")
             
             if codigo_editar and codigo_editar != "CREAR_NUEVO":
-                datos_indicador = df[df['Codigo'] == codigo_editar] if not df.empty else pd.DataFrame()
+                datos_indicador = df[df['COD'] == codigo_editar] if not df.empty else pd.DataFrame()
                 
                 if not datos_indicador.empty:
                     EditTab._render_indicator_info_card(datos_indicador, codigo_editar)
@@ -409,7 +511,7 @@ class EditTab:
                 if codigo_editar == "CREAR_NUEVO":
                     EditTab._render_new_indicator_form_auth(df)
                 elif codigo_editar and not df.empty:
-                    datos_indicador = df[df['Codigo'] == codigo_editar]
+                    datos_indicador = df[df['COD'] == codigo_editar]
                     if not datos_indicador.empty:
                         registros_indicador = datos_indicador.sort_values('Fecha', ascending=False)
                         EditTab._render_admin_management_tabs(df, codigo_editar, registros_indicador, fichas_data)
@@ -428,7 +530,7 @@ class EditTab:
             st.info("Base de datos vacía")
             return "CREAR_NUEVO" if auth_manager.is_authenticated() else None
         
-        codigos_disponibles = sorted(df['Codigo'].dropna().unique())
+        codigos_disponibles = sorted(df['COD'].dropna().unique())
         
         if auth_manager.is_authenticated():
             opciones_codigo = ["[Crear nuevo código]"] + list(codigos_disponibles)
@@ -484,7 +586,7 @@ class EditTab:
             # Tabla de datos
             columns_to_show = ['Fecha', 'Valor', 'Tipo', 'Valor_Normalizado', 'Componente', 'Categoria']
             available_columns = [col for col in columns_to_show if col in registros_indicador.columns]
-            st.dataframe(registros_indicador[available_columns], use_container_width=True)
+            st.dataframe(registros_indicador[available_columns], width='stretch')
         else:
             st.info("No hay registros para este indicador")
     
@@ -522,7 +624,7 @@ class EditTab:
             with col1:
                 st.markdown("#### Ficha Metodológica")
                 if fichas_data is not None and not fichas_data.empty:
-                    indicador_metodologico = fichas_data[fichas_data['Codigo'] == codigo_editar]
+                    indicador_metodologico = fichas_data[fichas_data['COD'] == codigo_editar]
                     
                     if not indicador_metodologico.empty:
                         metodologia = indicador_metodologico.iloc[0]
@@ -553,7 +655,7 @@ class EditTab:
                         
                         # Mostrar códigos disponibles
                         if 'Codigo' in fichas_data.columns:
-                            codigos_disponibles = fichas_data['Codigo'].dropna().unique().tolist()
+                            codigos_disponibles = fichas_data['COD'].dropna().unique().tolist()
                             if codigos_disponibles:
                                 st.info(f"💡 Códigos disponibles: {', '.join(map(str, codigos_disponibles[:5]))}")
                 else:
@@ -592,7 +694,7 @@ class EditTab:
             if submitted:
                 # Crear ficha
                 ficha_data = {
-                    'Codigo': codigo_editar,
+                    'COD': codigo_editar,
                     'Nombre_Indicador': nombre_indicador,
                     'Definicion': definicion,
                     'Objetivo': objetivo,
@@ -648,7 +750,7 @@ class EditTab:
             reportlab_available = False
         
         if reportlab_available and fichas_data is not None and not fichas_data.empty:
-            if codigo_editar in fichas_data['Codigo'].values:
+            if codigo_editar in fichas_data['COD'].values:
                 if st.button("📄 Generar PDF", key=f"generate_pdf_{codigo_editar}"):
                     EditTab._generate_and_download_pdf(codigo_editar, fichas_data)
             else:
@@ -720,7 +822,7 @@ class EditTab:
                 
                 primera_fecha = st.date_input("Fecha Inicial")
             
-            submitted = st.form_submit_button("✅ Crear Indicador", use_container_width=True)
+            submitted = st.form_submit_button("✅ Crear Indicador", width='stretch')
             
             if submitted:
                 if EditTab._validate_and_create_indicator(
@@ -746,7 +848,7 @@ class EditTab:
             st.error("La categoría es obligatoria")
             return False
         
-        if not df.empty and codigo in df['Codigo'].values:
+        if not df.empty and codigo in df['COD'].values:
             st.error(f"El código '{codigo}' ya existe")
             return False
         
@@ -835,15 +937,15 @@ class EditTab:
                     st.metric("Período", "1 registro")
             
             # Tabla completa
-            st.dataframe(registros_indicador, use_container_width=True)
+            st.dataframe(registros_indicador, width='stretch')
             
             # Información metodológica expandida
             if fichas_data is not None and not fichas_data.empty:
                 with st.expander("📋 Información Metodológica Completa"):
-                    indicador_metodologico = fichas_data[fichas_data['Codigo'] == codigo_editar]
+                    indicador_metodologico = fichas_data[fichas_data['COD'] == codigo_editar]
                     if not indicador_metodologico.empty:
                         metodologia = indicador_metodologico.iloc[0]
-                        st.dataframe(metodologia.to_frame().T, use_container_width=True)
+                        st.dataframe(metodologia.to_frame().T, width='stretch')
                     else:
                         st.info("No hay información metodológica para este código en Google Sheets")
                         if st.button("➕ Crear ficha metodológica", key=f"crear_ficha_detailed_{codigo_editar}"):
@@ -863,7 +965,7 @@ class EditTab:
         
         # Obtener tipo del indicador
         if not df.empty:
-            datos_indicador = df[df['Codigo'] == codigo_editar]
+            datos_indicador = df[df['COD'] == codigo_editar]
             if not datos_indicador.empty:
                 tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
                 st.info(f"**Tipo de indicador:** {tipo_indicador}")
@@ -877,14 +979,14 @@ class EditTab:
             with col2:
                 nuevo_valor = st.number_input("Nuevo Valor", value=0.5)
             
-            submitted = st.form_submit_button("➕ Agregar Registro", use_container_width=True)
+            submitted = st.form_submit_button("➕ Agregar Registro", width='stretch')
             
             if submitted:
                 fecha_dt = pd.to_datetime(nueva_fecha)
                 
                 # Verificar duplicados
                 if not df.empty:
-                    registro_existente = df[(df['Codigo'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
+                    registro_existente = df[(df['COD'] == codigo_editar) & (df['Fecha'] == fecha_dt)]
                     if not registro_existente.empty:
                         st.warning(f"Ya existe un registro para {nueva_fecha.strftime('%d/%m/%Y')}")
                         return
@@ -947,7 +1049,7 @@ class EditTab:
                             help="Introduce el nuevo valor para este registro"
                         )
                     
-                    submitted_edit_form = st.form_submit_button("✏️ Actualizar Registro", use_container_width=True)
+                    submitted_edit_form = st.form_submit_button("✏️ Actualizar Registro", width='stretch')
                     
                     if submitted_edit_form:
                         if nuevo_valor_edit != valor_edit_actual:
@@ -1021,7 +1123,7 @@ class EditTab:
                         if st.button(
                             "🗑️ ELIMINAR PERMANENTEMENTE",
                             type="primary",
-                            use_container_width=True,
+                            width='stretch',
                             key="delete_button_final_unique"
                         ):
                             with st.spinner("Eliminando registro..."):
@@ -1039,7 +1141,7 @@ class EditTab:
                         st.button(
                             "🔒 Confirma primero para eliminar",
                             disabled=True,
-                            use_container_width=True
+                            width='stretch'
                         )
         
         except Exception as e:
@@ -1072,7 +1174,7 @@ class EditTab:
                         file_name=filename,
                         mime="application/pdf",
                         key=f"download_pdf_{codigo_editar}_{timestamp}",
-                        use_container_width=True
+                        width='stretch'
                     )
                 else:
                     st.error("No se pudo generar el PDF")
@@ -1091,25 +1193,42 @@ class TabManager:
         self.fichas_data = fichas_data
     
     def render_tabs(self, df_filtrado, filters):
-        """Renderizar todas las pestañas"""
-        
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "📊 Resumen General", 
-            "🏢 Resumen por Componente", 
-            "📈 Evolución", 
-            "⚙️ Gestión de Datos"
-        ])
-        
-        with tab1:
+        """Renderizar todas las pestañas con control manual de estado"""
+
+        # Inicializar pestaña activa en session_state
+        if 'active_tab' not in st.session_state:
+            st.session_state.active_tab = "Resumen General"
+
+        # Selector de pestañas manual
+        tabs_options = ["Resumen General", "Resumen por Componente", "Evolución", "Gestión de Datos"]
+
+        # Usar columnas para hacer el selector más horizontal
+        st.markdown("---")
+        selected_tab = st.radio(
+            "Navegación",
+            tabs_options,
+            index=tabs_options.index(st.session_state.active_tab),
+            horizontal=True,
+            key="tab_selector",
+            label_visibility="collapsed"
+        )
+
+        # Actualizar pestaña activa
+        st.session_state.active_tab = selected_tab
+
+        st.markdown("---")
+
+        # Renderizar contenido según pestaña seleccionada
+        if selected_tab == "Resumen General":
             GeneralSummaryTab.render(self.df)
-        
-        with tab2:
+
+        elif selected_tab == "Resumen por Componente":
             ComponentSummaryTab.render(self.df)
-        
-        with tab3:
-            EvolutionTab.render(self.df)
-        
-        with tab4:
+
+        elif selected_tab == "Evolución":
+            EvolutionTab.render(self.df, fichas_data=self.fichas_data)
+
+        elif selected_tab == "Gestión de Datos":
             EditTab.render(self.df, None, self.fichas_data)
         
         # Sidebar con información del sistema
@@ -1118,7 +1237,7 @@ class TabManager:
             
             if not self.df.empty:
                 st.success(f"**{len(self.df)}** registros cargados")
-                st.success(f"**{self.df['Codigo'].nunique()}** indicadores únicos")
+                st.success(f"**{self.df['COD'].nunique()}** indicadores únicos")
                 
                 if 'Tipo' in self.df.columns:
                     tipos_count = self.df['Tipo'].value_counts()
@@ -1186,12 +1305,12 @@ class TabManager:
             # Controles
             st.markdown("### 🎛️ Controles")
             
-            if st.button("🔄 Actualizar Datos", key="sidebar_refresh", use_container_width=True):
+            if st.button("🔄 Actualizar Datos", key="sidebar_refresh", width='stretch'):
                 st.cache_data.clear()
                 st.session_state.data_timestamp = time.time()
                 st.rerun()
             
-            if st.button("🧹 Limpiar Cache", key="sidebar_cache", use_container_width=True):
+            if st.button("🧹 Limpiar Cache", key="sidebar_cache", width='stretch'):
                 st.cache_data.clear()
                 st.session_state.clear()
                 st.success("Cache limpiado")

@@ -107,7 +107,7 @@ class AuthManager:
             with col2:
                 password = st.text_input("Contraseña", type="password", placeholder="qwerty", key="login_password")
             
-            login_button = st.form_submit_button("Iniciar Sesión", use_container_width=True)
+            login_button = st.form_submit_button("Iniciar Sesión", width='stretch')
             
             if login_button:
                 if username and password:

@@ -157,12 +157,12 @@ class EvolutionFilters:
     @staticmethod
     def create_evolution_filters_stable(df):
         """Crear filtros para la pestaña de evolución SIN causar rerun"""
-        st.markdown("### 🎛️ Configuración de Visualización")
-        
+        st.markdown("### Configuración de Visualización")
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            st.markdown("**📊 Selección de Indicador**")
+            st.markdown("**Selección de Indicador**")
             
             try:
                 # ✅ INICIALIZAR estado si no existe
@@ -172,10 +172,10 @@ class EvolutionFilters:
                     st.session_state.evolution_selected_indicador = None
                 
                 # Obtener códigos únicos disponibles
-                if 'Codigo' in df.columns:
-                    codigos_disponibles = sorted([c for c in df['Codigo'].dropna().unique() if str(c).strip()])
+                if 'COD' in df.columns:
+                    codigos_disponibles = sorted([c for c in df['COD'].dropna().unique() if str(c).strip()])
                 else:
-                    st.error("No se encontró la columna 'Codigo' en los datos")
+                    st.error("No se encontró la columna 'COD' en los datos")
                     return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
                 
                 if not codigos_disponibles:
@@ -183,19 +183,20 @@ class EvolutionFilters:
                     return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
                 
                 # Crear opciones con información adicional
-                opciones_display = ["🌍 Todos los indicadores (Vista General)"]
-                codigo_map = {opciones_display[0]: None}
-                
+                opciones_display = []
+                codigo_map = {}
+
                 for codigo in codigos_disponibles:
                     try:
-                        indicador_info = df[df['Codigo'] == codigo].iloc[0]
+                        indicador_info = df[df['COD'] == codigo].iloc[0]
                         nombre = indicador_info['Indicador'] if 'Indicador' in indicador_info else 'Sin nombre'
                         componente = indicador_info['Componente'] if 'Componente' in indicador_info else 'Sin componente'
-                        
+
+
                         # Limitar longitud para mejor visualización
                         nombre_corto = nombre[:50] + "..." if len(nombre) > 50 else nombre
-                        display_text = f"📈 {codigo} - {nombre_corto}"
-                        
+                        display_text = f"{codigo} - {nombre_corto}"
+
                         opciones_display.append(display_text)
                         codigo_map[display_text] = codigo
                         
@@ -217,7 +218,7 @@ class EvolutionFilters:
                     opciones_display,
                     index=index_actual,
                     key="evolution_indicador_selector_stable",
-                    help="Selecciona un indicador específico o la vista general"
+                    help="Selecciona un indicador para ver su evolución histórica"
                 )
                 
                 codigo_seleccionado = codigo_map.get(seleccion)
@@ -228,15 +229,9 @@ class EvolutionFilters:
                 # Obtener nombre del indicador si se seleccionó uno específico
                 if codigo_seleccionado:
                     try:
-                        indicador_data = df[df['Codigo'] == codigo_seleccionado].iloc[0]
+                        indicador_data = df[df['COD'] == codigo_seleccionado].iloc[0]
                         indicador_seleccionado = indicador_data['Indicador']
                         st.session_state.evolution_selected_indicador = indicador_seleccionado
-                        
-                        # Mostrar información adicional del indicador seleccionado
-                        st.info(f"""
-                        **Componente:** {indicador_data.get('Componente', 'N/A')}  
-                        **Categoría:** {indicador_data.get('Categoria', 'N/A')}
-                        """)
                         
                     except Exception as e:
                         st.error(f"Error al obtener datos del indicador: {e}")
@@ -253,7 +248,7 @@ class EvolutionFilters:
                 return {'codigo': None, 'indicador': None, 'mostrar_meta': True, 'tipo_grafico': "Línea"}
         
         with col2:
-            st.markdown("**🎨 Opciones de Visualización**")
+            st.markdown("**Opciones de Visualización**")
             
             # ✅ INICIALIZAR estado para opciones de visualización
             if 'evolution_mostrar_meta' not in st.session_state:
@@ -283,7 +278,7 @@ class EvolutionFilters:
             
             # Mostrar estadísticas si hay un indicador seleccionado
             if codigo_seleccionado:
-                datos_indicador = df[df['Codigo'] == codigo_seleccionado]
+                datos_indicador = df[df['COD'] == codigo_seleccionado]
                 if not datos_indicador.empty:
                     st.markdown("**📊 Estadísticas:**")
                     st.write(f"• **Registros:** {len(datos_indicador)}")

@@ -81,7 +81,7 @@ class ChartGenerator:
             
             # ✅ DETERMINAR SI USAR DATOS YA FILTRADOS O OBTENER MÁS RECIENTES
             # Si el DataFrame viene con pocos registros, probablemente ya está filtrado por fecha
-            total_indicadores = df['Codigo'].nunique() if 'Codigo' in df.columns else 0
+            total_indicadores = df['COD'].nunique() if 'COD' in df.columns else 0
             
             # Si hay filtros de fecha aplicados, usar los datos tal como vienen
             if filters and filters.get('fecha') is not None:
@@ -469,7 +469,7 @@ class ChartGenerator:
             categorias_stats = categorias_stats.sort_values('Puntaje Promedio', ascending=False)
             
             st.subheader(f"Resumen por Categoría - {componente}")
-            st.dataframe(categorias_stats, use_container_width=True)
+            st.dataframe(categorias_stats, width='stretch')
             
         except Exception as e:
             st.error(f"Error en tabla de categorías: {e}")
@@ -482,13 +482,13 @@ class ChartGenerator:
                 return df
             
             # Verificar columnas esenciales
-            required_columns = ['Codigo', 'Fecha', 'Valor']
+            required_columns = ['COD', 'Fecha', 'Valor']
             if not all(col in df.columns for col in required_columns):
                 st.error(f"Faltan columnas esenciales: {required_columns}")
                 return df
-            
+
             # Limpiar datos
-            df_clean = df.dropna(subset=['Codigo', 'Fecha', 'Valor']).copy()
+            df_clean = df.dropna(subset=['COD', 'Fecha', 'Valor']).copy()
             
             if df_clean.empty:
                 st.warning("No hay datos válidos para procesar")
@@ -506,12 +506,12 @@ class ChartGenerator:
             # Obtener valores más recientes de forma segura
             result_rows = []
             
-            for codigo in df_clean['Codigo'].unique():
+            for codigo in df_clean['COD'].unique():
                 if pd.isna(codigo):
                     continue
                     
                 # Filtrar datos para este código
-                codigo_data = df_clean[df_clean['Codigo'] == codigo].copy()
+                codigo_data = df_clean[df_clean['COD'] == codigo].copy()
                 
                 if codigo_data.empty:
                     continue

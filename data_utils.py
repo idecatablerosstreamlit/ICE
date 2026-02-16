@@ -16,6 +16,37 @@ try:
 except ImportError:
     GOOGLE_SHEETS_AVAILABLE = False
 
+# Tabla de IPC (Índice de Precios al Consumidor) por año
+IPC_ANUAL = {
+    2019: 3.8,
+    2020: 1.61,
+    2021: 5.625,
+    2022: 13.12,
+    2023: 9.28,
+    2024: 5.2,
+    2025: 5.1
+}
+
+def calcular_factor_inflacion_acumulada(año_base, año_final):
+    """
+    Calcula el factor de inflación acumulada desde año_base hasta año_final
+    Args:
+        año_base: Año del valor original
+        año_final: Año al que se quiere ajustar
+    Returns:
+        Factor de inflación acumulada (ej: 1.377 significa 37.7% de inflación acumulada)
+    """
+    if año_base >= año_final:
+        return 1.0
+
+    factor_acumulado = 1.0
+    for año in range(año_base + 1, año_final + 1):
+        if año in IPC_ANUAL:
+            tasa_ipc = IPC_ANUAL[año] / 100
+            factor_acumulado *= (1 + tasa_ipc)
+
+    return factor_acumulado
+
 class DataLoader:
     """Clase para cargar datos - VERSIÓN CON FICHAS DESDE SHEETS"""
     
@@ -62,30 +93,67 @@ class DataLoader:
         try:
             if not GOOGLE_SHEETS_AVAILABLE or not self.sheets_manager:
                 return None
-            
+
             # Cargar fichas desde Google Sheets
             fichas_df = self.sheets_manager.load_fichas_data()
-            
+
             if fichas_df is None:
                 return None
-            
+
             if fichas_df.empty:
                 return pd.DataFrame()
-            
-            # Limpiar datos de fichas
-            fichas_df = fichas_df.dropna(subset=['Codigo'], how='all')
-            
+
+            # Limpiar datos de fichas usando COD
+            if 'COD' in fichas_df.columns:
+                fichas_df = fichas_df.dropna(subset=['COD'], how='all')
+
             return fichas_df
-            
+
         except Exception as e:
             st.error(f"❌ Error al cargar fichas: {e}")
             return None
-    
+
+    def load_combined_data(self):
+        """NUEVO: Cargar datos combinados (IndicadoresICE + Fichas con JOIN)"""
+        try:
+            if not GOOGLE_SHEETS_AVAILABLE or not self.sheets_manager:
+                return self._create_empty_dataframe()
+
+            # Cargar datos combinados usando el método del GoogleSheetsManager
+            df = self.sheets_manager.load_combined_data()
+
+            if df is None or df.empty:
+                return self._create_empty_dataframe()
+
+            # Cargar fichas para calcular valores recalculados
+            fichas_data = self.sheets_manager.load_fichas_data()
+
+            # Procesar datos silenciosamente (incluye normalización)
+            self._process_dataframe_silent(df)
+
+            # Calcular valores recalculados DESPUÉS de todo el procesamiento
+            if fichas_data is not None and not fichas_data.empty:
+                self._calculate_recalculated_values(df, fichas_data)
+            else:
+                # Si no hay fichas, Valor_Recalculado = Valor
+                if 'Valor' in df.columns:
+                    df['Valor_Recalculado'] = df['Valor'].copy()
+
+            # Verificar y limpiar silenciosamente
+            if self._verify_dataframe_simple(df):
+                return df
+            else:
+                return self._create_empty_dataframe()
+
+        except Exception as e:
+            st.error(f"❌ Error al cargar datos combinados: {e}")
+            return self._create_empty_dataframe()
+
     def _create_empty_dataframe(self):
         """Crear DataFrame vacío"""
         return pd.DataFrame(columns=[
-            'Linea_Accion', 'Componente', 'Categoria', 
-            'Codigo', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado'
+            'Linea_Accion', 'Componente', 'Categoria',
+            'COD', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado', 'Valor_Recalculado'
         ])
     
     def _process_dataframe_silent(self, df):
@@ -95,19 +163,41 @@ class DataLoader:
             for original, nuevo in COLUMN_MAPPING.items():
                 if original in df.columns:
                     df.rename(columns={original: nuevo}, inplace=True)
-            
+
             # Procesar fechas silenciosamente
             self._process_dates_silent(df)
-            
+
             # Procesar valores silenciosamente
             self._process_values_silent(df)
-            
+
             # Añadir columnas por defecto
             self._add_default_columns_corrected(df)
-            
+
             # Normalización silenciosa
             self._normalize_values_silent(df)
-            
+
+        except Exception as e:
+            pass  # Silencioso
+
+    def _process_dataframe_without_normalize(self, df):
+        """Procesar DataFrame SIN normalizar (para procesar antes de calcular Valor_Recalculado)"""
+        try:
+            # Renombrar columnas
+            for original, nuevo in COLUMN_MAPPING.items():
+                if original in df.columns:
+                    df.rename(columns={original: nuevo}, inplace=True)
+
+            # Procesar fechas silenciosamente
+            self._process_dates_silent(df)
+
+            # Procesar valores silenciosamente
+            self._process_values_silent(df)
+
+            # Añadir columnas por defecto
+            self._add_default_columns_corrected(df)
+
+            # NO normalizar aquí - se hará después de calcular Valor_Recalculado
+
         except Exception as e:
             pass  # Silencioso
     
@@ -165,107 +255,316 @@ class DataLoader:
             pass  # Silencioso
     
     def _normalize_values_silent(self, df):
-        """Normalización silenciosa (sin mostrar información en pantalla)"""
+        """
+        Normalización de valores entre 0 y 1:
+        - Si Calculo = "promedio": promedio de valores normalizados de últimos 4 años
+        - Si Calculo = "acumulado": suma de valores de últimos 4 años, luego normalizar
+        - Si tiene Meta: valor/Meta (Meta es 1), nunca pasa de 1
+        - Si NO tiene Meta y hay datos históricos: min-max normalization
+        - Si NO tiene Meta y NO hay datos históricos: asigna 0.7
+        """
         try:
-            if df.empty or 'Valor' not in df.columns:
+            if df.empty or 'Valor' not in df.columns or 'Fecha' not in df.columns:
                 return
-            
+
             # Inicializar valores normalizados
             df['Valor_Normalizado'] = 0.0
-            
+
             # Verificar que tenemos datos válidos
             valores_validos = df['Valor'].notna()
             if not valores_validos.any():
                 return
-            
-            # Agrupar por indicador para detectar si tiene historial
-            for codigo in df['Codigo'].unique():
+
+            # Usar columna COD
+            if 'COD' not in df.columns:
+                return
+
+            tiene_meta = 'Meta' in df.columns
+            tiene_calculo = 'Calculo' in df.columns
+
+            # Asegurar que Fecha es datetime
+            if not pd.api.types.is_datetime64_any_dtype(df['Fecha']):
+                df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+
+            # Agrupar por indicador usando COD
+            for codigo in df['COD'].unique():
                 if pd.isna(codigo):
                     continue
-                    
-                mask = df['Codigo'] == codigo
-                datos_indicador = df[mask]
+
+                mask = df['COD'] == codigo
+                datos_indicador = df[mask].copy()
                 valores = datos_indicador['Valor'].dropna()
-                
+
                 if valores.empty:
                     continue
-                
+
                 # Obtener información del indicador
                 indicador_info = datos_indicador.iloc[0]
-                tipo = str(indicador_info.get('Tipo', 'porcentaje')).lower()
-                
-                # Verificar si tiene historial (más de un registro)
-                tiene_historico = len(valores) > 1
-                
-                if not tiene_historico:
-                    # SIN HISTORIAL: Asignar valores fijos según tipo
-                    if tipo in ['porcentaje', 'percentage', '%']:
-                        # Porcentajes: usar valor original normalizado
-                        for index in datos_indicador.index:
-                            valor = datos_indicador.loc[index, 'Valor']
-                            if pd.notna(valor):
-                                if valor <= 1:
-                                    valor_norm = valor  # Ya está en 0-1
-                                else:
-                                    valor_norm = valor / 100  # Convertir de 0-100 a 0-1
-                                df.at[index, 'Valor_Normalizado'] = max(0, min(1, valor_norm))
-                    else:
-                        # VALORES NUMÉRICOS SIN HISTORIAL: Asignar 0.7 (70%)
-                        for index in datos_indicador.index:
-                            df.at[index, 'Valor_Normalizado'] = 0.7
-                    
+                meta_valor = indicador_info.get('Meta') if tiene_meta else None
+                calculo = indicador_info.get('Calculo', '').lower().strip() if tiene_calculo else ''
+
+                # === CASO ESPECIAL: PROMEDIO ===
+                if calculo == 'promedio':
+                    self._normalize_promedio(df, datos_indicador, meta_valor)
+
+                # === CASO ESPECIAL: ACUMULADO ===
+                elif calculo == 'acumulado':
+                    self._normalize_acumulado(df, datos_indicador, meta_valor)
+
+                # === CASOS NORMALES ===
                 else:
-                    # CON HISTORIAL: Normalizar por el máximo del indicador
-                    if tipo in ['porcentaje', 'percentage', '%']:
-                        # Porcentajes: convertir a 0-1 si es necesario
+                    # Normalización estándar (sin considerar últimos 4 años)
+                    if pd.notna(meta_valor) and meta_valor > 0:
+                        # TIENE META: Meta es 1 (100%), normalizar como valor/Meta
                         for index in datos_indicador.index:
                             valor = datos_indicador.loc[index, 'Valor']
                             if pd.notna(valor):
-                                if valor <= 1:
-                                    valor_norm = valor
-                                else:
-                                    valor_norm = valor / 100
-                                df.at[index, 'Valor_Normalizado'] = max(0, min(1, valor_norm))
-                    else:
-                        # Valores numéricos: normalizar por el máximo del indicador
+                                valor_norm = valor / meta_valor
+                                df.at[index, 'Valor_Normalizado'] = min(1.0, max(0.0, valor_norm))
+
+                    elif len(valores) > 1:
+                        # NO tiene Meta pero SÍ hay datos históricos: min-max normalization
                         max_valor = valores.max()
-                        if max_valor > 0:
+                        min_valor = valores.min()
+                        rango = max_valor - min_valor
+
+                        if rango > 0:
                             for index in datos_indicador.index:
                                 valor = datos_indicador.loc[index, 'Valor']
                                 if pd.notna(valor):
-                                    valor_norm = valor / max_valor
-                                    df.at[index, 'Valor_Normalizado'] = max(0, valor_norm)
+                                    valor_norm = (valor - min_valor) / rango
+                                    df.at[index, 'Valor_Normalizado'] = min(1.0, max(0.0, valor_norm))
                         else:
-                            # Si todos los valores son 0, asignar 0.7
+                            # Todos los valores históricos son iguales
                             for index in datos_indicador.index:
                                 df.at[index, 'Valor_Normalizado'] = 0.7
-                
+
+                    else:
+                        # NO tiene Meta y NO hay datos históricos: asignar 0.7
+                        for index in datos_indicador.index:
+                            df.at[index, 'Valor_Normalizado'] = 0.7
+
         except Exception as e:
-            # Fallback seguro silencioso
+            # Fallback silencioso
+            pass
+
+    def _normalize_promedio(self, df, datos_indicador, meta_valor):
+        """
+        Normalización tipo PROMEDIO: para cada año, promedio de valores normalizados de ese año y los 3 anteriores
+        """
+        try:
+            # Ordenar por fecha ascendente
+            datos_ordenados = datos_indicador.sort_values('Fecha', ascending=True).copy()
+            datos_ordenados['Año'] = datos_ordenados['Fecha'].dt.year
+
+            # Obtener min y max de TODOS los valores históricos del indicador (para min-max)
+            todos_valores = datos_indicador['Valor'].dropna()
+            min_historico = todos_valores.min()
+            max_historico = todos_valores.max()
+            rango = max_historico - min_historico
+
+            # Para cada registro, calcular promedio con sus 3 años anteriores
+            for index in datos_ordenados.index:
+                año_actual = datos_ordenados.loc[index, 'Año']
+
+                # Obtener datos de este año y los 3 anteriores
+                años_ventana = [año_actual - i for i in range(4)]
+                datos_ventana = datos_ordenados[datos_ordenados['Año'].isin(años_ventana)]
+
+                if datos_ventana.empty:
+                    df.at[index, 'Valor_Normalizado'] = 0.7
+                    continue
+
+                # Normalizar cada valor en la ventana
+                valores_normalizados = []
+                for _, row in datos_ventana.iterrows():
+                    valor = row['Valor']
+                    if pd.notna(valor):
+                        if pd.notna(meta_valor) and meta_valor > 0:
+                            # Con meta: valor/meta
+                            valor_norm = min(1.0, max(0.0, valor / meta_valor))
+                        elif rango > 0:
+                            # Sin meta: min-max
+                            valor_norm = (valor - min_historico) / rango
+                            valor_norm = min(1.0, max(0.0, valor_norm))
+                        elif len(todos_valores) == 1:
+                            valor_norm = 0.7
+                        else:
+                            valor_norm = 0.7
+                        valores_normalizados.append(valor_norm)
+
+                # Calcular promedio para este año
+                if valores_normalizados:
+                    promedio_norm = sum(valores_normalizados) / len(valores_normalizados)
+                else:
+                    promedio_norm = 0.7
+
+                df.at[index, 'Valor_Normalizado'] = promedio_norm
+
+        except Exception as e:
+            # Fallback
+            for index in datos_indicador.index:
+                df.at[index, 'Valor_Normalizado'] = 0.7
+
+    def _normalize_acumulado(self, df, datos_indicador, meta_valor):
+        """
+        Normalización tipo ACUMULADO: para cada año, suma de valores de ese año y los 3 anteriores, luego normalizar
+        """
+        try:
+            # Ordenar por fecha ascendente
+            datos_ordenados = datos_indicador.sort_values('Fecha', ascending=True).copy()
+            datos_ordenados['Año'] = datos_ordenados['Fecha'].dt.year
+
+            # Calcular todas las sumas posibles de ventanas de 4 años para min-max
+            todos_años = sorted(datos_ordenados['Año'].unique())
+            sumas_historicas = []
+
+            for año_ref in todos_años:
+                años_ventana = [año_ref - i for i in range(4)]
+                datos_ventana = datos_ordenados[datos_ordenados['Año'].isin(años_ventana)]
+                if not datos_ventana.empty:
+                    suma_ventana = datos_ventana['Valor'].sum()
+                    sumas_historicas.append(suma_ventana)
+
+            # Min y max de las sumas históricas
+            if len(sumas_historicas) > 1:
+                min_suma = min(sumas_historicas)
+                max_suma = max(sumas_historicas)
+                rango_suma = max_suma - min_suma
+            else:
+                min_suma = 0
+                max_suma = 0
+                rango_suma = 0
+
+            # Para cada registro, calcular suma acumulada con sus 3 años anteriores
+            for index in datos_ordenados.index:
+                año_actual = datos_ordenados.loc[index, 'Año']
+
+                # Obtener datos de este año y los 3 anteriores
+                años_ventana = [año_actual - i for i in range(4)]
+                datos_ventana = datos_ordenados[datos_ordenados['Año'].isin(años_ventana)]
+
+                if datos_ventana.empty:
+                    df.at[index, 'Valor_Normalizado'] = 0.7
+                    continue
+
+                # Sumar valores de la ventana
+                suma_valores = datos_ventana['Valor'].sum()
+
+                # Normalizar la suma
+                if pd.notna(meta_valor) and meta_valor > 0:
+                    # Con meta: normalizar contra meta acumulada (meta * número de años en ventana)
+                    num_años_ventana = len(años_ventana)
+                    meta_acumulada = meta_valor * num_años_ventana
+                    valor_norm = min(1.0, max(0.0, suma_valores / meta_acumulada))
+                elif rango_suma > 0:
+                    # Sin meta: min-max sobre sumas históricas
+                    valor_norm = (suma_valores - min_suma) / rango_suma
+                    valor_norm = min(1.0, max(0.0, valor_norm))
+                else:
+                    # Sin rango o datos insuficientes
+                    valor_norm = 0.7
+
+                df.at[index, 'Valor_Normalizado'] = valor_norm
+
+        except Exception as e:
+            # Fallback
+            for index in datos_indicador.index:
+                df.at[index, 'Valor_Normalizado'] = 0.7
+
+    def _calculate_recalculated_values(self, df, fichas_data):
+        """
+        Calcular valores recalculados ajustados por inflación
+        Si VPN=1 en Fichas, ajustar el valor por inflación acumulada
+        """
+        try:
+            from datetime import datetime
+
+            # Inicializar columna Valor_Recalculado
+            df['Valor_Recalculado'] = df['Valor'].copy()
+
+            # Verificar que tenemos las columnas necesarias
+            if 'COD' not in df.columns or 'Valor' not in df.columns or 'Fecha' not in df.columns:
+                return
+
+            # Año actual como referencia para ajustar
+            año_actual = datetime.now().year
+
+            # Crear diccionario de VPN por código de indicador
+            vpn_dict = {}
+            if 'COD' in fichas_data.columns and 'VPN' in fichas_data.columns:
+                for _, ficha in fichas_data.iterrows():
+                    codigo = ficha.get('COD')
+                    vpn = ficha.get('VPN')
+                    if pd.notna(codigo) and pd.notna(vpn):
+                        try:
+                            vpn_dict[str(codigo).strip()] = int(vpn)
+                        except:
+                            vpn_dict[str(codigo).strip()] = 0
+
+            # Procesar cada registro
+            for index, row in df.iterrows():
+                codigo = str(row.get('COD', '')).strip()
+                valor = row.get('Valor')
+                fecha = row.get('Fecha')
+
+                # Verificar si debe ajustarse por inflación
+                if codigo in vpn_dict and vpn_dict[codigo] == 1:
+                    # VPN=1: Ajustar por inflación
+                    if pd.notna(valor) and pd.notna(fecha):
+                        try:
+                            # Obtener año del registro
+                            if isinstance(fecha, pd.Timestamp):
+                                año_registro = fecha.year
+                            elif isinstance(fecha, str):
+                                año_registro = pd.to_datetime(fecha).year
+                            else:
+                                año_registro = None
+
+                            if año_registro and año_registro <= año_actual:
+                                # Calcular factor de inflación acumulada
+                                factor_inflacion = calcular_factor_inflacion_acumulada(año_registro, año_actual)
+
+                                # Aplicar ajuste
+                                valor_recalculado = valor * factor_inflacion
+                                df.at[index, 'Valor_Recalculado'] = valor_recalculado
+                            else:
+                                # Año inválido: mantener valor original
+                                df.at[index, 'Valor_Recalculado'] = valor
+                        except Exception as e:
+                            # Error al procesar: mantener valor original
+                            df.at[index, 'Valor_Recalculado'] = valor
+                else:
+                    # VPN != 1 o no tiene VPN: mantener valor original
+                    df.at[index, 'Valor_Recalculado'] = valor
+
+        except Exception as e:
+            # Fallback: Valor_Recalculado = Valor
             try:
-                df['Valor_Normalizado'] = 0.7
+                df['Valor_Recalculado'] = df['Valor']
             except:
                 pass
-    
+
     def _add_default_columns_corrected(self, df):
         """Añadir columnas por defecto - VERSIÓN SILENCIOSA"""
         try:
-            # Meta por defecto
+            # Meta - NO establecer valor por defecto, dejar NaN si no existe
             if 'Meta' not in df.columns:
-                df['Meta'] = DEFAULT_META
-            
+                df['Meta'] = pd.NA
+            else:
+                # Solo convertir a numérico, mantener NaN como NaN
+                df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce')
+
             # Peso por defecto
             if 'Peso' not in df.columns:
                 df['Peso'] = 1.0
-            
+            else:
+                df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
+
             # Tipo por defecto
             if 'Tipo' not in df.columns:
                 df['Tipo'] = 'porcentaje'
-            
-            # Convertir tipos
-            df['Meta'] = pd.to_numeric(df['Meta'], errors='coerce').fillna(DEFAULT_META)
-            df['Peso'] = pd.to_numeric(df['Peso'], errors='coerce').fillna(1.0)
-            
+
         except Exception as e:
             pass  # Silencioso
     
@@ -274,17 +573,25 @@ class DataLoader:
         try:
             if df.empty:
                 return True
-            
-            # Verificar columnas esenciales
-            required_columns = ['Codigo', 'Fecha', 'Valor', 'Componente', 'Categoria', 'Indicador']
+
+            # Verificar columnas esenciales (permitir variantes de nombres)
+            required_columns = ['COD', 'Fecha', 'Valor']
             missing_columns = [col for col in required_columns if col not in df.columns]
-            
+
             if missing_columns:
                 return False
-            
+
+            # Verificar que tenga al menos componente/categoría e indicador (con nombres flexibles)
+            has_componente = any(col in df.columns for col in ['Componente', 'COMPONENTE PROPUESTO'])
+            has_categoria = any(col in df.columns for col in ['Categoria', 'Categoría', 'CATEGORÍA'])
+            has_indicador = any(col in df.columns for col in ['Indicador', 'Nombre de indicador', 'Nombre_Indicador'])
+
+            if not (has_componente and has_categoria and has_indicador):
+                return False
+
             # Limpiar registros vacíos
             initial_count = len(df)
-            df.dropna(subset=['Codigo'], inplace=True)
+            df.dropna(subset=['COD'], inplace=True)
             
             return True
             
@@ -351,14 +658,16 @@ class DataProcessor:
                        pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
             
             # Calcular puntajes por componente
-            puntajes_componente = df_filtrado.groupby('Componente').apply(
-                lambda x: (x['Valor_Normalizado'] * x['Peso']).sum() / x['Peso'].sum()
+            puntajes_componente = df_filtrado.groupby('Componente', group_keys=False).apply(
+                lambda x: (x['Valor_Normalizado'] * x['Peso']).sum() / x['Peso'].sum(),
+                include_groups=False
             ).reset_index()
             puntajes_componente.columns = ['Componente', 'Puntaje_Ponderado']
-            
+
             # Calcular puntajes por categoría
-            puntajes_categoria = df_filtrado.groupby('Categoria').apply(
-                lambda x: (x['Valor_Normalizado'] * x['Peso']).sum() / x['Peso'].sum()
+            puntajes_categoria = df_filtrado.groupby('Categoria', group_keys=False).apply(
+                lambda x: (x['Valor_Normalizado'] * x['Peso']).sum() / x['Peso'].sum(),
+                include_groups=False
             ).reset_index()
             puntajes_categoria.columns = ['Categoria', 'Puntaje_Ponderado']
             
@@ -384,19 +693,19 @@ class DataProcessor:
                 return df
             
             # Verificar columnas necesarias
-            if not all(col in df.columns for col in ['Codigo', 'Fecha', 'Valor']):
+            if not all(col in df.columns for col in ['COD', 'Fecha', 'Valor']):
                 return df
-            
+
             # Limpiar datos
-            df_clean = df.dropna(subset=['Codigo', 'Fecha', 'Valor'])
-            
+            df_clean = df.dropna(subset=['COD', 'Fecha', 'Valor'])
+
             if df_clean.empty:
                 return df
-            
+
             # Obtener valores más recientes
             df_latest = (df_clean
-                        .sort_values(['Codigo', 'Fecha'])
-                        .groupby('Codigo')
+                        .sort_values(['COD', 'Fecha'])
+                        .groupby('COD')
                         .last()
                         .reset_index())
             
@@ -424,7 +733,7 @@ class DataEditor:
                 st.error("❌ No hay datos base disponibles")
                 return False
             
-            indicador_existente = df[df['Codigo'] == codigo]
+            indicador_existente = df[df['COD'] == codigo]
             if indicador_existente.empty:
                 st.error(f"❌ No se encontró el código {codigo}")
                 return False
@@ -504,9 +813,10 @@ class SheetsDataLoader:
             if fichas_df.empty:
                 return pd.DataFrame()
             
-            # Limpiar y procesar fichas
-            fichas_df = fichas_df.dropna(subset=['Codigo'], how='all')
-            
+            # Limpiar y procesar fichas usando COD
+            if 'COD' in fichas_df.columns:
+                fichas_df = fichas_df.dropna(subset=['COD'], how='all')
+
             return fichas_df
             
         except Exception as e:

@@ -222,11 +222,11 @@ class GoogleSheetsManager:
                     return pd.DataFrame()
                 
                 fichas_df = pd.DataFrame(fichas_data)
-                
-                # Limpiar datos vacíos
-                if not fichas_df.empty:
-                    fichas_df = fichas_df.dropna(subset=['Codigo'], how='all')
-                
+
+                # Limpiar datos vacíos usando COD
+                if not fichas_df.empty and 'COD' in fichas_df.columns:
+                    fichas_df = fichas_df.dropna(subset=['COD'], how='all')
+
                 return fichas_df
                 
             except Exception as e:
@@ -240,7 +240,160 @@ class GoogleSheetsManager:
                     return None
         
         return None
-    
+
+    def load_combined_data(self):
+        """
+        NUEVO: Cargar datos combinados de IndicadoresICE y Fichas
+        Hace JOIN entre ambas tablas usando COD/Codigo
+        Los metadatos (componente, categoría, línea de acción, tipo) vienen de Fichas
+        Los valores y fechas vienen de IndicadoresICE
+        """
+        try:
+            # Cargar ambas tablas
+            df_indicadores = self.load_data()
+            df_fichas = self.load_fichas_data()
+
+            if df_indicadores is None:
+                st.error("❌ No se pudieron cargar los datos de IndicadoresICE")
+                return None
+
+            if df_fichas is None or df_fichas.empty:
+                st.warning("⚠️ No hay datos en Fichas. Usando datos de IndicadoresICE tal cual.")
+                return df_indicadores
+
+            # Limpiar nombres de columnas
+            df_indicadores.columns = df_indicadores.columns.str.strip()
+            df_fichas.columns = df_fichas.columns.str.strip()
+
+
+            # Verificar que existen las columnas necesarias
+            if 'COD' not in df_indicadores.columns:
+                st.error("❌ Columna 'COD' no encontrada en IndicadoresICE")
+                return df_indicadores
+
+            if 'COD' not in df_fichas.columns:
+                st.error("❌ Columna 'COD' no encontrada en Fichas")
+                return df_indicadores
+
+            # Limpiar códigos para el JOIN (ambas tablas usan COD)
+            df_indicadores['COD_clean'] = df_indicadores['COD'].astype(str).str.strip()
+            df_fichas['COD_clean'] = df_fichas['COD'].astype(str).str.strip()
+
+            # Seleccionar columnas relevantes de Fichas
+            fichas_cols = ['COD_clean', 'LINEA DE ACCIÓN', 'Componente', 'Categoría',
+                          'Tipo_Indicador', 'Nombre_Indicador', 'Meta', 'Peso', 'VPN',
+                          'Definicion', 'Unidad_Medida', 'Metodologia_Calculo', 'Calculo']
+
+            # Verificar qué columnas existen en Fichas
+            available_fichas_cols = ['COD_clean']
+            for col in fichas_cols[1:]:
+                if col in df_fichas.columns:
+                    available_fichas_cols.append(col)
+
+            df_fichas_subset = df_fichas[available_fichas_cols].copy()
+
+            # Renombrar columnas de Fichas para que coincidan con el formato esperado
+            rename_dict = {
+                'Componente': 'COMPONENTE PROPUESTO',
+                'Categoría': 'CATEGORÍA',
+                'Tipo_Indicador': 'Tipo',
+                'Nombre_Indicador': 'Nombre_Indicador_Ficha'
+            }
+            df_fichas_subset = df_fichas_subset.rename(columns=rename_dict)
+
+            # Hacer LEFT JOIN usando COD en ambas tablas
+            df_combined = df_indicadores.merge(
+                df_fichas_subset,
+                left_on='COD_clean',
+                right_on='COD_clean',
+                how='left',
+                suffixes=('_ind', '_ficha')
+            )
+
+            # Normalizar nombres de columnas después del merge
+            rename_map = {
+                'Linea_Accion': 'LINEA DE ACCIÓN',
+                'Componente': 'COMPONENTE PROPUESTO',
+                'Categoria': 'Categoría',
+                'Código': 'COD',
+                'Codigo': 'COD'  # También sin acento
+            }
+            for old_name, new_name in rename_map.items():
+                if old_name in df_combined.columns:
+                    df_combined = df_combined.rename(columns={old_name: new_name})
+
+            # Priorizar metadatos de Fichas sobre IndicadoresICE
+            # Si existe el valor en Fichas, usarlo; si no, mantener el de IndicadoresICE
+
+            for col in ['LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'Categoría', 'Tipo']:
+                if col in df_combined.columns:
+                    # Si tenemos columna duplicada (_ind y _ficha), usar _ficha cuando esté disponible
+                    col_ind = f"{col}_ind"
+                    col_ficha = f"{col}_ficha"
+
+                    if col_ind in df_combined.columns and col_ficha in df_combined.columns:
+                        # Usar valor de Fichas si está disponible, sino usar el de Indicadores
+                        df_combined[col] = df_combined[col_ficha].fillna(df_combined[col_ind])
+                        # Eliminar columnas duplicadas
+                        df_combined = df_combined.drop(columns=[col_ind, col_ficha])
+                    elif col_ficha in df_combined.columns:
+                        # Solo existe _ficha (no había en indicadores)
+                        df_combined[col] = df_combined[col_ficha]
+                        df_combined = df_combined.drop(columns=[col_ficha])
+
+            # Renombrar Nombre_Indicador_Ficha a "Nombre de indicador" y luego a "Indicador"
+            if 'Nombre_Indicador_Ficha' in df_combined.columns:
+                df_combined = df_combined.rename(columns={'Nombre_Indicador_Ficha': 'Indicador'})
+            elif 'Nombre_Indicador' in df_combined.columns:
+                df_combined = df_combined.rename(columns={'Nombre_Indicador': 'Indicador'})
+
+            # Eliminar COD_clean si existe COD
+            if 'COD_clean' in df_combined.columns:
+                df_combined = df_combined.drop(columns=['COD_clean'], errors='ignore')
+
+            # Verificar que no haya duplicados en los nombres de columnas
+            if df_combined.columns.duplicated().any():
+                df_combined = df_combined.loc[:, ~df_combined.columns.duplicated(keep='first')]
+
+            # Asegurar que CATEGORÍA tiene el nombre correcto
+            if 'Categoría' in df_combined.columns and 'CATEGORÍA' not in df_combined.columns:
+                df_combined = df_combined.rename(columns={'Categoría': 'CATEGORÍA'})
+
+            # Reordenar columnas al formato esperado
+            expected_cols = ['LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA',
+                           'COD', 'Indicador', 'Tipo', 'Valor', 'Fecha']
+
+            # Mantener solo las columnas que existen
+            final_cols = [col for col in expected_cols if col in df_combined.columns]
+
+            # Agregar columnas adicionales que no estén en expected_cols
+            extra_cols = [col for col in df_combined.columns if col not in final_cols]
+            final_cols.extend(extra_cols)
+
+            df_combined = df_combined[final_cols]
+
+            # ✅ NORMALIZAR nombres de columnas para compatibilidad con calculate_scores
+            column_standardization = {
+                'COMPONENTE PROPUESTO': 'Componente',
+                'CATEGORÍA': 'Categoria',
+                'LINEA DE ACCIÓN': 'Linea_Accion'
+            }
+
+            for original, standard in column_standardization.items():
+                if original in df_combined.columns:
+                    df_combined = df_combined.rename(columns={original: standard})
+
+            st.success(f"✅ Datos combinados: {len(df_combined)} registros de IndicadoresICE con metadatos de Fichas")
+
+            return df_combined
+
+        except Exception as e:
+            st.error(f"❌ Error al combinar datos: {e}")
+            import traceback
+            st.error(traceback.format_exc())
+            # En caso de error, devolver datos de IndicadoresICE sin combinar
+            return self.load_data()
+
     def add_ficha_record(self, ficha_data_dict):
         """NUEVO: Agregar ficha metodológica"""
         try:
@@ -561,9 +714,77 @@ class GoogleSheetsManager:
                     fichas_status = f" + Sin Fichas"
                 
                 return True, f"Conexión exitosa ({connection_time:.1f}s){fichas_status}"
-                
+
             except Exception as e:
                 return False, f"Error al leer: {e}"
-                
+
         except Exception as e:
             return False, f"Error de conexión: {e}"
+
+    def update_valores_recalculados(self, df_with_recalculated):
+        """
+        Actualizar la columna Valor_Recalculado en Google Sheets
+        Args:
+            df_with_recalculated: DataFrame con columnas COD, Fecha, Valor_Recalculado
+        """
+        try:
+            if not self.connected and not self.connect_to_sheet():
+                return False
+
+            # Verificar que el DataFrame tiene las columnas necesarias
+            if 'Codigo' not in df_with_recalculated.columns or 'Valor_Recalculado' not in df_with_recalculated.columns:
+                return False
+
+            # Obtener headers actuales
+            headers = self.worksheet.row_values(1)
+
+            # Verificar si existe columna Valor_Recalculado
+            if 'Valor_Recalculado' not in headers:
+                # Agregar columna Valor_Recalculado
+                headers.append('Valor_Recalculado')
+                col_recalc = len(headers)
+                # Actualizar header
+                self.worksheet.update_cell(1, col_recalc, 'Valor_Recalculado')
+            else:
+                col_recalc = headers.index('Valor_Recalculado') + 1
+
+            # Obtener todos los datos
+            all_data = self.worksheet.get_all_records()
+
+            # Actualizar valores recalculados fila por fila
+            for i, row in enumerate(all_data, start=2):
+                try:
+                    codigo = str(row.get('COD', '')).strip()
+                    fecha = row.get('Fecha', '')
+
+                    # Buscar el valor recalculado correspondiente en el DataFrame
+                    matching_rows = df_with_recalculated[
+                        (df_with_recalculated['Codigo'].astype(str).str.strip() == codigo)
+                    ]
+
+                    if not matching_rows.empty:
+                        # Si hay fecha, intentar hacer match más preciso
+                        if fecha and 'Fecha' in df_with_recalculated.columns:
+                            import pandas as pd
+                            fecha_row = pd.to_datetime(fecha, errors='coerce')
+                            matching_with_date = matching_rows[
+                                pd.to_datetime(matching_rows['Fecha'], errors='coerce') == fecha_row
+                            ]
+                            if not matching_with_date.empty:
+                                valor_recalc = matching_with_date.iloc[0]['Valor_Recalculado']
+                            else:
+                                valor_recalc = matching_rows.iloc[0]['Valor_Recalculado']
+                        else:
+                            valor_recalc = matching_rows.iloc[0]['Valor_Recalculado']
+
+                        # Actualizar celda
+                        self.worksheet.update_cell(i, col_recalc, float(valor_recalc))
+                except Exception as e:
+                    # Si falla una fila, continuar con la siguiente
+                    continue
+
+            return True
+
+        except Exception as e:
+            st.error(f"Error al actualizar valores recalculados: {e}")
+            return False

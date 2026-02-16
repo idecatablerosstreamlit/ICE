@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Streamlit
+.streamlit/secrets.toml
+.streamlit/
+
+# Google credentials
+*.json
+credentials/
+service-account*.json
+ice-ideca-*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Data files (optional - remove if you want to version control data)
+*.csv
+*.xlsx
+*.xls
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+
+# Environment variables
+.env
+.env.local
+
+# Test/debug files
+test_*.py
+debug_*.py
+check_*.py
+compare_*.py
+verify_*.py

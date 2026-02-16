@@ -235,16 +235,10 @@ def apply_dark_theme():
     </style>
     """, unsafe_allow_html=True)
 
-# Configuración de columnas para Google Sheets - ACTUALIZADO CON TIPO
+# Configuración de columnas para Google Sheets - ACTUALIZADO
+# NO renombrar columnas - mantener nombres originales
 COLUMN_MAPPING = {
-    'LINEA DE ACCIÓN': 'Linea_Accion',
-    'COMPONENTE PROPUESTO': 'Componente',
-    'CATEGORÍA': 'Categoria',
-    'COD': 'Codigo',
-    'Nombre de indicador': 'Indicador',
-    'Valor': 'Valor',
-    'Fecha': 'Fecha',
-    'Tipo': 'Tipo'
+    # No hacemos renombres - las columnas mantienen sus nombres originales
 }
 
 # Configuración por defecto
@@ -407,7 +401,7 @@ def show_setup_instructions():
     
     import pandas as pd
     example_df = pd.DataFrame(example_data)
-    st.dataframe(example_df, use_container_width=True)
+    st.dataframe(example_df, width='stretch')
     
     st.info("💡 **Tip:** Nota la columna 'Tipo' que define cómo normalizar cada indicador.")
 
