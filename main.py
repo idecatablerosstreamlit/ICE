@@ -23,7 +23,8 @@ def get_colombia_time():
     return datetime.now(COLOMBIA_TZ)
 def main():
     configure_page()
-    
+    apply_dark_theme()  # Inyectar CSS: paleta IDECA, fuente Nunito Sans y pestañas distribuidas
+
     # Crear banner superior
     create_banner()
     

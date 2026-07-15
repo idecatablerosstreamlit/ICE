@@ -164,7 +164,7 @@ class ComponentSummaryTab:
             return
         
         df_latest = DataProcessor._get_latest_values_by_indicator(df)
-        componentes = sorted(df_latest['Componente'].unique()) if not df_latest.empty else []
+        componentes = sorted(df_latest['Componente'].dropna().unique()) if not df_latest.empty else []
         
         if not componentes:
             st.info("No hay componentes disponibles")
@@ -600,7 +600,7 @@ class EditTab:
             tipo_indicador = datos_indicador.get('Tipo', pd.Series(['porcentaje'])).iloc[0]
             
             st.markdown(f"""
-            <div style="background: linear-gradient(45deg, #4472C4 0%, #5B9BD5 100%); 
+            <div style="background: linear-gradient(45deg, #003A5B 0%, #7A97A8 100%);
                        padding: 1rem; border-radius: 10px; margin: 1rem 0; color: white;">
                 <h4 style="color: white; margin: 0;">{nombre_indicador}</h4>
                 <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">
@@ -1239,10 +1239,6 @@ class TabManager:
                 st.success(f"**{len(self.df)}** registros cargados")
                 st.success(f"**{self.df['COD'].nunique()}** indicadores únicos")
                 
-                if 'Tipo' in self.df.columns:
-                    tipos_count = self.df['Tipo'].value_counts()
-                    st.info(f"**Tipos:** {dict(tipos_count)}")
-                
                 if 'Fecha' in self.df.columns:
                     fechas_count = self.df['Fecha'].nunique()
                     fecha_min = self.df['Fecha'].min()
@@ -1255,7 +1251,7 @@ class TabManager:
                     st.info(f"**Componentes:** {componentes_count}")
                     
                     with st.expander("Ver componentes"):
-                        componentes_list = sorted(self.df['Componente'].unique())
+                        componentes_list = sorted(self.df['Componente'].dropna().unique())
                         for comp in componentes_list:
                             count = len(self.df[self.df['Componente'] == comp])
                             st.write(f"• **{comp}:** {count} registros")

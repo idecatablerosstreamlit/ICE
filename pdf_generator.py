@@ -8,6 +8,7 @@ CORRECCIÓN: Ahora usa la fecha y hora de Colombia correctamente
 
 import streamlit as st
 import pandas as pd
+import os
 from io import BytesIO
 from datetime import datetime
 import pytz
@@ -25,9 +26,33 @@ try:
     from reportlab.lib.units import inch
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
+
+# Fuente institucional Nunito Sans (TTF en carpeta fonts/); si falta, se usa Helvetica
+PDF_FONT = 'Helvetica'
+PDF_FONT_BOLD = 'Helvetica-Bold'
+if PDF_AVAILABLE:
+    try:
+        _FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
+        pdfmetrics.registerFont(TTFont('NunitoSans', os.path.join(_FONTS_DIR, 'NunitoSans-Regular.ttf')))
+        pdfmetrics.registerFont(TTFont('NunitoSans-Bold', os.path.join(_FONTS_DIR, 'NunitoSans-Bold.ttf')))
+        pdfmetrics.registerFont(TTFont('NunitoSans-Italic', os.path.join(_FONTS_DIR, 'NunitoSans-Italic.ttf')))
+        pdfmetrics.registerFont(TTFont('NunitoSans-BoldItalic', os.path.join(_FONTS_DIR, 'NunitoSans-BoldItalic.ttf')))
+        pdfmetrics.registerFontFamily(
+            'NunitoSans',
+            normal='NunitoSans',
+            bold='NunitoSans-Bold',
+            italic='NunitoSans-Italic',
+            boldItalic='NunitoSans-BoldItalic'
+        )
+        PDF_FONT = 'NunitoSans'
+        PDF_FONT_BOLD = 'NunitoSans-Bold'
+    except Exception:
+        pass
 
 class PDFGenerator:
     """Generador de fichas metodológicas en PDF - ACTUALIZADO PARA GOOGLE SHEETS"""
@@ -108,7 +133,8 @@ class PDFGenerator:
             fontSize=18,
             spaceAfter=30,
             alignment=TA_CENTER,
-            textColor=colors.HexColor('#4472C4')
+            textColor=colors.HexColor('#003A5B'),
+            fontName=PDF_FONT_BOLD
         )
         
         subtitle_style = ParagraphStyle(
@@ -117,11 +143,12 @@ class PDFGenerator:
             fontSize=14,
             spaceAfter=15,
             spaceBefore=20,
-            textColor=colors.HexColor('#4472C4'),
+            textColor=colors.HexColor('#003A5B'),
             borderWidth=1,
-            borderColor=colors.HexColor('#4472C4'),
+            borderColor=colors.HexColor('#003A5B'),
             borderPadding=8,
-            backColor=colors.HexColor('#F8F9FA')
+            backColor=colors.HexColor('#F8F9FA'),
+            fontName=PDF_FONT_BOLD
         )
         
         normal_style = ParagraphStyle(
@@ -130,7 +157,8 @@ class PDFGenerator:
             fontSize=10,
             spaceAfter=8,
             alignment=TA_JUSTIFY,
-            leading=12
+            leading=12,
+            fontName=PDF_FONT
         )
         
         label_style = ParagraphStyle(
@@ -138,8 +166,8 @@ class PDFGenerator:
             parent=styles['Normal'],
             fontSize=10,
             spaceAfter=6,
-            textColor=colors.HexColor('#2C3E50'),
-            fontName='Helvetica-Bold'
+            textColor=colors.HexColor('#444444'),
+            fontName=PDF_FONT_BOLD
         )
         
         # Construir contenido del documento
@@ -320,10 +348,10 @@ class PDFGenerator:
         """Crear tabla simple para información institucional"""
         table = Table(data, colWidths=[2.5*inch, 4*inch])
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#4472C4')),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#003A5B')),
             ('TEXTCOLOR', (0, 0), (0, -1), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ('TOPPADDING', (0, 0), (-1, -1), 8),
@@ -345,7 +373,8 @@ class PDFGenerator:
                 # Crear paragraph para contenido largo
                 if len(str(content)) > 80:
                     # Usar Paragraph para texto largo
-                    content_paragraph = Paragraph(str(content), getSampleStyleSheet()['Normal'])
+                    cell_style = ParagraphStyle('CellNormal', parent=getSampleStyleSheet()['Normal'], fontName=PDF_FONT)
+                    content_paragraph = Paragraph(str(content), cell_style)
                     processed_data.append([label, content_paragraph])
                 else:
                     processed_data.append([label, str(content)])
@@ -364,10 +393,10 @@ class PDFGenerator:
         
         table = Table(processed_data, colWidths=col_widths, repeatRows=0)
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E7F3FF')),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#E5EBEF')),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTNAME', (0, 0), (-1, -1), PDF_FONT),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ('TOPPADDING', (0, 0), (-1, -1), 8),

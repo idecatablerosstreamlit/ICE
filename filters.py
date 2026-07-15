@@ -33,7 +33,7 @@ class FilterManager:
     def _create_date_filter(self):
         """Crear filtro de fechas"""
         try:
-            fechas = sorted(self.df['Fecha'].unique())
+            fechas = sorted(self.df['Fecha'].dropna().unique())
             fecha_seleccionada = st.sidebar.selectbox(
                 "Fecha", 
                 fechas, 
@@ -47,7 +47,7 @@ class FilterManager:
     def _create_component_filter(self):
         """Crear filtro de componentes"""
         try:
-            componentes = sorted(self.df['Componente'].unique())
+            componentes = sorted(self.df['Componente'].dropna().unique())
             componente_seleccionado = st.sidebar.selectbox(
                 "Componente", 
                 ["Todos"] + list(componentes)
@@ -66,10 +66,10 @@ class FilterManager:
         try:
             if self.filters.get('componente'):
                 categorias = sorted(
-                    self.df[self.df['Componente'] == self.filters['componente']]['Categoria'].unique()
+                    self.df[self.df['Componente'] == self.filters['componente']]['Categoria'].dropna().unique()
                 )
             else:
-                categorias = sorted(self.df['Categoria'].unique())
+                categorias = sorted(self.df['Categoria'].dropna().unique())
             
             categoria_seleccionada = st.sidebar.selectbox(
                 "Categoría", 

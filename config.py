@@ -5,6 +5,35 @@ import streamlit as st
 import base64
 import os
 
+# ============================================================
+# PALETA DE COLOR IDECA (manual de marca)
+# ============================================================
+IDECA_COLORS = {
+    'azul': '#003A5B',        # Azul Ideca - primario
+    'azul_claro': '#7A97A8',  # Azul Ideca claro - primario
+    'rojo': '#E3192F',        # Rojo impacto - acciones puntuales
+    'amarillo': '#FEB400',    # Amarillo - destacar elementos clave
+    'gris_fondos': '#EAEAEA', # Gris neutro - fondos
+    'negro_textos': '#444444' # Negro - textos
+}
+
+# Derivados para hover/degradados (tintes del azul Ideca)
+IDECA_AZUL_HOVER = '#002A42'   # azul más oscuro para hover
+IDECA_AZUL_TINTE = '#E5EBEF'   # tinte muy claro del azul para fondos suaves
+
+# Escala de desempeño (semáforo alineado a la paleta IDECA)
+# alto → azul Ideca, medio-alto → azul claro, medio-bajo → amarillo, crítico → rojo
+IDECA_PERFORMANCE_SCALE = {
+    'alto': IDECA_COLORS['azul'],
+    'medio_alto': IDECA_COLORS['azul_claro'],
+    'medio_bajo': IDECA_COLORS['amarillo'],
+    'critico': IDECA_COLORS['rojo']
+}
+
+# Tipografía institucional
+IDECA_FONT = "Nunito Sans"
+IDECA_FONT_CSS = f"'{IDECA_FONT}', 'Source Sans Pro', sans-serif"
+
 def configure_page():
     """Configurar la página de Streamlit"""
     st.set_page_config(
@@ -41,11 +70,11 @@ def create_banner():
         gov_logo_html = '''<div style="
             width: 32px; height: 32px; background: white; border-radius: 6px; margin-right: 12px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 14px; color: #4169E1; font-weight: bold;">🏛️</div>'''
-    
+            font-size: 14px; color: #003A5B; font-weight: bold;">🏛️</div>'''
+
     st.markdown(f"""
     <div style="
-        background: #4169E1;
+        background: #003A5B;
         padding: 15px 20px;
         margin: -1rem -1rem 0 -1rem;
         color: white;
@@ -135,14 +164,14 @@ def create_banner():
     st.markdown("""
     <div style="text-align: center; margin: 20px 0;">
         <h1 style="
-            color: #1e3a8a;
+            color: #003A5B;
             font-size: 2.5rem;
             font-weight: 700;
             margin: 0;
             line-height: 1.2;
         ">Dashboard ICE</h1>
         <p style="
-            color: #1e3a8a;
+            color: #003A5B;
             font-size: 1rem;
             font-weight: 500;
             margin: 10px 0 0 0;
@@ -153,46 +182,130 @@ def create_banner():
     st.markdown("---")
 
 def apply_dark_theme():
-    """Aplicar estilos - PESTAÑAS GRISES CON ACTIVA EN AZUL #4169E1"""
+    """Aplicar estilos - PALETA IDECA (azul #003A5B) Y FUENTE NUNITO SANS"""
     st.markdown("""
     <style>
-        /* PESTAÑAS - FORZAR COLORES ESPECÍFICOS */
+        /* FUENTE INSTITUCIONAL - NUNITO SANS */
+        @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
+        html, body, [class*="css"], .stApp, .stMarkdown,
+        button, input, select, textarea,
+        h1, h2, h3, h4, h5, h6, p, span, div, label {
+            font-family: 'Nunito Sans', 'Source Sans Pro', sans-serif !important;
+        }
+
+        /* EXCEPCIÓN: los íconos de Streamlit usan la fuente Material Symbols;
+           sin esto se muestran como texto (p.ej. "keyboard_double_arrow_right") */
+        [data-testid="stIconMaterial"],
+        [data-testid="stExpanderIcon"],
+        .material-symbols-rounded,
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Rounded' !important;
+        }
+
+        /* NAVEGACIÓN PRINCIPAL (st.radio "tab_selector") - ESTILO PESTAÑAS A TODO EL ANCHO */
+        .st-key-tab_selector,
+        .st-key-tab_selector > div,
+        .st-key-tab_selector [data-testid="stRadio"],
+        .st-key-tab_selector [data-testid="stRadio"] > div {
+            width: 100% !important;
+        }
+
+        .st-key-tab_selector [role="radiogroup"] {
+            display: flex !important;
+            width: 100% !important;
+            gap: 10px !important;
+            background: #EAEAEA !important;
+            padding: 10px !important;
+            border-radius: 10px !important;
+        }
+
+        .st-key-tab_selector [role="radiogroup"] > label {
+            flex: 1 1 0 !important;
+            justify-content: center !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 12px 8px !important;
+            background: #e8e8e8 !important;
+            border: 1px solid #cccccc !important;
+            border-radius: 8px !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+        }
+
+        /* Ocultar el círculo del radio */
+        .st-key-tab_selector [role="radiogroup"] > label > div:first-of-type {
+            display: none !important;
+        }
+
+        .st-key-tab_selector [role="radiogroup"] > label p {
+            font-weight: 600 !important;
+            color: #666666 !important;
+            font-size: 1rem !important;
+        }
+
+        .st-key-tab_selector [role="radiogroup"] > label:hover {
+            background: #d5d5d5 !important;
+            border-color: #999999 !important;
+        }
+
+        /* Pestaña activa en azul Ideca */
+        .st-key-tab_selector [role="radiogroup"] > label:has(input:checked) {
+            background: #003A5B !important;
+            border-color: #003A5B !important;
+            box-shadow: 0 4px 12px rgba(0, 58, 91, 0.4) !important;
+        }
+
+        .st-key-tab_selector [role="radiogroup"] > label:has(input:checked) p {
+            color: white !important;
+        }
+
+        /* PESTAÑAS st.tabs (vista de administración) - DISTRIBUIDAS EN TODO EL ANCHO */
         .stTabs [data-baseweb="tab-list"] {
-            background: #f5f5f5 !important;
+            background: #EAEAEA !important;
             border-radius: 10px 10px 0 0 !important;
             padding: 10px !important;
             border-bottom: 2px solid #ddd !important;
+            display: flex !important;
+            width: 100% !important;
+            gap: 10px !important;
         }
-        
-        .stTabs [data-baseweb="tab"] {
+
+        .stTabs [data-baseweb="tab"],
+        .stTabs [data-baseweb="tab-list"] button[role="tab"] {
+            flex: 1 1 0 !important;
+            flex-grow: 1 !important;
+            width: 100% !important;
+            justify-content: center !important;
+            text-align: center !important;
             background-color: #e8e8e8 !important;
             color: #666666 !important;
             font-weight: 500 !important;
             border-radius: 8px !important;
-            margin: 0 5px !important;
+            margin: 0 !important;
             padding: 12px 20px !important;
             border: 1px solid #cccccc !important;
             transition: all 0.3s ease !important;
         }
-        
+
         .stTabs [data-baseweb="tab"]:hover {
             background-color: #d5d5d5 !important;
-            color: #333333 !important;
+            color: #444444 !important;
             border-color: #999999 !important;
         }
-        
+
         .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            background-color: #4169E1 !important;
+            background-color: #003A5B !important;
             color: white !important;
-            border-color: #4169E1 !important;
+            border-color: #003A5B !important;
             font-weight: 700 !important;
             transform: translateY(-2px) !important;
-            box-shadow: 0 4px 12px rgba(65, 105, 225, 0.4) !important;
+            box-shadow: 0 4px 12px rgba(0, 58, 91, 0.4) !important;
         }
-        
+
         /* BOTONES */
         div.stButton > button:first-child {
-            background-color: #4169E1 !important;
+            background-color: #003A5B !important;
             color: white !important;
             border: none !important;
             border-radius: 6px !important;
@@ -200,27 +313,40 @@ def apply_dark_theme():
             font-weight: 500 !important;
             transition: all 0.3s ease !important;
         }
-        
+
         div.stButton > button:first-child:hover {
-            background-color: #365cc0 !important;
+            background-color: #002A42 !important;
             transform: translateY(-2px) !important;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
         }
-        
+
         /* MÉTRICAS */
         [data-testid="metric-container"] {
             background: rgba(255, 255, 255, 0.1) !important;
             padding: 1rem !important;
             border-radius: 8px !important;
-            border-left: 4px solid #4169E1 !important;
+            border-left: 4px solid #003A5B !important;
         }
-        
+
         /* SIDEBAR */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #4169E1 0%, #365cc0 100%) !important;
+            background: linear-gradient(180deg, #003A5B 0%, #002A42 100%) !important;
         }
-        
-        [data-testid="stSidebar"] .stSelectbox label, 
+
+        /* Todo el texto del sidebar en blanco para contraste sobre el azul */
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] h4,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] .stMarkdown,
+        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] {
+            color: white !important;
+        }
+
+        [data-testid="stSidebar"] .stSelectbox label,
         [data-testid="stSidebar"] .stMultiselect label {
             color: white !important;
             font-weight: 500 !important;

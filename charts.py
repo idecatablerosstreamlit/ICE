@@ -10,7 +10,16 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.colors as pc
+import plotly.io as pio
 from datetime import datetime, timedelta
+
+# Plantilla global IDECA: fuente y color de texto institucionales en todas las gráficas
+pio.templates["ideca"] = go.layout.Template(
+    layout=go.Layout(
+        font=dict(family="Nunito Sans, Source Sans Pro, sans-serif", color="#444444")
+    )
+)
+pio.templates.default = "plotly+ideca"
 
 class ChartGenerator:
     """Generador de gráficos para el Dashboard ICE"""
@@ -23,36 +32,36 @@ class ChartGenerator:
             normalized_value = min(max(value, 0), max_value)
             percentage = (normalized_value / max_value) * 100
             
-            # Determinar color basado en el valor
+            # Determinar color basado en el valor (escala IDECA)
             if percentage >= 80:
-                color = "#2E8B57"  # Verde
+                color = "#003A5B"  # Azul Ideca - alto
             elif percentage >= 60:
-                color = "#FFD700"  # Amarillo
+                color = "#7A97A8"  # Azul claro - medio-alto
             elif percentage >= 40:
-                color = "#FFA500"  # Naranja
+                color = "#FEB400"  # Amarillo - medio-bajo
             else:
-                color = "#DC143C"  # Rojo
+                color = "#E3192F"  # Rojo - crítico
             
             fig = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
                 value=percentage,
                 domain={'x': [0, 1], 'y': [0, 1]},
                 title={'text': title, 'font': {'size': 16}},
-                delta={'reference': 70, 'increasing': {'color': "green"}},
+                delta={'reference': 70, 'increasing': {'color': "#003A5B"}, 'decreasing': {'color': "#E3192F"}},
                 gauge={
-                    'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                    'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "#003A5B"},
                     'bar': {'color': color},
                     'bgcolor': "white",
                     'borderwidth': 2,
                     'bordercolor': "gray",
                     'steps': [
-                        {'range': [0, 40], 'color': '#ffcccc'},
-                        {'range': [40, 60], 'color': '#ffffcc'},
-                        {'range': [60, 80], 'color': '#ccffcc'},
-                        {'range': [80, 100], 'color': '#ccffff'}
+                        {'range': [0, 40], 'color': '#FAD1D5'},
+                        {'range': [40, 60], 'color': '#FFF0CC'},
+                        {'range': [60, 80], 'color': '#E4EAEE'},
+                        {'range': [80, 100], 'color': '#CCD8DE'}
                     ],
                     'threshold': {
-                        'line': {'color': "red", 'width': 4},
+                        'line': {'color': "#E3192F", 'width': 4},
                         'thickness': 0.75,
                         'value': 90
                     }
@@ -112,8 +121,8 @@ class ChartGenerator:
                 theta=componentes['Componente'],
                 fill='toself',
                 name='Puntaje por Componente',
-                line=dict(color='#4472C4'),
-                fillcolor='rgba(68, 114, 196, 0.3)'
+                line=dict(color='#003A5B'),
+                fillcolor='rgba(0, 58, 91, 0.3)'
             ))
             
             fig.update_layout(
@@ -150,13 +159,13 @@ class ChartGenerator:
             colors = []
             for score in puntajes_sorted['Puntaje_Ponderado']:
                 if score >= 0.8:
-                    colors.append('#2E8B57')  # Verde
+                    colors.append('#003A5B')  # Azul Ideca - alto
                 elif score >= 0.6:
-                    colors.append('#FFD700')  # Amarillo
+                    colors.append('#7A97A8')  # Azul claro - medio-alto
                 elif score >= 0.4:
-                    colors.append('#FFA500')  # Naranja
+                    colors.append('#FEB400')  # Amarillo - medio-bajo
                 else:
-                    colors.append('#DC143C')  # Rojo
+                    colors.append('#E3192F')  # Rojo - crítico
             
             fig = go.Figure(data=[
                 go.Bar(
@@ -223,7 +232,7 @@ class ChartGenerator:
                         title=f"Evolución: {indicador}"
                     )
                 
-                fig.update_traces(line=dict(color='#4472C4'), marker=dict(color='#4472C4'))
+                fig.update_traces(line=dict(color='#003A5B'), marker=dict(color='#003A5B'))
                 
             else:
                 # Gráfico de evolución general (promedio)
@@ -245,14 +254,14 @@ class ChartGenerator:
                         title="Evolución General (Promedio)"
                     )
                 
-                fig.update_traces(line=dict(color='#5B9BD5'), marker=dict(color='#5B9BD5'))
+                fig.update_traces(line=dict(color='#7A97A8'), marker=dict(color='#7A97A8'))
             
             # Añadir línea de meta si se solicita
             if mostrar_meta:
                 fig.add_hline(
-                    y=1.0, 
-                    line_dash="dash", 
-                    line_color="red",
+                    y=1.0,
+                    line_dash="dash",
+                    line_color="#E3192F",
                     annotation_text="Meta (100%)"
                 )
             
@@ -313,13 +322,13 @@ class ChartGenerator:
             colors = []
             for score in puntajes_categoria['Valor_Normalizado']:
                 if score >= 0.8:
-                    colors.append('#2E8B57')
+                    colors.append('#003A5B')  # Azul Ideca - alto
                 elif score >= 0.6:
-                    colors.append('#FFD700')
+                    colors.append('#7A97A8')  # Azul claro - medio-alto
                 elif score >= 0.4:
-                    colors.append('#FFA500')
+                    colors.append('#FEB400')  # Amarillo - medio-bajo
                 else:
-                    colors.append('#DC143C')
+                    colors.append('#E3192F')  # Rojo - crítico
             
             fig = go.Figure(data=[
                 go.Bar(
@@ -397,8 +406,8 @@ class ChartGenerator:
                 theta=categorias['Categoria'],
                 fill='toself',
                 name='Puntaje por Categoría',
-                line=dict(color='#5B9BD5'),
-                fillcolor='rgba(91, 155, 213, 0.3)'
+                line=dict(color='#7A97A8'),
+                fillcolor='rgba(122, 151, 168, 0.35)'
             ))
             
             titulo = f"Radar de Categorías - {componente}" if componente else "Radar de Categorías"
@@ -563,7 +572,7 @@ class ChartGenerator:
             xref="paper", yref="paper",
             x=0.5, y=0.5,
             showarrow=False,
-            font=dict(size=16, color="red")
+            font=dict(size=16, color="#E3192F")
         )
         fig.update_layout(
             height=400,
