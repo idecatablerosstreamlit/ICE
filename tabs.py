@@ -1179,8 +1179,8 @@ class EditTab:
                 else:
                     st.error("No se pudo generar el PDF")
                     
-        except ImportError:
-            st.error("Archivo pdf_generator.py no encontrado")
+        except ImportError as e:
+            st.error(f"No se pudo importar el generador de PDF: {e}")
         except Exception as e:
             st.error(f"Error al generar PDF: {e}")
 

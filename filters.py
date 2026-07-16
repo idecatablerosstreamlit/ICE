@@ -192,6 +192,12 @@ class EvolutionFilters:
                         nombre = indicador_info['Indicador'] if 'Indicador' in indicador_info else 'Sin nombre'
                         componente = indicador_info['Componente'] if 'Componente' in indicador_info else 'Sin componente'
 
+                        # Celdas vacías llegan como NaN (float); usar texto por defecto
+                        if pd.isna(nombre):
+                            nombre = 'Sin nombre'
+                        if pd.isna(componente):
+                            componente = 'Sin componente'
+
 
                         # Limitar longitud para mejor visualización
                         nombre_corto = nombre[:50] + "..." if len(nombre) > 50 else nombre
