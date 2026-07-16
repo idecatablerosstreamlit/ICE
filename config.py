@@ -233,8 +233,9 @@ def apply_dark_theme():
             transition: all 0.3s ease !important;
         }
 
-        /* Ocultar el círculo del radio */
-        .st-key-tab_selector [role="radiogroup"] > label > div:first-of-type {
+        /* Ocultar el círculo del radio (todo hijo directo que no contenga el texto,
+           robusto ante cambios de estructura entre versiones de Streamlit) */
+        .st-key-tab_selector [role="radiogroup"] > label > div:not(:has([data-testid="stMarkdownContainer"])) {
             display: none !important;
         }
 
