@@ -214,15 +214,28 @@ class ChartGenerator:
             # Preparar datos para el gráfico
             if indicador:
                 # Gráfico de un indicador específico: usar el valor recalculado
-                # (valor real, ajustado por IPC cuando aplica), no el normalizado 0-1
+                # (valor real, ajustado por IPC cuando aplica). Si el indicador tiene
+                # Meta, normalizar valor/meta (meta = 1.0 = 100%) para poder trazar la
+                # meta como referencia; si no tiene meta, mostrar el valor crudo.
                 valor_col = 'Valor_Recalculado' if 'Valor_Recalculado' in df_filtered.columns else 'Valor'
-                df_plot = df_filtered.sort_values('Fecha')
+                df_plot = df_filtered.sort_values('Fecha').copy()
+
+                meta_serie = df_plot['Meta'].dropna() if 'Meta' in df_plot.columns else pd.Series(dtype=float)
+                tiene_meta = not meta_serie.empty and meta_serie.iloc[0] > 0
+
+                if tiene_meta:
+                    meta_valor = meta_serie.iloc[0]
+                    y_col = "% de la Meta"
+                    df_plot[y_col] = df_plot[valor_col] / meta_valor
+                else:
+                    y_col = "Valor"
+                    df_plot[y_col] = df_plot[valor_col]
 
                 if tipo_grafico == "Línea":
                     fig = px.line(
                         df_plot,
                         x='Fecha',
-                        y=valor_col,
+                        y=y_col,
                         title=f"Evolución: {indicador}",
                         markers=True
                     )
@@ -230,29 +243,30 @@ class ChartGenerator:
                     fig = px.bar(
                         df_plot,
                         x='Fecha',
-                        y=valor_col,
+                        y=y_col,
                         title=f"Evolución: {indicador}"
                     )
 
                 fig.update_traces(line=dict(color='#003A5B'), marker=dict(color='#003A5B'))
 
-                # Línea de meta: el valor real de Meta del indicador (no un 100% fijo)
-                if mostrar_meta and 'Meta' in df_plot.columns:
-                    meta_valor = df_plot['Meta'].dropna()
-                    if not meta_valor.empty and meta_valor.iloc[0] > 0:
-                        fig.add_hline(
-                            y=meta_valor.iloc[0],
-                            line_dash="dash",
-                            line_color="#E3192F",
-                            annotation_text=f"Meta: {meta_valor.iloc[0]:,.2f}"
-                        )
-
-                fig.update_layout(
+                layout_kwargs = dict(
                     height=400,
                     margin=dict(l=20, r=20, t=40, b=20),
                     xaxis_title="Fecha",
-                    yaxis_title="Valor"
+                    yaxis_title=y_col
                 )
+
+                if tiene_meta:
+                    if mostrar_meta:
+                        fig.add_hline(
+                            y=1.0,
+                            line_dash="dash",
+                            line_color="#E3192F",
+                            annotation_text="Meta (100%)"
+                        )
+                    layout_kwargs['yaxis'] = dict(tickformat='.0%')
+
+                fig.update_layout(**layout_kwargs)
 
             else:
                 # Gráfico de evolución general/por componente (promedio del puntaje normalizado
@@ -295,11 +309,55 @@ class ChartGenerator:
                 )
 
             return fig
-            
+
         except Exception as e:
             st.error(f"Error en gráfico de evolución: {e}")
             return ChartGenerator._create_error_chart("Error en evolución")
-    
+
+    @staticmethod
+    def ice_historical_evolution_chart(df_historico):
+        """Gráfico de evolución semestral del puntaje general ICE"""
+        try:
+            if df_historico is None or df_historico.empty:
+                return ChartGenerator._create_empty_chart("No hay suficiente histórico para calcular la evolución del ICE")
+
+            df_plot = df_historico.sort_values('Fecha_Corte')
+
+            fig = px.line(
+                df_plot,
+                x='Fecha_Corte',
+                y='Puntaje_General',
+                title="Evolución Histórica del ICE (semestral)",
+                markers=True,
+                custom_data=['N_Indicadores']
+            )
+            fig.update_traces(
+                line=dict(color='#003A5B', width=3),
+                marker=dict(color='#003A5B', size=8),
+                hovertemplate='<b>%{x|%b %Y}</b><br>Puntaje ICE: %{y:.1%}<br>Indicadores usados: %{customdata[0]}<extra></extra>'
+            )
+
+            fig.add_hline(
+                y=1.0,
+                line_dash="dash",
+                line_color="#E3192F",
+                annotation_text="Meta (100%)"
+            )
+
+            fig.update_layout(
+                height=400,
+                margin=dict(l=20, r=20, t=40, b=20),
+                yaxis=dict(tickformat='.0%', range=[0, 1.1]),
+                xaxis_title="Fecha de corte",
+                yaxis_title="Puntaje General ICE"
+            )
+
+            return fig
+
+        except Exception as e:
+            st.error(f"Error en gráfico de evolución histórica del ICE: {e}")
+            return ChartGenerator._create_error_chart("Error en evolución histórica del ICE")
+
     @staticmethod
     def horizontal_bar_chart(df, componente=None, categoria=None, fecha_filtro=None):
         """Crear gráfico de barras horizontales para categorías - CORREGIDO"""

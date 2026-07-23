@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import time
 import os
+import plotly.express as px
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
 from filters import EvolutionFilters
@@ -30,6 +31,119 @@ except ImportError:
     auth_manager = MockAuthManager()
     AUTH_AVAILABLE = False
 
+class IceInfoTab:
+    """Pestaña informativa: qué es la ICE, sus componentes/categorías e indicadores medidos"""
+
+    @staticmethod
+    def render(df):
+        """Renderizar la pestaña informativa de la ICE"""
+        st.header("¿Qué es la ICE?")
+
+        st.markdown(ICE_QUE_ES)
+
+        st.markdown("### ¿Cómo se mide?")
+        st.markdown(ICE_COMO_SE_MIDE)
+
+        st.markdown("### Los 8 componentes de la ICE")
+        nombres_componentes = [c["nombre"] for c in ICE_COMPONENTS_INFO]
+        comp_tabs = st.tabs(nombres_componentes)
+        for tab, comp in zip(comp_tabs, ICE_COMPONENTS_INFO):
+            with tab:
+                st.markdown(comp["descripcion"])
+                st.table(pd.DataFrame(comp["categorias"]))
+                st.caption(f"**Fuente y marco normativo:** {comp['fuente']}")
+
+        st.markdown("---")
+        st.subheader("Indicadores medidos por componente y categoría")
+        IceInfoTab._render_indicator_breakdown(df)
+
+        st.markdown("---")
+        IceInfoTab._render_pdf_download()
+
+    @staticmethod
+    def _render_indicator_breakdown(df):
+        """Treemap interactivo del número de indicadores por componente/categoría"""
+        try:
+            if df.empty or not all(c in df.columns for c in ['COD', 'Componente', 'Categoria']):
+                st.info("Aún no hay datos suficientes para construir esta visualización.")
+                return
+
+            df_cod = df.dropna(subset=['COD'])
+            conteo = (
+                df_cod.dropna(subset=['Componente', 'Categoria'])
+                .groupby(['Componente', 'Categoria'])['COD']
+                .nunique()
+                .reset_index()
+            )
+            conteo.columns = ['Componente', 'Categoría', 'N° de indicadores']
+
+            if conteo.empty:
+                st.info("Aún no hay datos suficientes para construir esta visualización.")
+                return
+
+            conteo = conteo.sort_values(['Componente', 'Categoría']).reset_index(drop=True)
+
+            # Treemap: área = N° de indicadores, color = misma magnitud (escala secuencial
+            # de un solo tono, azul Ideca) para reforzar visualmente el tamaño relativo.
+            fig = px.treemap(
+                conteo,
+                path=[px.Constant("ICE"), 'Componente', 'Categoría'],
+                values='N° de indicadores',
+                color='N° de indicadores',
+                color_continuous_scale=[[0, '#EEF3F6'], [0.5, '#B7C7CF'], [1, '#5C7E90']],
+            )
+            fig.update_traces(
+                textfont=dict(color='#003A5B', size=13, family="Nunito Sans, Source Sans Pro, sans-serif"),
+                textinfo="label+value",
+                hovertemplate='<b>%{label}</b><br>Indicadores: %{value}<extra></extra>',
+                marker=dict(line=dict(width=2, color='#FFFFFF')),
+                root_color="#FFFFFF"
+            )
+            fig.update_layout(
+                height=480,
+                margin=dict(l=10, r=10, t=10, b=10),
+                coloraxis_showscale=False,
+                font=dict(family="Nunito Sans, Source Sans Pro, sans-serif")
+            )
+            st.plotly_chart(fig, width='stretch')
+            st.caption(
+                f"Total de indicadores únicos medidos: **{df_cod['COD'].nunique()}** · "
+                "Haz clic en un componente para explorar sus categorías."
+            )
+
+            with st.expander("Ver como tabla"):
+                st.dataframe(
+                    conteo,
+                    width='stretch',
+                    height=min(400, 45 + 35 * len(conteo)),
+                    column_config={
+                        "N° de indicadores": st.column_config.ProgressColumn(
+                            "N° de indicadores",
+                            min_value=0,
+                            max_value=int(conteo['N° de indicadores'].max()),
+                            format="%d"
+                        )
+                    }
+                )
+        except Exception as e:
+            st.warning(f"No se pudo construir la visualización de indicadores: {e}")
+
+    @staticmethod
+    def _render_pdf_download():
+        try:
+            pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resumen.pdf')
+            with open(pdf_path, 'rb') as f:
+                resumen_pdf_bytes = f.read()
+            st.download_button(
+                label="Descargar PDF resumen de la ICE",
+                data=resumen_pdf_bytes,
+                file_name="Resumen_ICE.pdf",
+                mime="application/pdf",
+                key="download_resumen_ice_pdf"
+            )
+        except Exception:
+            st.caption("El PDF resumen no está disponible en este momento.")
+
 class GeneralSummaryTab:
     """Pestaña de resumen general"""
     
@@ -37,10 +151,6 @@ class GeneralSummaryTab:
     def render(df, fecha_seleccionada=None):
         """Renderizar la pestaña de resumen general"""
         st.header("Resumen General")
-
-        # Sección explorable: qué es la ICE, sus componentes/categorías y el
-        # conteo de indicadores medidos. Se muestra siempre, incluso sin datos.
-        GeneralSummaryTab._render_ice_overview(df)
 
         try:
             if df.empty:
@@ -103,7 +213,17 @@ class GeneralSummaryTab:
                     )
                 except Exception as e:
                     st.error(f"Error en radar: {e}")
-            
+
+            # Evolución histórica del ICE (semestral, con el último valor de cada
+            # indicador disponible en o antes de cada fecha de corte)
+            st.subheader("Evolución Histórica del ICE")
+            try:
+                df_ice_historico = DataProcessor.calculate_ice_historical_series(df)
+                fig_ice_hist = ChartGenerator.ice_historical_evolution_chart(df_ice_historico)
+                st.plotly_chart(fig_ice_hist, width='stretch')
+            except Exception as e:
+                st.error(f"Error en evolución histórica del ICE: {e}")
+
             # Puntajes por componente
             st.subheader("Puntajes por Componente")
             if not puntajes_componente.empty:
@@ -128,63 +248,6 @@ class GeneralSummaryTab:
         except Exception as e:
             st.error(f"Error en resumen general: {e}")
     
-    @staticmethod
-    def _render_ice_overview(df):
-        """Sección explorable: qué es la ICE, componentes/categorías y conteo de indicadores medidos"""
-        try:
-            with st.expander("Explorar: ¿Qué es la ICE? Componentes, categorías e indicadores", expanded=False):
-                st.markdown("### ¿Qué es la ICE?")
-                st.markdown(ICE_QUE_ES)
-
-                st.markdown("### ¿Cómo se mide?")
-                st.markdown(ICE_COMO_SE_MIDE)
-
-                st.markdown("### Los 8 componentes de la ICE")
-                nombres_componentes = [c["nombre"] for c in ICE_COMPONENTS_INFO]
-                comp_tabs = st.tabs(nombres_componentes)
-                for tab, comp in zip(comp_tabs, ICE_COMPONENTS_INFO):
-                    with tab:
-                        st.markdown(comp["descripcion"])
-                        st.table(pd.DataFrame(comp["categorias"]))
-                        st.caption(f"**Fuente y marco normativo:** {comp['fuente']}")
-
-                st.markdown("---")
-                st.markdown("### Indicadores medidos por componente y categoría")
-                try:
-                    if not df.empty and all(c in df.columns for c in ['COD', 'Componente', 'Categoria']):
-                        df_cod = df.dropna(subset=['COD'])
-                        conteo = (
-                            df_cod.dropna(subset=['Componente', 'Categoria'])
-                            .groupby(['Componente', 'Categoria'])['COD']
-                            .nunique()
-                            .reset_index()
-                        )
-                        conteo.columns = ['Componente', 'Categoría', 'N° de indicadores']
-                        conteo = conteo.sort_values(['Componente', 'Categoría']).reset_index(drop=True)
-                        st.dataframe(conteo, width='stretch', height=min(400, 45 + 35 * len(conteo)))
-                        st.caption(f"Total de indicadores únicos medidos: {df_cod['COD'].nunique()}")
-                    else:
-                        st.info("Aún no hay datos suficientes para construir la tabla de indicadores.")
-                except Exception as e:
-                    st.warning(f"No se pudo construir la tabla de indicadores: {e}")
-
-                st.markdown("---")
-                try:
-                    pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resumen.pdf')
-                    with open(pdf_path, 'rb') as f:
-                        resumen_pdf_bytes = f.read()
-                    st.download_button(
-                        label="Descargar PDF resumen de la ICE",
-                        data=resumen_pdf_bytes,
-                        file_name="Resumen_ICE.pdf",
-                        mime="application/pdf",
-                        key="download_resumen_ice_pdf"
-                    )
-                except Exception:
-                    st.caption("El PDF resumen no está disponible en este momento.")
-        except Exception as e:
-            st.error(f"Error al mostrar la sección informativa de la ICE: {e}")
-
     @staticmethod
     def _get_last_update_info(df):
         """Obtener información de la última actualización"""
@@ -1267,7 +1330,7 @@ class TabManager:
             st.session_state.active_tab = "Resumen General"
 
         # Selector de pestañas manual
-        tabs_options = ["Resumen General", "Resumen por Componente", "Evolución", "Gestión de Datos"]
+        tabs_options = ["Resumen General", "¿Qué es la ICE?", "Resumen por Componente", "Evolución", "Gestión de Datos"]
 
         # Usar columnas para hacer el selector más horizontal
         st.markdown("---")
@@ -1288,6 +1351,9 @@ class TabManager:
         # Renderizar contenido según pestaña seleccionada
         if selected_tab == "Resumen General":
             GeneralSummaryTab.render(self.df)
+
+        elif selected_tab == "¿Qué es la ICE?":
+            IceInfoTab.render(self.df)
 
         elif selected_tab == "Resumen por Componente":
             ComponentSummaryTab.render(self.df)

@@ -690,6 +690,86 @@ class DataProcessor:
                    pd.DataFrame({'Categoria': [], 'Puntaje_Ponderado': []}), 0
     
     @staticmethod
+    def _score_as_of(df, fecha_corte):
+        """
+        Puntaje general ICE 'a la fecha de corte': para cada indicador (COD), usa
+        su último valor disponible en o antes de fecha_corte (no el más reciente
+        del dataset completo). Indicadores sin ningún dato hasta esa fecha
+        simplemente no participan del promedio de ese corte.
+        """
+        columnas = ['COD', 'Fecha', 'Valor_Normalizado', 'Peso']
+        if not all(c in df.columns for c in columnas):
+            return None, 0
+
+        df_valido = df.dropna(subset=['COD', 'Fecha', 'Valor_Normalizado'])
+        df_valido = df_valido[df_valido['Fecha'] <= fecha_corte]
+
+        if df_valido.empty:
+            return None, 0
+
+        df_ultimo = (df_valido
+                     .sort_values(['COD', 'Fecha'])
+                     .groupby('COD')
+                     .last()
+                     .reset_index())
+
+        peso = df_ultimo['Peso'].fillna(1.0) if 'Peso' in df_ultimo.columns else pd.Series(1.0, index=df_ultimo.index)
+        peso_total = peso.sum()
+
+        if peso_total > 0:
+            puntaje = (df_ultimo['Valor_Normalizado'] * peso).sum() / peso_total
+        else:
+            puntaje = df_ultimo['Valor_Normalizado'].mean()
+
+        return puntaje, len(df_ultimo)
+
+    @staticmethod
+    def calculate_ice_historical_series(df):
+        """
+        Serie histórica semestral del puntaje general ICE: para cada corte
+        (30-jun y 31-dic de cada año, desde el primer dato disponible hasta hoy),
+        calcula el puntaje usando el último valor de cada indicador en o antes
+        de esa fecha de corte.
+        """
+        try:
+            if df.empty or 'Fecha' not in df.columns:
+                return pd.DataFrame(columns=['Fecha_Corte', 'Puntaje_General', 'N_Indicadores'])
+
+            fechas_validas = df['Fecha'].dropna()
+            if not pd.api.types.is_datetime64_any_dtype(fechas_validas):
+                fechas_validas = pd.to_datetime(fechas_validas, errors='coerce').dropna()
+
+            if fechas_validas.empty:
+                return pd.DataFrame(columns=['Fecha_Corte', 'Puntaje_General', 'N_Indicadores'])
+
+            primera_fecha = fechas_validas.min()
+            hoy = pd.Timestamp.now().normalize()
+
+            # Generar cortes semestrales (30-jun y 31-dic) entre el primer dato y hoy
+            cortes = []
+            for anio in range(primera_fecha.year, hoy.year + 1):
+                for corte in [pd.Timestamp(year=anio, month=6, day=30), pd.Timestamp(year=anio, month=12, day=31)]:
+                    if primera_fecha <= corte <= hoy:
+                        cortes.append(corte)
+            cortes = sorted(set(cortes))
+
+            filas = []
+            for corte in cortes:
+                puntaje, n_indicadores = DataProcessor._score_as_of(df, corte)
+                if puntaje is not None:
+                    filas.append({
+                        'Fecha_Corte': corte,
+                        'Puntaje_General': puntaje,
+                        'N_Indicadores': n_indicadores
+                    })
+
+            return pd.DataFrame(filas)
+
+        except Exception as e:
+            st.warning(f"No se pudo calcular la evolución histórica del ICE: {e}")
+            return pd.DataFrame(columns=['Fecha_Corte', 'Puntaje_General', 'N_Indicadores'])
+
+    @staticmethod
     def _get_latest_values_by_indicator(df):
         """Obtener valores más recientes por indicador"""
         try:
