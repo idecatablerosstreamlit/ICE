@@ -158,7 +158,7 @@ def load_data_with_status_sheets():
         st.error(f"❌ Error al cargar datos: {e}")
         # Retornar datos vacíos para mantener funcionalidad
         empty_df = pd.DataFrame(columns=[
-            'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA',
+            'COMPONENTE PROPUESTO', 'CATEGORÍA',
             'COD', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado'
         ])
         return empty_df, {'source': 'Google Sheets (Error)', 'connection_info': {'connected': False}}, None

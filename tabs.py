@@ -131,56 +131,59 @@ class GeneralSummaryTab:
     @staticmethod
     def _render_ice_overview(df):
         """Sección explorable: qué es la ICE, componentes/categorías y conteo de indicadores medidos"""
-        with st.expander("Explorar: ¿Qué es la ICE? Componentes, categorías e indicadores", expanded=False):
-            st.markdown("### ¿Qué es la ICE?")
-            st.markdown(ICE_QUE_ES)
+        try:
+            with st.expander("Explorar: ¿Qué es la ICE? Componentes, categorías e indicadores", expanded=False):
+                st.markdown("### ¿Qué es la ICE?")
+                st.markdown(ICE_QUE_ES)
 
-            st.markdown("### ¿Cómo se mide?")
-            st.markdown(ICE_COMO_SE_MIDE)
+                st.markdown("### ¿Cómo se mide?")
+                st.markdown(ICE_COMO_SE_MIDE)
 
-            st.markdown("### Los 8 componentes de la ICE")
-            nombres_componentes = [c["nombre"] for c in ICE_COMPONENTS_INFO]
-            comp_tabs = st.tabs(nombres_componentes)
-            for tab, comp in zip(comp_tabs, ICE_COMPONENTS_INFO):
-                with tab:
-                    st.markdown(comp["descripcion"])
-                    st.table(pd.DataFrame(comp["categorias"]))
-                    st.caption(f"**Fuente y marco normativo:** {comp['fuente']}")
+                st.markdown("### Los 8 componentes de la ICE")
+                nombres_componentes = [c["nombre"] for c in ICE_COMPONENTS_INFO]
+                comp_tabs = st.tabs(nombres_componentes)
+                for tab, comp in zip(comp_tabs, ICE_COMPONENTS_INFO):
+                    with tab:
+                        st.markdown(comp["descripcion"])
+                        st.table(pd.DataFrame(comp["categorias"]))
+                        st.caption(f"**Fuente y marco normativo:** {comp['fuente']}")
 
-            st.markdown("---")
-            st.markdown("### Indicadores medidos por componente y categoría")
-            try:
-                if not df.empty and all(c in df.columns for c in ['COD', 'Componente', 'Categoria']):
-                    df_cod = df.dropna(subset=['COD'])
-                    conteo = (
-                        df_cod.dropna(subset=['Componente', 'Categoria'])
-                        .groupby(['Componente', 'Categoria'])['COD']
-                        .nunique()
-                        .reset_index()
+                st.markdown("---")
+                st.markdown("### Indicadores medidos por componente y categoría")
+                try:
+                    if not df.empty and all(c in df.columns for c in ['COD', 'Componente', 'Categoria']):
+                        df_cod = df.dropna(subset=['COD'])
+                        conteo = (
+                            df_cod.dropna(subset=['Componente', 'Categoria'])
+                            .groupby(['Componente', 'Categoria'])['COD']
+                            .nunique()
+                            .reset_index()
+                        )
+                        conteo.columns = ['Componente', 'Categoría', 'N° de indicadores']
+                        conteo = conteo.sort_values(['Componente', 'Categoría']).reset_index(drop=True)
+                        st.dataframe(conteo, width='stretch', height=min(400, 45 + 35 * len(conteo)))
+                        st.caption(f"Total de indicadores únicos medidos: {df_cod['COD'].nunique()}")
+                    else:
+                        st.info("Aún no hay datos suficientes para construir la tabla de indicadores.")
+                except Exception as e:
+                    st.warning(f"No se pudo construir la tabla de indicadores: {e}")
+
+                st.markdown("---")
+                try:
+                    pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resumen.pdf')
+                    with open(pdf_path, 'rb') as f:
+                        resumen_pdf_bytes = f.read()
+                    st.download_button(
+                        label="Descargar PDF resumen de la ICE",
+                        data=resumen_pdf_bytes,
+                        file_name="Resumen_ICE.pdf",
+                        mime="application/pdf",
+                        key="download_resumen_ice_pdf"
                     )
-                    conteo.columns = ['Componente', 'Categoría', 'N° de indicadores']
-                    conteo = conteo.sort_values(['Componente', 'Categoría']).reset_index(drop=True)
-                    st.dataframe(conteo, width='stretch', height=min(400, 45 + 35 * len(conteo)))
-                    st.caption(f"Total de indicadores únicos medidos: {df_cod['COD'].nunique()}")
-                else:
-                    st.info("Aún no hay datos suficientes para construir la tabla de indicadores.")
-            except Exception as e:
-                st.warning(f"No se pudo construir la tabla de indicadores: {e}")
-
-            st.markdown("---")
-            try:
-                pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resumen.pdf')
-                with open(pdf_path, 'rb') as f:
-                    resumen_pdf_bytes = f.read()
-                st.download_button(
-                    label="Descargar PDF resumen de la ICE",
-                    data=resumen_pdf_bytes,
-                    file_name="Resumen_ICE.pdf",
-                    mime="application/pdf",
-                    key="download_resumen_ice_pdf"
-                )
-            except FileNotFoundError:
-                pass
+                except Exception:
+                    st.caption("El PDF resumen no está disponible en este momento.")
+        except Exception as e:
+            st.error(f"Error al mostrar la sección informativa de la ICE: {e}")
 
     @staticmethod
     def _get_last_update_info(df):
@@ -443,7 +446,7 @@ class EvolutionTab:
             if len(datos_indicador) > 1:
                 col1, col2, col3, col4 = st.columns(4)
 
-                valor_col = 'Valor_Normalizado' if 'Valor_Normalizado' in datos_indicador.columns else 'Valor'
+                valor_col = 'Valor_Recalculado' if 'Valor_Recalculado' in datos_indicador.columns else 'Valor'
 
                 # Usar el primer y último período con dato real; los períodos sin
                 # reporte quedan como NaN y no deben tomarse como "Valor Inicial"/"Actual" = 0.
@@ -454,14 +457,14 @@ class EvolutionTab:
                     valor_actual = valores_validos.iloc[-1]
 
                     with col1:
-                        st.metric("Valor Inicial", f"{valor_inicial:.3f}")
+                        st.metric("Valor Inicial", f"{valor_inicial:,.2f}")
 
                     with col2:
-                        st.metric("Valor Actual", f"{valor_actual:.3f}")
+                        st.metric("Valor Actual", f"{valor_actual:,.2f}")
 
                     with col3:
                         cambio = valor_actual - valor_inicial
-                        st.metric("Cambio Total", f"{cambio:+.3f}")
+                        st.metric("Cambio Total", f"{cambio:+,.2f}")
 
                     with col4:
                         if valor_inicial != 0:
@@ -875,12 +878,7 @@ class EditTab:
                     "Categoría",
                     placeholder="Ej: 01. Disponibilidad"
                 )
-                
-                nueva_linea = st.text_input(
-                    "Línea de Acción",
-                    placeholder="Ej: LA.2.3."
-                )
-                
+
                 if nuevo_tipo in INDICATOR_TYPES:
                     tipo_info = INDICATOR_TYPES[nuevo_tipo]
                     st.info(f"**{nuevo_tipo.title()}:** {tipo_info['description']}")
@@ -896,7 +894,7 @@ class EditTab:
             
             if submitted:
                 if EditTab._validate_and_create_indicator(
-                    df, nuevo_codigo, nuevo_indicador, nueva_categoria, nueva_linea,
+                    df, nuevo_codigo, nuevo_indicador, nueva_categoria,
                     nuevo_componente, nuevo_tipo, primer_valor, primera_fecha
                 ):
                     st.success("✅ Indicador creado exitosamente")
@@ -904,7 +902,7 @@ class EditTab:
                     st.rerun()
     
     @staticmethod
-    def _validate_and_create_indicator(df, codigo, indicador, categoria, linea, componente, tipo, valor, fecha):
+    def _validate_and_create_indicator(df, codigo, indicador, categoria, componente, tipo, valor, fecha):
         """Validar y crear indicador"""
         if not codigo.strip():
             st.error("El código es obligatorio")
@@ -927,7 +925,6 @@ class EditTab:
             sheets_manager = GoogleSheetsManager()
             
             data_dict = {
-                'LINEA DE ACCIÓN': linea.strip(),
                 'COMPONENTE PROPUESTO': componente,
                 'CATEGORÍA': categoria.strip(),
                 'COD': codigo.strip(),

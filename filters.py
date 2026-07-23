@@ -24,10 +24,7 @@ class FilterManager:
         
         # Filtro de categorías (dependiente del componente)
         self._create_category_filter()
-        
-        # Filtro de línea de acción
-        self._create_action_line_filter()
-        
+
         return self.filters
     
     def _create_date_filter(self):
@@ -84,41 +81,6 @@ class FilterManager:
             st.sidebar.warning(f"Error al cargar categorías: {e}")
             self.filters['categoria'] = None
     
-    def _create_action_line_filter(self):
-        """Crear filtro de línea de acción"""
-        try:
-            # Filtrar líneas de acción basado en selecciones previas
-            df_temp = self.df.copy()
-            
-            if self.filters.get('componente'):
-                df_temp = df_temp[df_temp['Componente'] == self.filters['componente']]
-            
-            if self.filters.get('categoria'):
-                df_temp = df_temp[df_temp['Categoria'] == self.filters['categoria']]
-            
-            # Filtrar valores NaN y vacíos antes de ordenar
-            lineas_accion_series = df_temp['Linea_Accion'].dropna()
-            lineas_accion_filtradas = lineas_accion_series[lineas_accion_series != ''].unique()
-            
-            # Convertir a lista y ordenar solo si hay elementos válidos
-            if len(lineas_accion_filtradas) > 0:
-                lineas_accion = sorted([str(x) for x in lineas_accion_filtradas if pd.notna(x)])
-            else:
-                lineas_accion = []
-            
-            linea_accion_seleccionada = st.sidebar.selectbox(
-                "Línea de Acción", 
-                ["Todas"] + list(lineas_accion)
-            )
-            
-            if linea_accion_seleccionada == "Todas":
-                self.filters['linea_accion'] = None
-            else:
-                self.filters['linea_accion'] = linea_accion_seleccionada
-        except Exception as e:
-            st.sidebar.warning(f"Error al cargar líneas de acción: {e}")
-            self.filters['linea_accion'] = None
-    
     def apply_filters(self, df):
         """Aplicar filtros al DataFrame"""
         df_filtrado = df.copy()
@@ -131,14 +93,7 @@ class FilterManager:
         
         if self.filters.get('categoria'):
             df_filtrado = df_filtrado[df_filtrado['Categoria'] == self.filters['categoria']]
-        
-        if self.filters.get('linea_accion'):
-            # Manejo seguro de la comparación incluyendo valores NaN
-            df_filtrado = df_filtrado[
-                (df_filtrado['Linea_Accion'] == self.filters['linea_accion']) |
-                (df_filtrado['Linea_Accion'].fillna('') == self.filters['linea_accion'])
-            ]
-        
+
         return df_filtrado
     
     def get_filter_info(self):

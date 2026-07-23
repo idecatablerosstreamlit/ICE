@@ -507,7 +507,7 @@ EXCEL_FILENAME = "Batería de indicadores.xlsx"
 GOOGLE_SHEETS_CONFIG = {
     'worksheet_name': 'IndicadoresICE',
     'required_columns': [
-        'LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA', 
+        'COMPONENTE PROPUESTO', 'CATEGORÍA',
         'COD', 'Nombre de indicador', 'Valor', 'Fecha', 'Tipo'
     ],
     'cache_ttl_seconds': 30,
@@ -578,8 +578,7 @@ spreadsheet_url = "https://docs.google.com/spreadsheets/d/TU_SPREADSHEET_ID/edit
 
 ### 4. Estructura de la hoja:
 La hoja debe tener estas columnas en la **primera fila**:
-- `LINEA DE ACCIÓN`
-- `COMPONENTE PROPUESTO`  
+- `COMPONENTE PROPUESTO`
 - `CATEGORÍA`
 - `COD`
 - `Nombre de indicador`
@@ -643,7 +642,6 @@ def show_setup_instructions():
     st.subheader("📊 Ejemplo de estructura de Google Sheets:")
     
     example_data = {
-        'LINEA DE ACCIÓN': ['LA.2.3.', 'N.A.', 'L.A.4.3'],
         'COMPONENTE PROPUESTO': ['Datos', 'Seguridad e interoperabilidad', 'Gobernanza y estratégia'],
         'CATEGORÍA': ['01. Disponibilidad', '01. Interoperabilidad', '02. Financiación'],
         'COD': ['D01-1', 'S01-1', 'G02-3'],

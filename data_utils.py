@@ -152,7 +152,7 @@ class DataLoader:
     def _create_empty_dataframe(self):
         """Crear DataFrame vacío"""
         return pd.DataFrame(columns=[
-            'Linea_Accion', 'Componente', 'Categoria',
+            'Componente', 'Categoria',
             'COD', 'Indicador', 'Valor', 'Fecha', 'Meta', 'Peso', 'Tipo', 'Valor_Normalizado', 'Valor_Recalculado'
         ])
     
@@ -746,7 +746,6 @@ class DataEditor:
             
             # Preparar datos
             data_dict = {
-                'LINEA DE ACCIÓN': indicador_base.get('Linea_Accion', ''),
                 'COMPONENTE PROPUESTO': indicador_base.get('Componente', ''),
                 'CATEGORÍA': indicador_base.get('Categoria', ''),
                 'COD': codigo,

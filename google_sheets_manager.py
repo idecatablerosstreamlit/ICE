@@ -95,7 +95,7 @@ class GoogleSheetsManager:
                 )
                 # Agregar headers
                 headers = [
-                    "LINEA DE ACCIÓN", "COMPONENTE PROPUESTO", "CATEGORÍA", 
+                    "COMPONENTE PROPUESTO", "CATEGORÍA", 
                     "COD", "Nombre de indicador", "Valor", "Fecha", "Tipo"
                 ]
                 self.worksheet.append_row(headers)
@@ -168,7 +168,7 @@ class GoogleSheetsManager:
                 if not data:
                     st.info("📋 Google Sheets está vacío")
                     return pd.DataFrame(columns=[
-                        "LINEA DE ACCIÓN", "COMPONENTE PROPUESTO", "CATEGORÍA", 
+                        "COMPONENTE PROPUESTO", "CATEGORÍA", 
                         "COD", "Nombre de indicador", "Valor", "Fecha", "Tipo"
                     ])
                 
@@ -245,7 +245,7 @@ class GoogleSheetsManager:
         """
         NUEVO: Cargar datos combinados de IndicadoresICE y Fichas
         Hace JOIN entre ambas tablas usando COD/Codigo
-        Los metadatos (componente, categoría, línea de acción, tipo) vienen de Fichas
+        Los metadatos (componente, categoría, tipo) vienen de Fichas
         Los valores y fechas vienen de IndicadoresICE
         """
         try:
@@ -280,7 +280,7 @@ class GoogleSheetsManager:
             df_fichas['COD_clean'] = df_fichas['COD'].astype(str).str.strip()
 
             # Seleccionar columnas relevantes de Fichas
-            fichas_cols = ['COD_clean', 'LINEA DE ACCIÓN', 'Componente', 'Categoría',
+            fichas_cols = ['COD_clean', 'Componente', 'Categoría',
                           'Tipo_Indicador', 'Nombre_Indicador', 'Meta', 'Peso', 'VPN',
                           'Definicion', 'Unidad_Medida', 'Metodologia_Calculo', 'Calculo']
 
@@ -312,7 +312,6 @@ class GoogleSheetsManager:
 
             # Normalizar nombres de columnas después del merge
             rename_map = {
-                'Linea_Accion': 'LINEA DE ACCIÓN',
                 'Componente': 'COMPONENTE PROPUESTO',
                 'Categoria': 'Categoría',
                 'Código': 'COD',
@@ -325,7 +324,7 @@ class GoogleSheetsManager:
             # Priorizar metadatos de Fichas sobre IndicadoresICE
             # Si existe el valor en Fichas, usarlo; si no, mantener el de IndicadoresICE
 
-            for col in ['LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'Categoría', 'Tipo']:
+            for col in ['COMPONENTE PROPUESTO', 'Categoría', 'Tipo']:
                 if col in df_combined.columns:
                     # Si tenemos columna duplicada (_ind y _ficha), usar _ficha cuando esté disponible
                     col_ind = f"{col}_ind"
@@ -360,7 +359,7 @@ class GoogleSheetsManager:
                 df_combined = df_combined.rename(columns={'Categoría': 'CATEGORÍA'})
 
             # Reordenar columnas al formato esperado
-            expected_cols = ['LINEA DE ACCIÓN', 'COMPONENTE PROPUESTO', 'CATEGORÍA',
+            expected_cols = ['COMPONENTE PROPUESTO', 'CATEGORÍA',
                            'COD', 'Indicador', 'Tipo', 'Valor', 'Fecha']
 
             # Mantener solo las columnas que existen
@@ -375,8 +374,7 @@ class GoogleSheetsManager:
             # ✅ NORMALIZAR nombres de columnas para compatibilidad con calculate_scores
             column_standardization = {
                 'COMPONENTE PROPUESTO': 'Componente',
-                'CATEGORÍA': 'Categoria',
-                'LINEA DE ACCIÓN': 'Linea_Accion'
+                'CATEGORÍA': 'Categoria'
             }
 
             for original, standard in column_standardization.items():
@@ -520,7 +518,7 @@ class GoogleSheetsManager:
             headers = self.worksheet.row_values(1)
             if not headers:
                 headers = [
-                    "LINEA DE ACCIÓN", "COMPONENTE PROPUESTO", "CATEGORÍA", 
+                    "COMPONENTE PROPUESTO", "CATEGORÍA", 
                     "COD", "Nombre de indicador", "Valor", "Fecha", "Tipo"
                 ]
                 self.worksheet.append_row(headers)

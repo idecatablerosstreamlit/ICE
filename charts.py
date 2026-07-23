@@ -213,66 +213,87 @@ class ChartGenerator:
             
             # Preparar datos para el gráfico
             if indicador:
-                # Gráfico de un indicador específico
+                # Gráfico de un indicador específico: usar el valor recalculado
+                # (valor real, ajustado por IPC cuando aplica), no el normalizado 0-1
+                valor_col = 'Valor_Recalculado' if 'Valor_Recalculado' in df_filtered.columns else 'Valor'
                 df_plot = df_filtered.sort_values('Fecha')
-                
+
                 if tipo_grafico == "Línea":
                     fig = px.line(
-                        df_plot, 
-                        x='Fecha', 
-                        y='Valor_Normalizado',
+                        df_plot,
+                        x='Fecha',
+                        y=valor_col,
                         title=f"Evolución: {indicador}",
                         markers=True
                     )
                 else:  # Barras
                     fig = px.bar(
-                        df_plot, 
-                        x='Fecha', 
-                        y='Valor_Normalizado',
+                        df_plot,
+                        x='Fecha',
+                        y=valor_col,
                         title=f"Evolución: {indicador}"
                     )
-                
+
                 fig.update_traces(line=dict(color='#003A5B'), marker=dict(color='#003A5B'))
-                
+
+                # Línea de meta: el valor real de Meta del indicador (no un 100% fijo)
+                if mostrar_meta and 'Meta' in df_plot.columns:
+                    meta_valor = df_plot['Meta'].dropna()
+                    if not meta_valor.empty and meta_valor.iloc[0] > 0:
+                        fig.add_hline(
+                            y=meta_valor.iloc[0],
+                            line_dash="dash",
+                            line_color="#E3192F",
+                            annotation_text=f"Meta: {meta_valor.iloc[0]:,.2f}"
+                        )
+
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    xaxis_title="Fecha",
+                    yaxis_title="Valor"
+                )
+
             else:
-                # Gráfico de evolución general (promedio)
+                # Gráfico de evolución general/por componente (promedio del puntaje normalizado
+                # entre indicadores): mantiene la escala 0-1 porque agrega indicadores con
+                # unidades distintas, donde el valor recalculado no es comparable.
                 df_grouped = df_filtered.groupby('Fecha')['Valor_Normalizado'].mean().reset_index()
-                
+
                 if tipo_grafico == "Línea":
                     fig = px.line(
-                        df_grouped, 
-                        x='Fecha', 
+                        df_grouped,
+                        x='Fecha',
                         y='Valor_Normalizado',
                         title="Evolución General (Promedio)",
                         markers=True
                     )
                 else:  # Barras
                     fig = px.bar(
-                        df_grouped, 
-                        x='Fecha', 
+                        df_grouped,
+                        x='Fecha',
                         y='Valor_Normalizado',
                         title="Evolución General (Promedio)"
                     )
-                
+
                 fig.update_traces(line=dict(color='#7A97A8'), marker=dict(color='#7A97A8'))
-            
-            # Añadir línea de meta si se solicita
-            if mostrar_meta:
-                fig.add_hline(
-                    y=1.0,
-                    line_dash="dash",
-                    line_color="#E3192F",
-                    annotation_text="Meta (100%)"
+
+                if mostrar_meta:
+                    fig.add_hline(
+                        y=1.0,
+                        line_dash="dash",
+                        line_color="#E3192F",
+                        annotation_text="Meta (100%)"
+                    )
+
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    yaxis=dict(tickformat='.0%', range=[0, 1.1]),
+                    xaxis_title="Fecha",
+                    yaxis_title="Valor Normalizado"
                 )
-            
-            fig.update_layout(
-                height=400,
-                margin=dict(l=20, r=20, t=40, b=20),
-                yaxis=dict(tickformat='.0%', range=[0, 1.1]),
-                xaxis_title="Fecha",
-                yaxis_title="Valor Normalizado"
-            )
-            
+
             return fig
             
         except Exception as e:
