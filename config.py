@@ -34,6 +34,137 @@ IDECA_PERFORMANCE_SCALE = {
 IDECA_FONT = "Nunito Sans"
 IDECA_FONT_CSS = f"'{IDECA_FONT}', 'Source Sans Pro', sans-serif"
 
+# ============================================================
+# CONTENIDO DE REFERENCIA: ¿QUÉ ES LA ICE? COMPONENTES Y CATEGORÍAS
+# Basado en el documento "ICE — Infraestructura de Conocimiento Espacial:
+# Definiciones, componentes, categorías y marco normativo" (Resumen.pdf, IDECA 2025)
+# ============================================================
+ICE_QUE_ES = """
+La **Infraestructura de Conocimiento Espacial (ICE)** es la evolución de la tradicional Infraestructura
+de Datos Espaciales (IDE): no se limita a gestionar técnicamente los datos geográficos, sino que busca
+convertirlos en conocimiento útil para tomar decisiones, innovar, planear el territorio y facilitar la
+participación ciudadana.
+
+En otras palabras: la IDE se encarga de que los datos existan, estén disponibles y sean de calidad. La
+ICE va un paso más allá y pregunta qué tanto esos datos se están usando realmente para generar valor
+público en la ciudad.
+
+Esta evolución responde a la misión de IDECA (facilitar el descubrimiento, acceso, interoperabilidad y
+reutilización de la información geoespacial de forma colaborativa) y a su visión 2033: ser una
+infraestructura de conocimiento geoespacial que soporte la transformación de Bogotá hacia un territorio
+inteligente y sostenible.
+"""
+
+ICE_COMO_SE_MIDE = """
+El modelo ICE organiza el seguimiento en tres niveles, de lo más general a lo más específico:
+
+- **Componentes:** las 8 grandes dimensiones de la infraestructura (gobernanza, datos, interoperabilidad, etc.).
+- **Categorías:** subtemas dentro de cada componente (por ejemplo, dentro de "Datos": disponibilidad, datos básicos y calidad).
+- **Indicadores:** las métricas específicas que se calculan y consolidan hacia arriba, hasta llegar a un puntaje único (Índice General ICE) entre 0 y 1.
+
+Cada indicador tiene su propia ficha metodológica (definición, fórmula, fuente y responsable), y los
+puntajes se calculan como un promedio ponderado que sube desde los indicadores hasta las categorías,
+los componentes y finalmente el índice general.
+
+De acuerdo con el Decreto Nacional 1389 de 2022 y el Decreto Distrital 575 de 2023, la infraestructura
+de datos del Distrito (y por tanto la ICE) se organiza en los siguientes 8 componentes.
+"""
+
+# Lista de los 8 componentes: nombre, descripción, categorías (nombre + qué mide) y fuente normativa
+ICE_COMPONENTS_INFO = [
+    {
+        "nombre": "1. Gobernanza de la Infraestructura de Datos",
+        "descripcion": "Es el conjunto de reglas, roles y espacios de coordinación que permiten que las "
+                        "entidades del Distrito trabajen juntas para gestionar los datos geográficos de "
+                        "forma ordenada, confiable y con responsabilidades claras. Define quién decide, "
+                        "quién ejecuta y quién es responsable de cada dato.",
+        "categorias": [
+            {"Categoría": "Condiciones iniciales y normativa", "Qué mide": "Marco jurídico e institucional que habilita la operación de la infraestructura de datos."},
+            {"Categoría": "Financiación", "Qué mide": "Recursos presupuestales que garantizan la sostenibilidad de la infraestructura en el tiempo."},
+            {"Categoría": "Planeación y participación", "Qué mide": "Formulación estratégica y articulación con entidades públicas, privadas y ciudadanía."},
+            {"Categoría": "Comunicaciones", "Qué mide": "Divulgación y posicionamiento de la infraestructura de datos como un bien público."},
+            {"Categoría": "Seguimiento y evaluación", "Qué mide": "Monitoreo del desempeño, impacto y cumplimiento de metas."},
+        ],
+        "fuente": "Decreto Nacional 1389 de 2022 (MinTIC), Decreto Distrital 575 de 2023 y Decreto 608 de 2022 (IDECA)."
+    },
+    {
+        "nombre": "2. Generación de capacidades",
+        "descripcion": "Se refiere a fortalecer las habilidades de las personas y las entidades para que "
+                        "puedan implementar, operar y sostener la infraestructura de datos por sí mismas: "
+                        "formación, transferencia de conocimiento e investigación aplicada.",
+        "categorias": [
+            {"Categoría": "Fortalecimiento de capacidades", "Qué mide": "Desarrollo de competencias técnicas e institucionales para gestionar y usar datos geoespaciales."},
+            {"Categoría": "Educación", "Qué mide": "Inclusión de contenidos sobre datos abiertos y geografía digital en procesos formativos."},
+            {"Categoría": "I+D+i", "Qué mide": "Investigación, desarrollo e innovación aplicados a datos geoespaciales."},
+        ],
+        "fuente": "Plan Nacional de Infraestructura de Datos (PNID, Resolución MinTIC 460 de 2022) y Plan Estratégico IDECA 2024–2033."
+    },
+    {
+        "nombre": "3. Datos",
+        "descripcion": "Es el núcleo de todo el sistema: la información geográfica que producen las "
+                        "entidades del Distrito (mapas, catastro, límites administrativos, etc.), que debe "
+                        "estar disponible, actualizada y ser confiable para poder usarse con seguridad.",
+        "categorias": [
+            {"Categoría": "Disponibilidad", "Qué mide": "Acceso oportuno y abierto a los datos, conforme a principios internacionales (FAIR)."},
+            {"Categoría": "Datos básicos", "Qué mide": "Conjuntos de datos esenciales para el funcionamiento del Distrito, como el mapa de referencia o el catastro."},
+            {"Categoría": "Calidad", "Qué mide": "Precisión, completitud, coherencia y actualidad de los datos geográficos."},
+        ],
+        "fuente": "Decreto Distrital 575 de 2023 y principios internacionales de datos abiertos FAIR."
+    },
+    {
+        "nombre": "4. Interoperabilidad",
+        "descripcion": "Es la capacidad de que los sistemas de distintas entidades se 'entiendan entre sí' "
+                        "e intercambien información de forma automática, segura y estandarizada, sin "
+                        "importar qué tecnología use cada una.",
+        "categorias": [
+            {"Categoría": "Interoperabilidad", "Qué mide": "Capacidad de los sistemas para intercambiar, procesar y reutilizar datos entre plataformas de forma estandarizada."},
+        ],
+        "fuente": "Marco de Interoperabilidad del MinTIC (dominios político-legal, organizacional, semántico y técnico)."
+    },
+    {
+        "nombre": "5. Aprovechamiento de datos",
+        "descripcion": "Es convertir los datos en decisiones: usar la información geográfica para planear "
+                        "mejor la ciudad, identificar patrones y brechas en el territorio, y crear "
+                        "soluciones e innovación pública, no solo publicar datos.",
+        "categorias": [
+            {"Categoría": "Analítica de datos", "Qué mide": "Uso de estadística, geografía e inteligencia artificial para generar conocimiento a partir de los datos."},
+            {"Categoría": "Uso de información de las plataformas", "Qué mide": "Medición del acceso, consulta y reutilización de datos desde los geoportales y servicios web."},
+        ],
+        "fuente": "Marco de Referencia de Arquitectura Empresarial del MinTIC y Política Pública Bogotá Territorio Inteligente 2023–2032 (CONPES Distrital 29 de 2023)."
+    },
+    {
+        "nombre": "6. Seguridad y privacidad",
+        "descripcion": "Es proteger los datos geográficos frente a accesos indebidos, alteraciones o "
+                        "pérdidas, y cuidar los datos personales de las personas, cumpliendo la ley y "
+                        "generando confianza institucional y ciudadana.",
+        "categorias": [
+            {"Categoría": "Seguridad", "Qué mide": "Protocolos de protección, control de acceso y gestión de riesgos sobre los datos y las plataformas."},
+        ],
+        "fuente": "Modelo de Seguridad y Privacidad de la Información (MSPI) del MinTIC, Ley 1581 de 2012 y Ley 1712 de 2014."
+    },
+    {
+        "nombre": "7. Insumos técnicos y tecnológicos",
+        "descripcion": "Son las herramientas, plataformas y estándares tecnológicos (como Mapas Bogotá o "
+                        "el portal de Datos Abiertos) que hacen posible producir, administrar, intercambiar "
+                        "y visualizar la información geográfica.",
+        "categorias": [
+            {"Categoría": "Geoportales y servicios web geoespaciales", "Qué mide": "Plataformas para visualizar, consultar y descargar datos geográficos."},
+            {"Categoría": "Desempeño tecnológico", "Qué mide": "Eficiencia, escalabilidad y disponibilidad de los sistemas que soportan la infraestructura."},
+        ],
+        "fuente": "Plan Nacional de Infraestructura de Datos (PNID), Marco de Referencia de Arquitectura Empresarial del MinTIC y estándares OGC."
+    },
+    {
+        "nombre": "8. Uso y apropiación",
+        "descripcion": "Mide qué tanto las entidades, la ciudadanía, la academia y el sector privado "
+                        "realmente consultan, entienden y se apropian de los datos geográficos que ofrece "
+                        "IDECA, más allá de que estén simplemente disponibles.",
+        "categorias": [
+            {"Categoría": "Interacción con los geoportales IDECA", "Qué mide": "Nivel de participación y aprovechamiento de los datos geográficos por parte de los usuarios."},
+        ],
+        "fuente": "Guía de Uso y Apropiación de TI del MinTIC y principios del Plan Nacional de Infraestructura de Datos (PNID)."
+    },
+]
+
 def configure_page():
     """Configurar la página de Streamlit"""
     st.set_page_config(

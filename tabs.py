@@ -6,9 +6,11 @@ ACTUALIZACIÓN: Ya no usa Excel, ahora usa fichas desde la pestaña "Fichas" de 
 import streamlit as st
 import pandas as pd
 import time
+import os
 from charts import ChartGenerator, MetricsDisplay
 from data_utils import DataProcessor, DataEditor
 from filters import EvolutionFilters
+from config import ICE_QUE_ES, ICE_COMO_SE_MIDE, ICE_COMPONENTS_INFO
 from datetime import datetime
 
 # Importar el sistema de autenticación
@@ -35,7 +37,11 @@ class GeneralSummaryTab:
     def render(df, fecha_seleccionada=None):
         """Renderizar la pestaña de resumen general"""
         st.header("Resumen General")
-        
+
+        # Sección explorable: qué es la ICE, sus componentes/categorías y el
+        # conteo de indicadores medidos. Se muestra siempre, incluso sin datos.
+        GeneralSummaryTab._render_ice_overview(df)
+
         try:
             if df.empty:
                 st.info("Google Sheets está vacío. Puedes agregar datos en la pestaña 'Gestión de Datos'")
@@ -122,6 +128,60 @@ class GeneralSummaryTab:
         except Exception as e:
             st.error(f"Error en resumen general: {e}")
     
+    @staticmethod
+    def _render_ice_overview(df):
+        """Sección explorable: qué es la ICE, componentes/categorías y conteo de indicadores medidos"""
+        with st.expander("Explorar: ¿Qué es la ICE? Componentes, categorías e indicadores", expanded=False):
+            st.markdown("### ¿Qué es la ICE?")
+            st.markdown(ICE_QUE_ES)
+
+            st.markdown("### ¿Cómo se mide?")
+            st.markdown(ICE_COMO_SE_MIDE)
+
+            st.markdown("### Los 8 componentes de la ICE")
+            nombres_componentes = [c["nombre"] for c in ICE_COMPONENTS_INFO]
+            comp_tabs = st.tabs(nombres_componentes)
+            for tab, comp in zip(comp_tabs, ICE_COMPONENTS_INFO):
+                with tab:
+                    st.markdown(comp["descripcion"])
+                    st.table(pd.DataFrame(comp["categorias"]))
+                    st.caption(f"**Fuente y marco normativo:** {comp['fuente']}")
+
+            st.markdown("---")
+            st.markdown("### Indicadores medidos por componente y categoría")
+            try:
+                if not df.empty and all(c in df.columns for c in ['COD', 'Componente', 'Categoria']):
+                    df_cod = df.dropna(subset=['COD'])
+                    conteo = (
+                        df_cod.dropna(subset=['Componente', 'Categoria'])
+                        .groupby(['Componente', 'Categoria'])['COD']
+                        .nunique()
+                        .reset_index()
+                    )
+                    conteo.columns = ['Componente', 'Categoría', 'N° de indicadores']
+                    conteo = conteo.sort_values(['Componente', 'Categoría']).reset_index(drop=True)
+                    st.dataframe(conteo, width='stretch', height=min(400, 45 + 35 * len(conteo)))
+                    st.caption(f"Total de indicadores únicos medidos: {df_cod['COD'].nunique()}")
+                else:
+                    st.info("Aún no hay datos suficientes para construir la tabla de indicadores.")
+            except Exception as e:
+                st.warning(f"No se pudo construir la tabla de indicadores: {e}")
+
+            st.markdown("---")
+            try:
+                pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resumen.pdf')
+                with open(pdf_path, 'rb') as f:
+                    resumen_pdf_bytes = f.read()
+                st.download_button(
+                    label="Descargar PDF resumen de la ICE",
+                    data=resumen_pdf_bytes,
+                    file_name="Resumen_ICE.pdf",
+                    mime="application/pdf",
+                    key="download_resumen_ice_pdf"
+                )
+            except FileNotFoundError:
+                pass
+
     @staticmethod
     def _get_last_update_info(df):
         """Obtener información de la última actualización"""
@@ -385,22 +445,32 @@ class EvolutionTab:
 
                 valor_col = 'Valor_Normalizado' if 'Valor_Normalizado' in datos_indicador.columns else 'Valor'
 
-                with col1:
-                    valor_inicial = datos_indicador.iloc[0][valor_col]
-                    st.metric("Valor Inicial", f"{valor_inicial:.3f}")
+                # Usar el primer y último período con dato real; los períodos sin
+                # reporte quedan como NaN y no deben tomarse como "Valor Inicial"/"Actual" = 0.
+                valores_validos = datos_indicador[valor_col].dropna()
 
-                with col2:
-                    valor_actual = datos_indicador.iloc[-1][valor_col]
-                    st.metric("Valor Actual", f"{valor_actual:.3f}")
+                if not valores_validos.empty:
+                    valor_inicial = valores_validos.iloc[0]
+                    valor_actual = valores_validos.iloc[-1]
 
-                with col3:
-                    cambio = valor_actual - valor_inicial
-                    st.metric("Cambio Total", f"{cambio:+.3f}")
+                    with col1:
+                        st.metric("Valor Inicial", f"{valor_inicial:.3f}")
 
-                with col4:
-                    if valor_inicial != 0:
-                        cambio_pct = (cambio / valor_inicial) * 100
-                        st.metric("Cambio %", f"{cambio_pct:+.1f}%")
+                    with col2:
+                        st.metric("Valor Actual", f"{valor_actual:.3f}")
+
+                    with col3:
+                        cambio = valor_actual - valor_inicial
+                        st.metric("Cambio Total", f"{cambio:+.3f}")
+
+                    with col4:
+                        if valor_inicial != 0:
+                            cambio_pct = (cambio / valor_inicial) * 100
+                            st.metric("Cambio %", f"{cambio_pct:+.1f}%")
+                        else:
+                            st.metric("Cambio %", "N/A")
+                else:
+                    st.info("No hay valores reportados para calcular estadísticas.")
 
             # === TABLA DE DATOS HISTÓRICOS ===
             st.subheader("Datos Históricos")

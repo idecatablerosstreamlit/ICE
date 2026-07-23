@@ -267,8 +267,10 @@ class DataLoader:
             if df.empty or 'Valor' not in df.columns or 'Fecha' not in df.columns:
                 return
 
-            # Inicializar valores normalizados
-            df['Valor_Normalizado'] = 0.0
+            # Inicializar valores normalizados como "sin dato" (NaN), no como 0.
+            # Un período sin valor reportado no equivale a un desempeño de 0%;
+            # debe quedar como dato faltante para que las gráficas muestren un vacío, no una caída a cero.
+            df['Valor_Normalizado'] = np.nan
 
             # Verificar que tenemos datos válidos
             valores_validos = df['Valor'].notna()
@@ -337,12 +339,14 @@ class DataLoader:
                         else:
                             # Todos los valores históricos son iguales
                             for index in datos_indicador.index:
-                                df.at[index, 'Valor_Normalizado'] = 0.7
+                                if pd.notna(datos_indicador.loc[index, 'Valor']):
+                                    df.at[index, 'Valor_Normalizado'] = 0.7
 
                     else:
                         # NO tiene Meta y NO hay datos históricos: asignar 0.7
                         for index in datos_indicador.index:
-                            df.at[index, 'Valor_Normalizado'] = 0.7
+                            if pd.notna(datos_indicador.loc[index, 'Valor']):
+                                df.at[index, 'Valor_Normalizado'] = 0.7
 
         except Exception as e:
             # Fallback silencioso
